@@ -1,0 +1,174 @@
+'use client';
+
+import { useUser } from '@/hooks/use-user';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+  LayoutDashboard,
+  Users,
+  UserPlus,
+  CalendarDays,
+  Video,
+  FolderOpen,
+  BarChart3,
+  Bell,
+  LineChart,
+  FileText,
+  HelpCircle,
+  ChevronLeft,
+  Sparkles,
+  Settings,
+} from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+
+const adminNavItems = [
+  { label: 'Overview', href: '/admin', icon: LayoutDashboard },
+  { label: 'Invites', href: '/admin/invites', icon: UserPlus },
+  { label: 'Cohorts', href: '/admin/cohorts', icon: CalendarDays },
+  { label: 'Users', href: '/admin/users', icon: Users },
+  { label: 'Sessions', href: '/admin/sessions', icon: Video },
+  { label: 'Resources', href: '/admin/resources', icon: FolderOpen },
+  { label: 'Attendance', href: '/admin/attendance', icon: BarChart3 },
+  { label: 'Notifications', href: '/admin/notifications', icon: Bell },
+  { label: 'Analytics', href: '/admin/analytics', icon: LineChart },
+  { label: 'Invoices', href: '/admin/invoices', icon: FileText },
+  { label: 'Support', href: '/admin/support', icon: HelpCircle },
+];
+
+export default function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const { profile, isAdmin, loading } = useUser();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (!loading && !isAdmin) {
+      router.push('/dashboard');
+    }
+  }, [loading, isAdmin, router]);
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen">
+        <div className="w-64 border-r bg-sidebar">
+          <div className="p-4">
+            <Skeleton className="h-8 w-32" />
+          </div>
+          <div className="p-4 space-y-2">
+            {[...Array(10)].map((_, i) => (
+              <Skeleton key={i} className="h-10 w-full" />
+            ))}
+          </div>
+        </div>
+        <div className="flex-1 p-8">
+          <Skeleton className="h-8 w-64 mb-6" />
+          <Skeleton className="h-96 w-full" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return null;
+  }
+
+  return (
+    <div className="flex min-h-screen bg-background">
+      {/* Admin Sidebar */}
+      <aside className="w-64 h-screen sticky top-0 flex flex-col bg-sidebar border-r border-sidebar-border">
+        {/* Logo */}
+        <div className="h-16 flex items-center justify-between border-b border-sidebar-border px-4">
+          <Link href="/admin" className="flex items-center gap-3 group">
+            <div className="w-9 h-9 rounded-xl gradient-bg flex items-center justify-center glow-sm group-hover:scale-105 transition-transform">
+              <Sparkles className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <span className="font-semibold gradient-text">Admin</span>
+              <p className="text-xs text-muted-foreground">Control Panel</p>
+            </div>
+          </Link>
+        </div>
+
+        {/* Back to Dashboard */}
+        <Link href="/dashboard">
+          <Button variant="ghost" className="w-full justify-start gap-2 m-2 mt-3" size="sm">
+            <ChevronLeft className="w-4 h-4" />
+            Back to Dashboard
+          </Button>
+        </Link>
+
+        {/* Navigation */}
+        <ScrollArea className="flex-1 px-3 py-4">
+          <nav className="space-y-1">
+            {adminNavItems.map((item) => {
+              const isActive = pathname === item.href;
+              const Icon = item.icon;
+
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200',
+                    isActive
+                      ? 'bg-sidebar-accent text-sidebar-accent-foreground shadow-sm'
+                      : 'text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50'
+                  )}
+                >
+                  <Icon
+                    className={cn(
+                      'w-5 h-5 transition-colors',
+                      isActive ? 'text-primary' : 'text-muted-foreground'
+                    )}
+                  />
+                  <span>{item.label}</span>
+                  {isActive && (
+                    <div className="ml-auto w-1.5 h-1.5 rounded-full bg-primary" />
+                  )}
+                </Link>
+              );
+            })}
+          </nav>
+        </ScrollArea>
+
+        {/* User info */}
+        <div className="px-3 pb-4 border-t border-sidebar-border pt-4">
+          <div className="p-3 rounded-xl bg-sidebar-accent/50 border border-sidebar-border">
+            <div className="flex items-center gap-3">
+              <Avatar className="h-10 w-10">
+                <AvatarImage src={profile?.avatar_url || ''} />
+                <AvatarFallback className="gradient-bg text-white font-medium">
+                  {profile?.full_name?.charAt(0) || profile?.email?.charAt(0)?.toUpperCase() || 'A'}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">
+                  {profile?.full_name || 'Admin'}
+                </p>
+                <p className="text-xs text-muted-foreground capitalize">
+                  {profile?.role}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <main className="flex-1 p-8 overflow-auto">
+        <div className="max-w-7xl mx-auto page-transition">
+          {children}
+        </div>
+      </main>
+    </div>
+  );
+}

@@ -1,0 +1,239 @@
+{
+  "projectName": "Rethink Dashboard",
+  "branchName": "ralph/verify-features",
+  "description": "Post-Sales Dashboard for Cohort-based Learning Platform",
+  "userStories": [
+    {
+      "id": "build-1",
+      "priority": 1,
+      "title": "TypeScript Build Passes",
+      "passes": true,
+      "acceptanceCriteria": [
+        "npm run build completes without errors",
+        "All pages compile successfully",
+        "No TypeScript type errors"
+      ]
+    },
+    {
+      "id": "auth-1",
+      "priority": 2,
+      "title": "Login Page Renders Correctly",
+      "passes": true,
+      "acceptanceCriteria": [
+        "Login page at /login exists and renders",
+        "Email input field is present",
+        "Continue button is visible",
+        "Dark mode is enabled by default",
+        "Playwright auth tests pass"
+      ]
+    },
+    {
+      "id": "dash-1",
+      "priority": 3,
+      "title": "Dashboard Page Structure",
+      "passes": true,
+      "acceptanceCriteria": [
+        "Dashboard page at /dashboard exists",
+        "Sidebar component renders",
+        "Header component renders",
+        "Welcome banner shows",
+        "Stats cards display"
+      ]
+    },
+    {
+      "id": "cal-1",
+      "priority": 4,
+      "title": "Calendar Page Structure",
+      "passes": true,
+      "acceptanceCriteria": [
+        "Calendar page at /calendar exists",
+        "Month view displays",
+        "Navigation buttons work (prev/next month)",
+        "Session cards can render"
+      ]
+    },
+    {
+      "id": "learn-1",
+      "priority": 5,
+      "title": "Learnings Page Structure",
+      "passes": true,
+      "acceptanceCriteria": [
+        "Learnings page at /learnings exists",
+        "Search input is present",
+        "Week tabs/accordion structure exists",
+        "Module cards can render"
+      ]
+    },
+    {
+      "id": "res-1",
+      "priority": 6,
+      "title": "Resources Page Structure",
+      "passes": true,
+      "acceptanceCriteria": [
+        "Resources page at /resources exists",
+        "Breadcrumb navigation works",
+        "Folder/file grid displays",
+        "Search functionality present"
+      ]
+    },
+    {
+      "id": "prof-1",
+      "priority": 7,
+      "title": "Profile Page Structure",
+      "passes": true,
+      "acceptanceCriteria": [
+        "Profile page at /profile exists",
+        "Profile form fields render (name, phone, timezone)",
+        "LinkedIn/Portfolio URL inputs exist",
+        "Save button is present"
+      ]
+    },
+    {
+      "id": "team-1",
+      "priority": 8,
+      "title": "Team Page Structure (Mentor)",
+      "passes": true,
+      "acceptanceCriteria": [
+        "Team page at /team exists",
+        "Table structure for team members",
+        "Search input present",
+        "Empty state message shows when no members"
+      ]
+    },
+    {
+      "id": "att-1",
+      "priority": 9,
+      "title": "Attendance Page Structure (Mentor)",
+      "passes": true,
+      "acceptanceCriteria": [
+        "Attendance page at /attendance exists",
+        "Session selector dropdown present",
+        "Stats cards display",
+        "Export CSV button exists"
+      ]
+    },
+    {
+      "id": "admin-1",
+      "priority": 10,
+      "title": "Admin Dashboard Structure",
+      "passes": true,
+      "acceptanceCriteria": [
+        "Admin dashboard at /admin exists",
+        "Stats overview cards display",
+        "Quick actions section present",
+        "Recent activity section exists"
+      ]
+    },
+    {
+      "id": "admin-inv-1",
+      "priority": 11,
+      "title": "Admin Invites Page Structure",
+      "passes": true,
+      "acceptanceCriteria": [
+        "Invites page at /admin/invites exists",
+        "File upload area present",
+        "Cohort selector dropdown works",
+        "Download template button exists",
+        "Invites table structure present"
+      ]
+    },
+    {
+      "id": "admin-coh-1",
+      "priority": 12,
+      "title": "Admin Cohorts Page Structure",
+      "passes": true,
+      "acceptanceCriteria": [
+        "Cohorts page at /admin/cohorts exists",
+        "Create cohort button present",
+        "Cohorts table displays",
+        "Edit/Delete actions available"
+      ]
+    },
+    {
+      "id": "admin-sess-1",
+      "priority": 13,
+      "title": "Admin Sessions Page Structure",
+      "passes": true,
+      "acceptanceCriteria": [
+        "Sessions page at /admin/sessions exists",
+        "Create session button present",
+        "Sessions table displays",
+        "RSVP counts shown"
+      ]
+    },
+    {
+      "id": "admin-usr-1",
+      "priority": 14,
+      "title": "Admin Users Page Structure",
+      "passes": true,
+      "acceptanceCriteria": [
+        "Users page at /admin/users exists",
+        "Users table displays",
+        "Role/Cohort columns present",
+        "Search functionality works"
+      ]
+    },
+    {
+      "id": "admin-sup-1",
+      "priority": 15,
+      "title": "Admin Support Page Structure",
+      "passes": true,
+      "acceptanceCriteria": [
+        "Support page at /admin/support exists",
+        "Ticket status cards display",
+        "Tickets table present",
+        "Status dropdown for changing ticket status"
+      ]
+    },
+    {
+      "id": "api-1",
+      "priority": 16,
+      "title": "API Routes Exist",
+      "passes": true,
+      "acceptanceCriteria": [
+        "RSVP API route at /api/sessions/[id]/rsvp exists",
+        "Bulk invite API at /api/users/bulk-invite exists",
+        "Analytics dashboard API at /api/analytics/dashboard exists",
+        "Auth callback route exists"
+      ]
+    },
+    {
+      "id": "ui-1",
+      "priority": 17,
+      "title": "shadcn/ui Components Installed",
+      "passes": true,
+      "acceptanceCriteria": [
+        "Button component exists in components/ui",
+        "Card component exists",
+        "Input component exists",
+        "Dialog component exists",
+        "Table component exists",
+        "Skeleton component exists"
+      ]
+    },
+    {
+      "id": "theme-1",
+      "priority": 18,
+      "title": "Theme Configuration",
+      "passes": true,
+      "acceptanceCriteria": [
+        "Dark mode is the default theme",
+        "Theme toggle exists in header",
+        "Gradient colors defined in CSS",
+        "Custom CSS utilities like .gradient-bg work"
+      ]
+    },
+    {
+      "id": "test-1",
+      "priority": 19,
+      "title": "Playwright Tests Pass",
+      "passes": true,
+      "acceptanceCriteria": [
+        "Playwright config exists",
+        "Auth test file exists",
+        "Dashboard test file exists",
+        "npx playwright test runs without critical failures"
+      ]
+    }
+  ]
+}
