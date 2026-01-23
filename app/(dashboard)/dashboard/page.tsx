@@ -38,14 +38,73 @@ export default function DashboardPage() {
       const supabase = getClient();
 
       try {
-        // Fetch cohort info
+        // Fetch all data in parallel for better performance
         if (profile.cohort_id) {
-          const { data: cohort } = await supabase
-            .from('cohorts')
-            .select('*')
-            .eq('id', profile.cohort_id)
-            .single();
+          const [
+            cohortResult,
+            studentsCountResult,
+            attendanceResult,
+            rankingResult,
+            resourcesCountResult,
+            sessionsResult,
+            modulesResult,
+            resourcesResult,
+          ] = await Promise.all([
+            // Fetch cohort info
+            supabase
+              .from('cohorts')
+              .select('*')
+              .eq('id', profile.cohort_id)
+              .single(),
+            // Fetch stats - count all users in cohort
+            supabase
+              .from('profiles')
+              .select('*', { count: 'exact', head: true })
+              .eq('cohort_id', profile.cohort_id),
+            // Fetch attendance
+            supabase
+              .from('attendance')
+              .select('attendance_percentage')
+              .eq('user_id', profile.id),
+            // Fetch ranking
+            supabase
+              .from('rankings')
+              .select('rank')
+              .eq('user_id', profile.id)
+              .eq('cohort_id', profile.cohort_id)
+              .single(),
+            // Fetch total resources count for the cohort
+            supabase
+              .from('resources')
+              .select('*', { count: 'exact', head: true })
+              .eq('cohort_id', profile.cohort_id),
+            // Fetch upcoming sessions
+            supabase
+              .from('sessions')
+              .select('*')
+              .eq('cohort_id', profile.cohort_id)
+              .gte('scheduled_at', new Date().toISOString())
+              .order('scheduled_at', { ascending: true })
+              .limit(3),
+            // Fetch recent learning modules
+            supabase
+              .from('learning_modules')
+              .select('*')
+              .eq('cohort_id', profile.cohort_id)
+              .order('created_at', { ascending: false })
+              .limit(4),
+            // Fetch recent resources
+            supabase
+              .from('resources')
+              .select('*')
+              .eq('cohort_id', profile.cohort_id)
+              .eq('type', 'file')
+              .order('created_at', { ascending: false })
+              .limit(4),
+          ]);
 
+          // Process cohort data
+          const cohort = cohortResult.data;
           if (cohort) {
             setCohortName(cohort.name);
             if (cohort.start_date) {
@@ -53,74 +112,24 @@ export default function DashboardPage() {
             }
           }
 
-          // Fetch stats - count all users in cohort
-          const { count: studentsCount } = await supabase
-            .from('profiles')
-            .select('*', { count: 'exact', head: true })
-            .eq('cohort_id', profile.cohort_id);
-
-          // Fetch attendance
-          const { data: attendance } = await supabase
-            .from('attendance')
-            .select('attendance_percentage')
-            .eq('user_id', profile.id);
-
+          // Calculate average attendance
+          const attendance = attendanceResult.data;
           const avgAttendance = attendance?.length
             ? attendance.reduce((acc: number, a: { attendance_percentage: number | null }) => acc + (a.attendance_percentage || 0), 0) / attendance.length
             : 0;
 
-          // Fetch ranking
-          const { data: ranking } = await supabase
-            .from('rankings')
-            .select('rank')
-            .eq('user_id', profile.id)
-            .eq('cohort_id', profile.cohort_id)
-            .single();
-
-          // Fetch total resources count for the cohort
-          const { count: resourcesCount } = await supabase
-            .from('resources')
-            .select('*', { count: 'exact', head: true })
-            .eq('cohort_id', profile.cohort_id);
-
+          // Set stats
           setStats({
-            total_students: studentsCount || 0,
+            total_students: studentsCountResult.count || 0,
             attendance_percentage: Math.round(avgAttendance),
-            current_rank: ranking?.rank || null,
-            total_resources: resourcesCount || 0,
+            current_rank: rankingResult.data?.rank || null,
+            total_resources: resourcesCountResult.count || 0,
           });
 
-          // Fetch upcoming sessions
-          const { data: sessions } = await supabase
-            .from('sessions')
-            .select('*')
-            .eq('cohort_id', profile.cohort_id)
-            .gte('scheduled_at', new Date().toISOString())
-            .order('scheduled_at', { ascending: true })
-            .limit(3);
-
-          setUpcomingSessions(sessions || []);
-
-          // Fetch recent learning modules
-          const { data: modules } = await supabase
-            .from('learning_modules')
-            .select('*')
-            .eq('cohort_id', profile.cohort_id)
-            .order('created_at', { ascending: false })
-            .limit(4);
-
-          setRecentModules(modules || []);
-
-          // Fetch recent resources
-          const { data: resources } = await supabase
-            .from('resources')
-            .select('*')
-            .eq('cohort_id', profile.cohort_id)
-            .eq('type', 'file')
-            .order('created_at', { ascending: false })
-            .limit(4);
-
-          setRecentResources(resources || []);
+          // Set sessions, modules, and resources
+          setUpcomingSessions(sessionsResult.data || []);
+          setRecentModules(modulesResult.data || []);
+          setRecentResources(resourcesResult.data || []);
         }
       } catch (error) {
         console.error('Error fetching dashboard data:', error);

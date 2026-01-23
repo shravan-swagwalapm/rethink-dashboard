@@ -24,7 +24,7 @@ import {
   LogOut,
   Sparkles,
 } from 'lucide-react';
-import { Skeleton } from '@/components/ui/skeleton';
+import { FullPageLoader } from '@/components/ui/page-loader';
 
 const adminNavItems = [
   { label: 'Overview', href: '/admin', icon: LayoutDashboard },
@@ -57,26 +57,9 @@ export default function AdminLayout({
     }
   }, [loading, profile, isAdmin, router]);
 
-  // Only show loading skeleton while initial auth check is happening
+  // Only show loading while initial auth check is happening
   if (loading) {
-    return (
-      <div className="flex min-h-screen">
-        <div className="w-64 border-r bg-sidebar">
-          <div className="p-4">
-            <Skeleton className="h-8 w-32" />
-          </div>
-          <div className="p-4 space-y-2">
-            {[...Array(10)].map((_, i) => (
-              <Skeleton key={i} className="h-10 w-full" />
-            ))}
-          </div>
-        </div>
-        <div className="flex-1 p-8">
-          <Skeleton className="h-8 w-64 mb-6" />
-          <Skeleton className="h-96 w-full" />
-        </div>
-      </div>
-    );
+    return <FullPageLoader message="Loading admin panel..." />;
   }
 
   // If profile loaded and user is NOT admin, don't render (redirect will happen via useEffect)
