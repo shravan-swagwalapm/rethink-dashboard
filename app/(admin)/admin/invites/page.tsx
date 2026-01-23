@@ -1,8 +1,6 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useUser } from '@/hooks/use-user';
-import { getClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -73,7 +71,6 @@ interface Invite {
 }
 
 export default function InvitesPage() {
-  const { loading: userLoading } = useUser();
   const [invites, setInvites] = useState<Invite[]>([]);
   const [cohorts, setCohorts] = useState<Cohort[]>([]);
   const [loading, setLoading] = useState(true);
@@ -85,24 +82,14 @@ export default function InvitesPage() {
   const [selectedCohort, setSelectedCohort] = useState<string>('');
 
   const fetchData = useCallback(async () => {
-    const supabase = getClient();
-
     try {
-      const [{ data: invitesData }, { data: cohortsData }] = await Promise.all([
-        supabase
-          .from('invites')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(100),
-        supabase
-          .from('cohorts')
-          .select('*')
-          .eq('status', 'active')
-          .order('name', { ascending: true }),
-      ]);
-
-      setInvites(invitesData || []);
-      setCohorts(cohortsData || []);
+      const response = await fetch('/api/admin/invites');
+      if (!response.ok) {
+        throw new Error('Failed to fetch invites');
+      }
+      const data = await response.json();
+      setInvites(data.invites || []);
+      setCohorts(data.cohorts || []);
     } catch (error) {
       console.error('Error fetching data:', error);
       toast.error('Failed to load invites');
@@ -112,10 +99,8 @@ export default function InvitesPage() {
   }, []);
 
   useEffect(() => {
-    if (!userLoading) {
-      fetchData();
-    }
-  }, [userLoading, fetchData]);
+    fetchData();
+  }, [fetchData]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -195,37 +180,38 @@ export default function InvitesPage() {
     }
 
     setSending(true);
-    const supabase = getClient();
-    const { data: { user } } = await supabase.auth.getUser();
 
     try {
-      // Insert invites into database
-      const { data: insertedInvites, error: insertError } = await supabase
-        .from('invites')
-        .insert(
-          validInvites.map(invite => ({
+      // Insert invites via API
+      const response = await fetch('/api/admin/invites', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          invites: validInvites.map(invite => ({
             email: invite.email,
-            full_name: invite.name,
+            name: invite.name,
             phone: invite.phone || null,
             cohort_tag: invite.cohort_tag || selectedCohort || null,
             mentor_email: invite.mentor_email || null,
-            status: 'pending',
-            created_by: user?.id,
-          }))
-        )
-        .select();
+          })),
+        }),
+      });
 
-      if (insertError) throw insertError;
+      if (!response.ok) {
+        throw new Error('Failed to create invites');
+      }
+
+      const insertedInvites = await response.json();
 
       // Trigger email sending via API
-      const response = await fetch('/api/users/bulk-invite', {
+      const emailResponse = await fetch('/api/users/bulk-invite', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ inviteIds: insertedInvites?.map((i: { id: string }) => i.id) }),
       });
 
-      if (!response.ok) {
-        const error = await response.json();
+      if (!emailResponse.ok) {
+        const error = await emailResponse.json();
         throw new Error(error.message || 'Failed to send invites');
       }
 
@@ -242,13 +228,12 @@ export default function InvitesPage() {
   };
 
   const handleResend = async (inviteId: string) => {
-    const supabase = getClient();
-
     try {
-      await supabase
-        .from('invites')
-        .update({ status: 'pending', error_message: null })
-        .eq('id', inviteId);
+      await fetch('/api/admin/invites', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: inviteId, status: 'pending', error_message: null }),
+      });
 
       const response = await fetch('/api/users/bulk-invite', {
         method: 'POST',
@@ -266,10 +251,13 @@ export default function InvitesPage() {
   };
 
   const handleDelete = async (inviteId: string) => {
-    const supabase = getClient();
-
     try {
-      await supabase.from('invites').delete().eq('id', inviteId);
+      const response = await fetch(`/api/admin/invites?id=${inviteId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) throw new Error('Failed to delete');
+
       toast.success('Invite deleted');
       fetchData();
     } catch (error) {
@@ -304,7 +292,7 @@ export default function InvitesPage() {
     }
   };
 
-  if (userLoading || loading) {
+  if (loading) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-8 w-48" />

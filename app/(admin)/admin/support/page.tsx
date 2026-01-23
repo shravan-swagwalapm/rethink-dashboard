@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { getClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -43,15 +42,12 @@ export default function AdminSupportPage() {
   const [selectedTicket, setSelectedTicket] = useState<TicketWithUser | null>(null);
 
   const fetchTickets = useCallback(async () => {
-    const supabase = getClient();
-
     try {
-      const { data, error } = await supabase
-        .from('support_tickets')
-        .select('*, user:profiles(*)')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
+      const response = await fetch('/api/admin/support');
+      if (!response.ok) {
+        throw new Error('Failed to fetch tickets');
+      }
+      const data = await response.json();
       setTickets(data || []);
     } catch (error) {
       console.error('Error fetching tickets:', error);
@@ -66,15 +62,14 @@ export default function AdminSupportPage() {
   }, [fetchTickets]);
 
   const handleStatusChange = async (ticketId: string, newStatus: string) => {
-    const supabase = getClient();
-
     try {
-      const { error } = await supabase
-        .from('support_tickets')
-        .update({ status: newStatus })
-        .eq('id', ticketId);
+      const response = await fetch('/api/admin/support', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: ticketId, status: newStatus }),
+      });
 
-      if (error) throw error;
+      if (!response.ok) throw new Error('Failed to update status');
 
       toast.success('Status updated');
       fetchTickets();

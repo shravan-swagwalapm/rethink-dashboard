@@ -14,7 +14,7 @@ export type TicketStatus = 'open' | 'in_progress' | 'resolved';
 
 export type NotificationType = 'session_reminder' | 'new_resource' | 'system';
 
-export type ResourceType = 'file' | 'folder';
+export type ResourceType = 'file' | 'folder' | 'link';
 
 export type FileType = 'pdf' | 'doc' | 'docx' | 'xls' | 'xlsx' | 'mp4' | 'other';
 
@@ -90,6 +90,7 @@ export interface Resource {
   file_path: string | null;
   file_type: FileType | null;
   file_size: number | null;
+  external_url: string | null;
   parent_id: string | null;
   cohort_id: string | null;
   week_number: number | null;

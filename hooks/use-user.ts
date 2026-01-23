@@ -1,65 +1,55 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { User, AuthChangeEvent, Session } from '@supabase/supabase-js';
 import { getClient } from '@/lib/supabase/client';
 import type { Profile } from '@/types';
-
-// Demo user profile for testing without Supabase
-const DEMO_PROFILE: Profile = {
-  id: 'demo-user-id',
-  email: 'demo@rethink.systems',
-  full_name: 'Demo User',
-  phone: '+91 9876543210',
-  linkedin_url: 'https://linkedin.com/in/demo',
-  portfolio_url: 'https://demo.rethink.systems',
-  timezone: 'Asia/Kolkata',
-  role: 'student',
-  cohort_id: 'demo-cohort-id',
-  mentor_id: null,
-  avatar_url: null,
-  calendly_url: null,
-  calendly_shared: false,
-  created_at: new Date().toISOString(),
-  updated_at: new Date().toISOString(),
-};
 
 export function useUser() {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isDemo, setIsDemo] = useState(false);
+  const loadingCompletedRef = useRef(false);
+  const isMountedRef = useRef(true);
 
   useEffect(() => {
     const supabase = getClient();
+    isMountedRef.current = true;
+    loadingCompletedRef.current = false;
 
-    // Check for demo user first
-    const demoUser = typeof window !== 'undefined' ? localStorage.getItem('demo_user') : null;
-    if (demoUser) {
-      setProfile(DEMO_PROFILE);
-      setIsDemo(true);
-      setLoading(false);
-      return;
-    }
-
-    // Get initial session
-    const getUser = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        setUser(user);
-
-        if (user) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', user.id)
-            .single();
-          setProfile(profile);
-        }
-      } catch (error) {
-        console.error('Error fetching user:', error);
-      } finally {
+    const completeLoading = () => {
+      if (!loadingCompletedRef.current && isMountedRef.current) {
+        loadingCompletedRef.current = true;
+        console.log('useUser: Setting loading to false');
         setLoading(false);
+      }
+    };
+
+    // Safety timeout - ensure loading becomes false within 3000ms max
+    const timeoutId = setTimeout(() => {
+      if (!loadingCompletedRef.current) {
+        console.warn('useUser: Auth check timed out after 3000ms, forcing loading to false');
+        completeLoading();
+      }
+    }, 3000);
+
+    // Get initial session via API (more reliable)
+    const getUser = async () => {
+      console.log('useUser: Starting getUser via API...');
+      try {
+        const response = await fetch('/api/me');
+        const data = await response.json();
+        console.log('useUser: API result:', { user: data.user?.email, profile: data.profile?.full_name });
+
+        if (!isMountedRef.current) return;
+
+        setUser(data.user);
+        setProfile(data.profile);
+      } catch (error) {
+        console.error('useUser: Error fetching user:', error);
+      } finally {
+        clearTimeout(timeoutId);
+        completeLoading();
       }
     };
 
@@ -68,51 +58,73 @@ export function useUser() {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event: AuthChangeEvent, session: Session | null) => {
-        setUser(session?.user ?? null);
+        console.log('useUser: Auth state changed:', _event, session?.user?.email);
+        if (!isMountedRef.current) return;
 
         if (session?.user) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
-          setProfile(profile);
+          // Fetch profile via API when auth state changes
+          console.log('useUser: Fetching profile via API for auth change');
+          try {
+            const response = await fetch('/api/me');
+            const data = await response.json();
+            console.log('useUser: Auth change API result:', { user: data.user?.email, profile: data.profile?.full_name });
+
+            if (!isMountedRef.current) return;
+            setUser(data.user);
+            setProfile(data.profile);
+          } catch (err) {
+            console.error('useUser: Profile fetch error:', err);
+            setUser(session.user);
+            setProfile(null);
+          }
         } else {
+          setUser(null);
           setProfile(null);
         }
 
-        setLoading(false);
+        completeLoading();
       }
     );
 
     return () => {
+      isMountedRef.current = false;
+      clearTimeout(timeoutId);
       subscription.unsubscribe();
     };
   }, []);
 
   const signOut = async () => {
-    // Clear demo user if present
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('demo_user');
+    console.log('useUser.signOut: Starting Supabase sign out...');
+    try {
+      const supabase = getClient();
+      // Use scope: 'global' to sign out from all sessions
+      const { error } = await supabase.auth.signOut({ scope: 'global' });
+      if (error) {
+        console.error('useUser.signOut: Error signing out:', error);
+      }
+      console.log('useUser.signOut: Supabase sign out successful');
+      setUser(null);
+      setProfile(null);
+    } catch (error) {
+      console.error('useUser.signOut: Exception during sign out:', error);
+      setUser(null);
+      setProfile(null);
     }
-    setIsDemo(false);
-
-    const supabase = getClient();
-    await supabase.auth.signOut();
-    setUser(null);
-    setProfile(null);
   };
 
   const refreshProfile = async () => {
     if (!user) return;
 
     const supabase = getClient();
-    const { data: profile } = await supabase
+    const { data: profileData, error } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', user.id)
-      .single();
-    setProfile(profile);
+      .maybeSingle();
+
+    if (!error) {
+      setProfile(profileData);
+    }
   };
 
   return {
@@ -121,7 +133,6 @@ export function useUser() {
     loading,
     signOut,
     refreshProfile,
-    isDemo,
     isAdmin: profile?.role === 'admin' || profile?.role === 'company_user',
     isMentor: profile?.role === 'mentor',
     isStudent: profile?.role === 'student',

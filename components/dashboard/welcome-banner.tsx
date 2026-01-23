@@ -49,11 +49,16 @@ export function WelcomeBanner({ cohortStartDate, cohortName }: WelcomeBannerProp
             <div className="flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-white/80" />
               <span className="text-white/80 text-sm font-medium">
-                {cohortName || 'Welcome back'}
+                Welcome back
               </span>
             </div>
             <h1 className="text-2xl md:text-3xl font-bold text-white">
               {getGreeting()}, {firstName}!
+              {cohortName && (
+                <span className="text-white/80 font-normal text-lg md:text-xl block mt-1">
+                  from {cohortName}
+                </span>
+              )}
             </h1>
             {cohortStartDate && (
               <p className="text-white/80">

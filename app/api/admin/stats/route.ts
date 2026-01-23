@@ -1,0 +1,75 @@
+import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { NextResponse } from 'next/server';
+import { isSuperuserDomain } from '@/lib/auth/allowed-domains';
+
+export async function GET() {
+  const supabase = await createClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  // Check superuser domain or admin role
+  const userEmail = user.email;
+  let isAdmin = userEmail ? isSuperuserDomain(userEmail) : false;
+
+  if (!isAdmin) {
+    const adminClient = await createAdminClient();
+    const { data: profile } = await adminClient
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+    isAdmin = profile?.role === 'admin' || profile?.role === 'company_user';
+  }
+
+  if (!isAdmin) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  try {
+    const adminClient = await createAdminClient();
+
+    // Fetch all stats in parallel
+    const [
+      { count: totalUsers },
+      { count: totalStudents },
+      { count: totalMentors },
+      { count: activeCohorts },
+      { count: upcomingSessions },
+      { count: pendingInvites },
+      { count: openTickets },
+      { data: attendance },
+    ] = await Promise.all([
+      adminClient.from('profiles').select('*', { count: 'exact', head: true }),
+      adminClient.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'student'),
+      adminClient.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'mentor'),
+      adminClient.from('cohorts').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+      adminClient.from('sessions').select('*', { count: 'exact', head: true }).gte('scheduled_at', new Date().toISOString()),
+      adminClient.from('invites').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+      adminClient.from('support_tickets').select('*', { count: 'exact', head: true }).eq('status', 'open'),
+      adminClient.from('attendance').select('attendance_percentage'),
+    ]);
+
+    const avgAttendance = attendance?.length
+      ? Math.round(
+          attendance.reduce((acc: number, a: { attendance_percentage: number | null }) => acc + (a.attendance_percentage || 0), 0) / attendance.length
+        )
+      : 0;
+
+    return NextResponse.json({
+      totalUsers: totalUsers || 0,
+      totalStudents: totalStudents || 0,
+      totalMentors: totalMentors || 0,
+      activeCohorts: activeCohorts || 0,
+      upcomingSessions: upcomingSessions || 0,
+      pendingInvites: pendingInvites || 0,
+      openTickets: openTickets || 0,
+      avgAttendance,
+    });
+  } catch (error) {
+    console.error('Error fetching admin stats:', error);
+    return NextResponse.json({ error: 'Failed to fetch stats' }, { status: 500 });
+  }
+}

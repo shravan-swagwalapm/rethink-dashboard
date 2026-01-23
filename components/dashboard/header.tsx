@@ -24,21 +24,43 @@ import {
   LogOut,
   User,
   Shield,
-  Check,
   ChevronRight,
+  Menu,
+  Sparkles,
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
 
-export function DashboardHeader() {
+interface DashboardHeaderProps {
+  onMenuClick?: () => void;
+}
+
+export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
   const { theme, setTheme } = useTheme();
   const router = useRouter();
   const { profile, signOut, isAdmin } = useUser();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
 
-  const handleSignOut = async () => {
-    await signOut();
-    router.push('/login');
+  const handleSignOut = () => {
+    console.log('handleSignOut: Starting sign out...');
+
+    // Force redirect after 2 seconds no matter what
+    const forceRedirectTimeout = setTimeout(() => {
+      console.log('handleSignOut: Force redirecting after timeout...');
+      window.location.href = '/login?signedout=1';
+    }, 2000);
+
+    signOut()
+      .then(() => {
+        console.log('handleSignOut: Sign out complete, redirecting...');
+        clearTimeout(forceRedirectTimeout);
+        window.location.href = '/login?signedout=1';
+      })
+      .catch((error) => {
+        console.error('handleSignOut: Error:', error);
+        clearTimeout(forceRedirectTimeout);
+        window.location.href = '/login?signedout=1';
+      });
   };
 
   const getNotificationIcon = (type: string) => {
@@ -54,20 +76,40 @@ export function DashboardHeader() {
 
   return (
     <header className="h-16 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-40">
-      <div className="flex items-center justify-between h-full px-6">
-        {/* Left side - Breadcrumb or Search could go here */}
-        <div className="flex items-center gap-4">
-          {/* Placeholder for breadcrumb */}
+      <div className="flex items-center justify-between h-full px-4 sm:px-6">
+        {/* Left side - Mobile menu + Logo on mobile */}
+        <div className="flex items-center gap-3">
+          {/* Mobile menu button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="md:hidden"
+            onClick={onMenuClick}
+          >
+            <Menu className="w-5 h-5" />
+            <span className="sr-only">Open menu</span>
+          </Button>
+
+          {/* Logo on mobile (visible when sidebar is hidden) */}
+          <Link href="/dashboard" className="flex items-center gap-2 md:hidden">
+            <div className="w-8 h-8 rounded-lg gradient-bg flex items-center justify-center">
+              <Sparkles className="w-4 h-4 text-white" />
+            </div>
+            <span className="font-semibold gradient-text">Rethink</span>
+          </Link>
         </div>
 
         {/* Right side - Actions */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2">
           {/* Admin link */}
           {isAdmin && (
             <Link href="/admin">
-              <Button variant="ghost" size="sm" className="gap-2">
+              <Button variant="ghost" size="sm" className="gap-2 hidden sm:flex">
                 <Shield className="w-4 h-4" />
-                <span className="hidden sm:inline">Admin</span>
+                <span>Admin</span>
+              </Button>
+              <Button variant="ghost" size="icon" className="sm:hidden">
+                <Shield className="w-4 h-4" />
               </Button>
             </Link>
           )}
@@ -199,7 +241,13 @@ export function DashboardHeader() {
                 </DropdownMenuItem>
               </Link>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleSignOut} className="text-destructive focus:text-destructive">
+              <DropdownMenuItem
+                onClick={() => {
+                  console.log('Sign out clicked!');
+                  handleSignOut();
+                }}
+                className="text-destructive focus:text-destructive cursor-pointer"
+              >
                 <LogOut className="w-4 h-4 mr-2" />
                 Sign out
               </DropdownMenuItem>

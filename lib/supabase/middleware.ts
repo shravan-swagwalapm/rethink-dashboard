@@ -1,4 +1,5 @@
 import { createServerClient } from '@supabase/ssr';
+import { createClient } from '@supabase/supabase-js';
 import { NextResponse, type NextRequest } from 'next/server';
 
 export async function updateSession(request: NextRequest) {
@@ -52,7 +53,9 @@ export async function updateSession(request: NextRequest) {
   }
 
   // Redirect authenticated users from login to dashboard
-  if (user && pathname === '/login') {
+  // But not if they just signed out (signedout query param)
+  const signedOut = request.nextUrl.searchParams.get('signedout');
+  if (user && pathname === '/login' && !signedOut) {
     const url = request.nextUrl.clone();
     url.pathname = '/dashboard';
     return NextResponse.redirect(url);
@@ -67,11 +70,17 @@ export async function updateSession(request: NextRequest) {
 
   // Role-based route protection
   if (user && pathname.startsWith('/admin')) {
-    const { data: profile } = await supabase
+    // Use service role client to bypass RLS for role check
+    const adminSupabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    const { data: profile } = await adminSupabase
       .from('profiles')
       .select('role')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
 
     if (!profile || !['admin', 'company_user'].includes(profile.role)) {
       const url = request.nextUrl.clone();
@@ -82,11 +91,17 @@ export async function updateSession(request: NextRequest) {
 
   // Mentor-only routes
   if (user && (pathname.startsWith('/dashboard/team') || pathname.startsWith('/dashboard/attendance'))) {
-    const { data: profile } = await supabase
+    // Use service role client to bypass RLS for role check
+    const adminSupabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    const { data: profile } = await adminSupabase
       .from('profiles')
       .select('role')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
 
     if (!profile || !['admin', 'company_user', 'mentor'].includes(profile.role)) {
       const url = request.nextUrl.clone();

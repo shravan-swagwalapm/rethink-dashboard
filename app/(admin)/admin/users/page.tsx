@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
-import { getClient } from '@/lib/supabase/client';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -29,23 +29,49 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import {
   Search,
   Users,
   MoreVertical,
-  Pencil,
-  Trash2,
   Mail,
   Shield,
   UserCheck,
   GraduationCap,
+  UserPlus,
+  Upload,
+  Loader2,
+  FileSpreadsheet,
+  CheckCircle,
+  XCircle,
 } from 'lucide-react';
 import { format } from 'date-fns';
+import * as XLSX from 'xlsx';
 import type { Profile, Cohort } from '@/types';
 
 interface UserWithCohort extends Profile {
   cohort?: Cohort;
+}
+
+interface BulkUser {
+  email: string;
+  full_name: string;
+  cohort_tag: string;
+}
+
+interface BulkResult {
+  email: string;
+  success: boolean;
+  error?: string;
 }
 
 export default function UsersPage() {
@@ -55,23 +81,29 @@ export default function UsersPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
 
+  // Create user dialog state
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [createLoading, setCreateLoading] = useState(false);
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserName, setNewUserName] = useState('');
+  const [newUserCohort, setNewUserCohort] = useState('');
+
+  // Bulk upload state
+  const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
+  const [bulkUsers, setBulkUsers] = useState<BulkUser[]>([]);
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [bulkResults, setBulkResults] = useState<BulkResult[] | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const fetchData = useCallback(async () => {
-    const supabase = getClient();
-
     try {
-      const [{ data: usersData }, { data: cohortsData }] = await Promise.all([
-        supabase
-          .from('profiles')
-          .select('*, cohort:cohorts(*)')
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('cohorts')
-          .select('*')
-          .order('name', { ascending: true }),
-      ]);
-
-      setUsers(usersData || []);
-      setCohorts(cohortsData || []);
+      const response = await fetch('/api/admin/users');
+      if (!response.ok) {
+        throw new Error('Failed to fetch users');
+      }
+      const data = await response.json();
+      setUsers(data.users || []);
+      setCohorts(data.cohorts || []);
     } catch (error) {
       console.error('Error fetching data:', error);
       toast.error('Failed to load users');
@@ -85,15 +117,14 @@ export default function UsersPage() {
   }, [fetchData]);
 
   const handleRoleChange = async (userId: string, newRole: string) => {
-    const supabase = getClient();
-
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ role: newRole })
-        .eq('id', userId);
+      const response = await fetch('/api/admin/users', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: userId, role: newRole }),
+      });
 
-      if (error) throw error;
+      if (!response.ok) throw new Error('Failed to update role');
 
       toast.success('Role updated');
       fetchData();
@@ -103,20 +134,120 @@ export default function UsersPage() {
   };
 
   const handleCohortChange = async (userId: string, cohortId: string) => {
-    const supabase = getClient();
-
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ cohort_id: cohortId || null })
-        .eq('id', userId);
+      const response = await fetch('/api/admin/users', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: userId, cohort_id: cohortId || null }),
+      });
 
-      if (error) throw error;
+      if (!response.ok) throw new Error('Failed to update cohort');
 
       toast.success('Cohort updated');
       fetchData();
     } catch (error) {
       toast.error('Failed to update cohort');
+    }
+  };
+
+  // Create single user
+  const handleCreateUser = async () => {
+    if (!newUserEmail || !newUserCohort) {
+      toast.error('Email and cohort are required');
+      return;
+    }
+
+    setCreateLoading(true);
+    try {
+      const response = await fetch('/api/admin/users/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: newUserEmail,
+          full_name: newUserName,
+          cohort_id: newUserCohort,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create user');
+      }
+
+      toast.success('User created successfully! They can now login via email OTP.');
+      setCreateDialogOpen(false);
+      setNewUserEmail('');
+      setNewUserName('');
+      setNewUserCohort('');
+      fetchData();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to create user');
+    } finally {
+      setCreateLoading(false);
+    }
+  };
+
+  // Handle file upload for bulk import
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet) as Record<string, string>[];
+
+        const parsedUsers: BulkUser[] = jsonData.map((row) => ({
+          email: (row['Email'] || row['email'] || '').trim(),
+          full_name: (row['Name'] || row['Full Name'] || row['full_name'] || '').trim(),
+          cohort_tag: (row['Cohort'] || row['Cohort Tag'] || row['cohort_tag'] || '').trim(),
+        })).filter(u => u.email); // Filter out empty rows
+
+        setBulkUsers(parsedUsers);
+        setBulkResults(null);
+        setBulkDialogOpen(true);
+      } catch (error) {
+        toast.error('Failed to parse file. Please use a valid Excel or CSV file.');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  // Bulk create users
+  const handleBulkCreate = async () => {
+    if (bulkUsers.length === 0) return;
+
+    setBulkLoading(true);
+    try {
+      const response = await fetch('/api/admin/users/bulk-create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ users: bulkUsers }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create users');
+      }
+
+      setBulkResults(data.results);
+      toast.success(data.message);
+      fetchData();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to create users');
+    } finally {
+      setBulkLoading(false);
     }
   };
 
@@ -178,12 +309,215 @@ export default function UsersPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold">User Management</h1>
-        <p className="text-muted-foreground">
-          Manage users, roles, and cohort assignments
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">User Management</h1>
+          <p className="text-muted-foreground">
+            Manage users, roles, and cohort assignments
+          </p>
+        </div>
+        <div className="flex gap-2">
+          {/* Bulk Upload */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            onChange={handleFileUpload}
+            className="hidden"
+          />
+          <Button
+            variant="outline"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <Upload className="w-4 h-4 mr-2" />
+            Bulk Upload
+          </Button>
+
+          {/* Create User Dialog */}
+          <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="gradient-bg">
+                <UserPlus className="w-4 h-4 mr-2" />
+                Create User
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create New User</DialogTitle>
+                <DialogDescription>
+                  Add a new user to the system. They will be able to login via email OTP.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email *</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="user@example.com"
+                    value={newUserEmail}
+                    onChange={(e) => setNewUserEmail(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="name">Full Name</Label>
+                  <Input
+                    id="name"
+                    placeholder="John Doe"
+                    value={newUserName}
+                    onChange={(e) => setNewUserName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="cohort">Cohort *</Label>
+                  <Select value={newUserCohort} onValueChange={setNewUserCohort}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a cohort" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {cohorts.map((cohort) => (
+                        <SelectItem key={cohort.id} value={cohort.id}>
+                          {cohort.name} ({cohort.tag})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleCreateUser}
+                  disabled={createLoading || !newUserEmail || !newUserCohort}
+                  className="gradient-bg"
+                >
+                  {createLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    'Create User'
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
+
+      {/* Bulk Upload Dialog */}
+      <Dialog open={bulkDialogOpen} onOpenChange={setBulkDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Bulk User Upload</DialogTitle>
+            <DialogDescription>
+              Review the users to be created. Ensure each user has a valid email and cohort tag.
+            </DialogDescription>
+          </DialogHeader>
+
+          {!bulkResults ? (
+            <>
+              <div className="max-h-64 overflow-auto border rounded-lg">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Cohort Tag</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {bulkUsers.map((user, idx) => (
+                      <TableRow key={idx}>
+                        <TableCell className="font-mono text-sm">{user.email}</TableCell>
+                        <TableCell>{user.full_name || '-'}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{user.cohort_tag}</Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {bulkUsers.length} user{bulkUsers.length !== 1 ? 's' : ''} to create
+              </p>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setBulkDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleBulkCreate}
+                  disabled={bulkLoading || bulkUsers.length === 0}
+                  className="gradient-bg"
+                >
+                  {bulkLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    `Create ${bulkUsers.length} Users`
+                  )}
+                </Button>
+              </DialogFooter>
+            </>
+          ) : (
+            <>
+              <div className="max-h-64 overflow-auto border rounded-lg">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {bulkResults.map((result, idx) => (
+                      <TableRow key={idx}>
+                        <TableCell className="font-mono text-sm">{result.email}</TableCell>
+                        <TableCell>
+                          {result.success ? (
+                            <span className="flex items-center text-green-600">
+                              <CheckCircle className="w-4 h-4 mr-1" />
+                              Created
+                            </span>
+                          ) : (
+                            <span className="flex items-center text-red-600">
+                              <XCircle className="w-4 h-4 mr-1" />
+                              {result.error}
+                            </span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <div className="flex gap-4 text-sm">
+                <span className="text-green-600">
+                  {bulkResults.filter(r => r.success).length} created
+                </span>
+                <span className="text-red-600">
+                  {bulkResults.filter(r => !r.success).length} failed
+                </span>
+              </div>
+              <DialogFooter>
+                <Button onClick={() => {
+                  setBulkDialogOpen(false);
+                  setBulkUsers([]);
+                  setBulkResults(null);
+                }}>
+                  Done
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">

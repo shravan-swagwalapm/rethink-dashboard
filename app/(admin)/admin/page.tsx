@@ -1,8 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useUser } from '@/hooks/use-user';
-import { getClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -39,56 +37,19 @@ interface RecentActivity {
 }
 
 export default function AdminPage() {
-  const { profile, loading: userLoading } = useUser();
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [activities, setActivities] = useState<RecentActivity[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchAdminData = async () => {
-      const supabase = getClient();
-
       try {
-        // Fetch user counts
-        const [
-          { count: totalUsers },
-          { count: totalStudents },
-          { count: totalMentors },
-          { count: activeCohorts },
-          { count: upcomingSessions },
-          { count: pendingInvites },
-          { count: openTickets },
-        ] = await Promise.all([
-          supabase.from('profiles').select('*', { count: 'exact', head: true }),
-          supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'student'),
-          supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'mentor'),
-          supabase.from('cohorts').select('*', { count: 'exact', head: true }).eq('status', 'active'),
-          supabase.from('sessions').select('*', { count: 'exact', head: true }).gte('scheduled_at', new Date().toISOString()),
-          supabase.from('invites').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-          supabase.from('support_tickets').select('*', { count: 'exact', head: true }).eq('status', 'open'),
-        ]);
-
-        // Fetch average attendance
-        const { data: attendance } = await supabase
-          .from('attendance')
-          .select('attendance_percentage');
-
-        const avgAttendance = attendance?.length
-          ? Math.round(
-              attendance.reduce((acc: number, a: { attendance_percentage: number | null }) => acc + (a.attendance_percentage || 0), 0) / attendance.length
-            )
-          : 0;
-
-        setStats({
-          totalUsers: totalUsers || 0,
-          totalStudents: totalStudents || 0,
-          totalMentors: totalMentors || 0,
-          activeCohorts: activeCohorts || 0,
-          upcomingSessions: upcomingSessions || 0,
-          pendingInvites: pendingInvites || 0,
-          openTickets: openTickets || 0,
-          avgAttendance,
-        });
+        const response = await fetch('/api/admin/stats');
+        if (!response.ok) {
+          throw new Error('Failed to fetch stats');
+        }
+        const data = await response.json();
+        setStats(data);
 
         // Mock recent activities (would be from activity log table)
         setActivities([
@@ -118,10 +79,8 @@ export default function AdminPage() {
       }
     };
 
-    if (!userLoading) {
-      fetchAdminData();
-    }
-  }, [userLoading]);
+    fetchAdminData();
+  }, []);
 
   const quickActions = [
     { label: 'Send Invites', href: '/admin/invites', icon: UserPlus, color: 'bg-blue-500' },
@@ -130,7 +89,7 @@ export default function AdminPage() {
     { label: 'View Support', href: '/admin/support', icon: HelpCircle, color: 'bg-amber-500' },
   ];
 
-  if (userLoading || loading) {
+  if (loading) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-12 w-64" />
@@ -156,7 +115,7 @@ export default function AdminPage() {
           Admin Dashboard
         </h1>
         <p className="text-muted-foreground mt-1">
-          Welcome back, {profile?.full_name?.split(' ')[0] || 'Admin'}. Here&apos;s what&apos;s happening.
+          Welcome back, Admin. Here&apos;s what&apos;s happening.
         </p>
       </div>
 

@@ -1,8 +1,6 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useUser } from '@/hooks/use-user';
-import { getClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -59,7 +57,6 @@ interface CohortWithStats extends Cohort {
 }
 
 export default function CohortsPage() {
-  const { profile, loading: userLoading } = useUser();
   const [cohorts, setCohorts] = useState<CohortWithStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -79,39 +76,14 @@ export default function CohortsPage() {
   const [newTag, setNewTag] = useState('');
 
   const fetchCohorts = useCallback(async () => {
-    const supabase = getClient();
-
     try {
-      const { data: cohortsData, error } = await supabase
-        .from('cohorts')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      // Fetch student counts for each cohort
-      const cohortsWithStats = await Promise.all(
-        (cohortsData || []).map(async (cohort: Cohort) => {
-          const [{ count: studentCount }, { count: sessionCount }] = await Promise.all([
-            supabase
-              .from('profiles')
-              .select('*', { count: 'exact', head: true })
-              .eq('cohort_id', cohort.id),
-            supabase
-              .from('sessions')
-              .select('*', { count: 'exact', head: true })
-              .eq('cohort_id', cohort.id),
-          ]);
-
-          return {
-            ...cohort,
-            student_count: studentCount || 0,
-            session_count: sessionCount || 0,
-          };
-        })
-      );
-
-      setCohorts(cohortsWithStats);
+      const response = await fetch('/api/admin/cohorts');
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to fetch cohorts');
+      }
+      const data = await response.json();
+      setCohorts(data);
     } catch (error) {
       console.error('Error fetching cohorts:', error);
       toast.error('Failed to load cohorts');
@@ -121,10 +93,8 @@ export default function CohortsPage() {
   }, []);
 
   useEffect(() => {
-    if (!userLoading) {
-      fetchCohorts();
-    }
-  }, [userLoading, fetchCohorts]);
+    fetchCohorts();
+  }, [fetchCohorts]);
 
   const handleOpenForm = (cohort?: Cohort) => {
     if (cohort) {
@@ -163,47 +133,34 @@ export default function CohortsPage() {
     }
 
     setSaving(true);
-    const supabase = getClient();
 
     try {
-      if (editingCohort) {
-        const { error } = await supabase
-          .from('cohorts')
-          .update({
-            name: formData.name,
-            tag: formData.tag,
-            start_date: formData.start_date || null,
-            end_date: formData.end_date || null,
-            status: formData.status,
-          })
-          .eq('id', editingCohort.id);
+      const method = editingCohort ? 'PUT' : 'POST';
+      const body = editingCohort
+        ? { id: editingCohort.id, ...formData }
+        : formData;
 
-        if (error) throw error;
-        toast.success('Cohort updated');
-      } else {
-        const { error } = await supabase.from('cohorts').insert({
-          name: formData.name,
-          tag: formData.tag,
-          start_date: formData.start_date || null,
-          end_date: formData.end_date || null,
-          status: formData.status,
-          created_by: profile?.id,
-        });
+      const response = await fetch('/api/admin/cohorts', {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
 
-        if (error) throw error;
-        toast.success('Cohort created');
+      if (!response.ok) {
+        const error = await response.json();
+        if (response.status === 409) {
+          toast.error('Tag already exists. Please use a unique tag.');
+          return;
+        }
+        throw new Error(error.error || 'Failed to save cohort');
       }
 
+      toast.success(editingCohort ? 'Cohort updated' : 'Cohort created');
       setShowForm(false);
       fetchCohorts();
-    } catch (error: unknown) {
+    } catch (error) {
       console.error('Error saving cohort:', error);
-      const pgError = error as { code?: string };
-      if (pgError.code === '23505') {
-        toast.error('Tag already exists. Please use a unique tag.');
-      } else {
-        toast.error('Failed to save cohort');
-      }
+      toast.error('Failed to save cohort');
     } finally {
       setSaving(false);
     }
@@ -214,33 +171,39 @@ export default function CohortsPage() {
       return;
     }
 
-    const supabase = getClient();
-
     try {
-      const { error } = await supabase.from('cohorts').delete().eq('id', cohortId);
-      if (error) throw error;
+      const response = await fetch(`/api/admin/cohorts?id=${cohortId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete cohort');
+      }
 
       toast.success('Cohort deleted');
       fetchCohorts();
     } catch (error) {
+      console.error('Error deleting cohort:', error);
       toast.error('Failed to delete cohort');
     }
   };
 
   const handleArchive = async (cohortId: string) => {
-    const supabase = getClient();
-
     try {
-      const { error } = await supabase
-        .from('cohorts')
-        .update({ status: 'archived' })
-        .eq('id', cohortId);
+      const response = await fetch('/api/admin/cohorts', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: cohortId, status: 'archived' }),
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        throw new Error('Failed to archive cohort');
+      }
 
       toast.success('Cohort archived');
       fetchCohorts();
     } catch (error) {
+      console.error('Error archiving cohort:', error);
       toast.error('Failed to archive cohort');
     }
   };
@@ -251,41 +214,32 @@ export default function CohortsPage() {
       return;
     }
 
-    // Check if cohort has pending sessions
-    const supabase = getClient();
-    const { count: pendingSessions } = await supabase
-      .from('sessions')
-      .select('*', { count: 'exact', head: true })
-      .eq('cohort_id', retagCohort.id)
-      .gte('scheduled_at', new Date().toISOString());
-
-    if (pendingSessions && pendingSessions > 0) {
-      toast.error('Cannot retag cohort with pending sessions');
-      return;
-    }
-
     setSaving(true);
 
     try {
-      const { error } = await supabase
-        .from('cohorts')
-        .update({ tag: newTag.trim() })
-        .eq('id', retagCohort.id);
+      const response = await fetch('/api/admin/cohorts', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: retagCohort.id, tag: newTag.trim() }),
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const error = await response.json();
+        if (response.status === 409) {
+          toast.error('Tag already exists');
+          return;
+        }
+        throw new Error(error.error || 'Failed to retag cohort');
+      }
 
       toast.success('Cohort retagged successfully');
       setShowRetagDialog(false);
       setRetagCohort(null);
       setNewTag('');
       fetchCohorts();
-    } catch (error: unknown) {
-      const pgError = error as { code?: string };
-      if (pgError.code === '23505') {
-        toast.error('Tag already exists');
-      } else {
-        toast.error('Failed to retag cohort');
-      }
+    } catch (error) {
+      console.error('Error retagging cohort:', error);
+      toast.error('Failed to retag cohort');
     } finally {
       setSaving(false);
     }
@@ -304,7 +258,7 @@ export default function CohortsPage() {
     }
   };
 
-  if (userLoading || loading) {
+  if (loading) {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">

@@ -1,8 +1,6 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useUser } from '@/hooks/use-user';
-import { getClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -64,7 +62,6 @@ interface SessionWithStats extends Session {
 }
 
 export default function SessionsPage() {
-  const { profile, loading: userLoading } = useUser();
   const [sessions, setSessions] = useState<SessionWithStats[]>([]);
   const [cohorts, setCohorts] = useState<Cohort[]>([]);
   const [loading, setLoading] = useState(true);
@@ -83,51 +80,14 @@ export default function SessionsPage() {
   });
 
   const fetchData = useCallback(async () => {
-    const supabase = getClient();
-
     try {
-      const [{ data: sessionsData }, { data: cohortsData }] = await Promise.all([
-        supabase
-          .from('sessions')
-          .select(`
-            *,
-            cohort:cohorts(*)
-          `)
-          .order('scheduled_at', { ascending: false })
-          .limit(100),
-        supabase
-          .from('cohorts')
-          .select('*')
-          .in('status', ['active', 'completed'])
-          .order('name', { ascending: true }),
-      ]);
-
-      // Fetch RSVP counts
-      const sessionsWithRsvp = await Promise.all(
-        (sessionsData || []).map(async (session: Session & { cohort?: Cohort }) => {
-          const [{ count: yesCount }, { count: noCount }] = await Promise.all([
-            supabase
-              .from('rsvps')
-              .select('*', { count: 'exact', head: true })
-              .eq('session_id', session.id)
-              .eq('response', 'yes'),
-            supabase
-              .from('rsvps')
-              .select('*', { count: 'exact', head: true })
-              .eq('session_id', session.id)
-              .eq('response', 'no'),
-          ]);
-
-          return {
-            ...session,
-            rsvp_yes_count: yesCount || 0,
-            rsvp_no_count: noCount || 0,
-          };
-        })
-      );
-
-      setSessions(sessionsWithRsvp);
-      setCohorts(cohortsData || []);
+      const response = await fetch('/api/admin/sessions');
+      if (!response.ok) {
+        throw new Error('Failed to fetch sessions');
+      }
+      const data = await response.json();
+      setSessions(data.sessions || []);
+      setCohorts(data.cohorts || []);
     } catch (error) {
       console.error('Error fetching data:', error);
       toast.error('Failed to load sessions');
@@ -137,10 +97,8 @@ export default function SessionsPage() {
   }, []);
 
   useEffect(() => {
-    if (!userLoading) {
-      fetchData();
-    }
-  }, [userLoading, fetchData]);
+    fetchData();
+  }, [fetchData]);
 
   const handleOpenForm = (session?: Session) => {
     if (session) {
@@ -181,41 +139,40 @@ export default function SessionsPage() {
     }
 
     setSaving(true);
-    const supabase = getClient();
-
     const scheduledAt = new Date(`${formData.scheduled_at}T${formData.scheduled_time}`);
 
     try {
-      if (editingSession) {
-        const { error } = await supabase
-          .from('sessions')
-          .update({
+      const method = editingSession ? 'PUT' : 'POST';
+      const body = editingSession
+        ? {
+            id: editingSession.id,
             title: formData.title,
             description: formData.description || null,
             cohort_id: formData.cohort_id || null,
             scheduled_at: scheduledAt.toISOString(),
             duration_minutes: formData.duration_minutes,
             zoom_link: formData.zoom_link || null,
-          })
-          .eq('id', editingSession.id);
+          }
+        : {
+            title: formData.title,
+            description: formData.description || null,
+            cohort_id: formData.cohort_id || null,
+            scheduled_at: scheduledAt.toISOString(),
+            duration_minutes: formData.duration_minutes,
+            zoom_link: formData.zoom_link || null,
+          };
 
-        if (error) throw error;
-        toast.success('Session updated');
-      } else {
-        const { error } = await supabase.from('sessions').insert({
-          title: formData.title,
-          description: formData.description || null,
-          cohort_id: formData.cohort_id || null,
-          scheduled_at: scheduledAt.toISOString(),
-          duration_minutes: formData.duration_minutes,
-          zoom_link: formData.zoom_link || null,
-          created_by: profile?.id,
-        });
+      const response = await fetch('/api/admin/sessions', {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
 
-        if (error) throw error;
-        toast.success('Session created');
+      if (!response.ok) {
+        throw new Error('Failed to save session');
       }
 
+      toast.success(editingSession ? 'Session updated' : 'Session created');
       setShowForm(false);
       fetchData();
     } catch (error) {
@@ -231,11 +188,12 @@ export default function SessionsPage() {
       return;
     }
 
-    const supabase = getClient();
-
     try {
-      const { error } = await supabase.from('sessions').delete().eq('id', sessionId);
-      if (error) throw error;
+      const response = await fetch(`/api/admin/sessions?id=${sessionId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) throw new Error('Failed to delete');
 
       toast.success('Session deleted');
       fetchData();
@@ -252,7 +210,7 @@ export default function SessionsPage() {
     return <Badge className="bg-green-500/10 text-green-600">Upcoming</Badge>;
   };
 
-  if (userLoading || loading) {
+  if (loading) {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">

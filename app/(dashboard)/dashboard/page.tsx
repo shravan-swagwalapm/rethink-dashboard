@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useUser } from '@/hooks/use-user';
 import { getClient } from '@/lib/supabase/client';
 import { WelcomeBanner } from '@/components/dashboard/welcome-banner';
@@ -15,8 +16,10 @@ import { format, isToday, isTomorrow, parseISO } from 'date-fns';
 import type { Session, DashboardStats, LearningModule, Resource } from '@/types';
 
 export default function DashboardPage() {
-  const { profile, loading: userLoading } = useUser();
+  const router = useRouter();
+  const { profile, loading: userLoading, isAdmin } = useUser();
   const [stats, setStats] = useState<DashboardStats | null>(null);
+
   const [upcomingSessions, setUpcomingSessions] = useState<Session[]>([]);
   const [recentModules, setRecentModules] = useState<LearningModule[]>([]);
   const [recentResources, setRecentResources] = useState<Resource[]>([]);
@@ -26,7 +29,11 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const fetchDashboardData = async () => {
-      if (!profile) return;
+      if (!profile) {
+        // Don't get stuck in loading state if profile doesn't exist
+        setLoading(false);
+        return;
+      }
 
       const supabase = getClient();
 
@@ -136,7 +143,9 @@ export default function DashboardPage() {
     return format(sessionDate, 'EEE, MMM d');
   };
 
-  if (userLoading || loading) {
+  // Only show skeletons while checking if user is logged in
+  // Once userLoading is false, show dashboard (even with empty data)
+  if (userLoading) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-32 w-full rounded-xl" />

@@ -21,9 +21,8 @@ import {
   LineChart,
   FileText,
   HelpCircle,
-  ChevronLeft,
+  LogOut,
   Sparkles,
-  Settings,
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -46,16 +45,19 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { profile, isAdmin, loading } = useUser();
+  const { profile, isAdmin, loading, signOut } = useUser();
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
-    if (!loading && !isAdmin) {
+    // Only redirect if profile is loaded AND user is confirmed not admin
+    // Don't redirect if profile is null - could be a race condition with useUser timeout
+    if (!loading && profile && !isAdmin) {
       router.push('/dashboard');
     }
-  }, [loading, isAdmin, router]);
+  }, [loading, profile, isAdmin, router]);
 
+  // Only show loading skeleton while initial auth check is happening
   if (loading) {
     return (
       <div className="flex min-h-screen">
@@ -77,7 +79,9 @@ export default function AdminLayout({
     );
   }
 
-  if (!isAdmin) {
+  // If profile loaded and user is NOT admin, don't render (redirect will happen via useEffect)
+  // If profile is null, trust the auth callback verification and show the UI
+  if (profile && !isAdmin) {
     return null;
   }
 
@@ -98,13 +102,19 @@ export default function AdminLayout({
           </Link>
         </div>
 
-        {/* Back to Dashboard */}
-        <Link href="/dashboard">
-          <Button variant="ghost" className="w-full justify-start gap-2 m-2 mt-3" size="sm">
-            <ChevronLeft className="w-4 h-4" />
-            Back to Dashboard
-          </Button>
-        </Link>
+        {/* Logout */}
+        <Button
+          variant="ghost"
+          className="w-full justify-start gap-2 m-2 mt-3 text-red-500 hover:text-red-600 hover:bg-red-500/10"
+          size="sm"
+          onClick={async () => {
+            await signOut();
+            router.push('/login');
+          }}
+        >
+          <LogOut className="w-4 h-4" />
+          Logout
+        </Button>
 
         {/* Navigation */}
         <ScrollArea className="flex-1 px-3 py-4">

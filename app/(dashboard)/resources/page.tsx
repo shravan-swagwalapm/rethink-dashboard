@@ -37,6 +37,8 @@ import {
   Eye,
   MoreVertical,
   ArrowLeft,
+  Link as LinkIcon,
+  ExternalLink,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -188,6 +190,7 @@ export default function ResourcesPage() {
 
   const folders = filteredResources.filter(r => r.type === 'folder');
   const files = filteredResources.filter(r => r.type === 'file');
+  const links = filteredResources.filter(r => r.type === 'link');
 
   if (userLoading || loading) {
     return (
@@ -368,6 +371,37 @@ export default function ResourcesPage() {
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Links */}
+          {links.length > 0 && (
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium text-muted-foreground">External Links</h3>
+              <div className="grid gap-2">
+                {links.map((link) => (
+                  <a
+                    key={link.id}
+                    href={link.external_url || '#'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-4 p-4 rounded-xl border bg-card hover:bg-muted/50 hover:border-primary/50 transition-colors group"
+                  >
+                    <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+                      <LinkIcon className="w-6 h-6 text-blue-500" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{link.name}</p>
+                      <p className="text-sm text-muted-foreground truncate">
+                        {link.external_url}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <ExternalLink className="w-4 h-4 text-muted-foreground" />
+                    </div>
+                  </a>
                 ))}
               </div>
             </div>

@@ -1,29 +1,115 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { getClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from 'sonner';
-import { Loader2, Mail, KeyRound, ArrowRight, Sparkles, Play } from 'lucide-react';
+import { Loader2, Mail, KeyRound, ArrowRight, Sparkles, AlertCircle, Shield } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 
 type AuthStep = 'email' | 'otp' | 'password';
 
-export default function LoginPage() {
+const ERROR_MESSAGES: Record<string, string> = {
+  auth: 'Authentication failed. Please try again.',
+  no_email: 'Could not retrieve email from your account.',
+  domain_not_allowed: 'Only Gmail accounts (@gmail.com) are currently supported.',
+  not_invited: 'Your email is not registered. Please contact the admin to get access.',
+  access_denied: 'Access denied. Please try again.',
+  not_admin: 'You do not have admin privileges. Please contact support.',
+};
+
+function LoginContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [step, setStep] = useState<AuthStep>('email');
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [isNewUser, setIsNewUser] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const supabase = getClient();
+
+  // Handle error from URL params
+  useEffect(() => {
+    const errorCode = searchParams.get('error');
+    if (errorCode && ERROR_MESSAGES[errorCode]) {
+      setError(ERROR_MESSAGES[errorCode]);
+      toast.error(ERROR_MESSAGES[errorCode]);
+    }
+  }, [searchParams]);
+
+  // Check for existing session and listen for auth state changes (magic link handling)
+  useEffect(() => {
+    // Check if already logged in
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        router.push('/dashboard');
+      }
+    };
+    checkSession();
+
+    // Listen for auth state changes (handles magic link tokens in URL hash)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('Auth state change:', event);
+      if (event === 'SIGNED_IN' && session) {
+        toast.success('Signed in successfully!');
+        router.push('/dashboard');
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [supabase, router]);
+
+  const [adminLoading, setAdminLoading] = useState(false);
+
+  const handleGoogleSignIn = async (mode: 'user' | 'admin' = 'user') => {
+    if (mode === 'admin') {
+      setAdminLoading(true);
+    } else {
+      setGoogleLoading(true);
+    }
+    setError(null);
+
+    try {
+      // Use PATH-BASED routing for login mode
+      // Query params get stripped by Supabase during OAuth, but paths are preserved
+      // /auth/callback/admin -> admin login
+      // /auth/callback -> user login
+      const redirectUrl = mode === 'admin'
+        ? `${window.location.origin}/auth/callback/admin`
+        : `${window.location.origin}/auth/callback`;
+
+      console.log('Login: OAuth redirectTo (path-based):', redirectUrl);
+
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUrl,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        },
+      });
+
+      if (error) throw error;
+    } catch (error) {
+      toast.error('Failed to sign in with Google');
+      console.error(error);
+      setGoogleLoading(false);
+      setAdminLoading(false);
+    }
+  };
 
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,29 +119,32 @@ export default function LoginPage() {
     }
 
     setLoading(true);
+    setError(null);
     try {
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
           shouldCreateUser: false,
+          emailRedirectTo: `${window.location.origin}/login`,
         },
       });
 
       if (error) {
-        // If user doesn't exist, this might be a first-time login
-        if (error.message.includes('User not found')) {
-          toast.error('Account not found. Please contact admin for an invite.');
+        console.error('OTP error:', error);
+        if (error.message.includes('User not found') || error.message.includes('Signups not allowed')) {
+          setError('Account not found. Please contact admin for access.');
           setLoading(false);
           return;
         }
         throw error;
       }
 
-      toast.success('Check your email for the verification code');
+      toast.success('Check your email for the magic link!');
       setStep('otp');
-    } catch (error) {
-      toast.error('Failed to send verification code');
-      console.error(error);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      toast.error(`Failed to send magic link: ${errorMessage}`);
+      console.error('Send OTP error:', error);
     } finally {
       setLoading(false);
     }
@@ -78,7 +167,6 @@ export default function LoginPage() {
 
       if (error) throw error;
 
-      // Check if user needs to set password (first time login)
       const { data: profile } = await supabase
         .from('profiles')
         .select('*')
@@ -104,7 +192,6 @@ export default function LoginPage() {
   const handleSetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validate password
     if (password.length < 8) {
       toast.error('Password must be at least 8 characters');
       return;
@@ -147,23 +234,17 @@ export default function LoginPage() {
         email,
         options: {
           shouldCreateUser: false,
+          emailRedirectTo: `${window.location.origin}/login`,
         },
       });
 
       if (error) throw error;
-      toast.success('New code sent to your email');
+      toast.success('New login link sent to your email');
     } catch (error) {
-      toast.error('Failed to resend code');
+      toast.error('Failed to resend link');
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleDemoLogin = () => {
-    // Store demo user flag in localStorage
-    localStorage.setItem('demo_user', 'true');
-    toast.success('Welcome to the demo!');
-    router.push('/dashboard');
   };
 
   return (
@@ -184,101 +265,161 @@ export default function LoginPage() {
           <p className="text-muted-foreground text-sm mt-1">Learning Dashboard</p>
         </div>
 
+        {/* Error Alert */}
+        {error && (
+          <Alert variant="destructive" className="mb-4 animate-in-up">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
         <Card className="glass-strong animate-in-up stagger-1">
           <CardHeader className="text-center pb-2">
             <CardTitle className="text-xl">
-              {step === 'email' && 'Welcome back'}
+              {step === 'email' && 'Welcome'}
               {step === 'otp' && 'Verify your email'}
               {step === 'password' && 'Set your password'}
             </CardTitle>
             <CardDescription>
-              {step === 'email' && 'Enter your email to continue'}
-              {step === 'otp' && `We sent a code to ${email}`}
+              {step === 'email' && 'Sign in to access your dashboard'}
+              {step === 'otp' && 'Check your inbox'}
               {step === 'password' && 'Create a secure password for your account'}
             </CardDescription>
           </CardHeader>
 
-          <CardContent>
+          <CardContent className="space-y-4">
             {step === 'email' && (
-              <form onSubmit={handleSendOtp} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email address</Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="you@example.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="pl-10"
-                      autoFocus
-                      required
-                    />
+              <>
+                {/* Email Input Form */}
+                <form onSubmit={handleSendOtp} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email address</Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="you@example.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="pl-10"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {/* Send OTP Button - Always visible */}
+                  <Button
+                    type="submit"
+                    className="w-full gradient-bg hover:opacity-90 transition-opacity"
+                    disabled={loading || !email}
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Sending link...
+                      </>
+                    ) : (
+                      <>
+                        Send Magic Link
+                        <ArrowRight className="w-4 h-4 ml-2" />
+                      </>
+                    )}
+                  </Button>
+                </form>
+
+                {/* Google Sign In - Available for all emails (supports Google Workspace) */}
+                {email && (
+                  <>
+                    <div className="relative">
+                      <div className="absolute inset-0 flex items-center">
+                        <Separator className="w-full" />
+                      </div>
+                      <div className="relative flex justify-center text-xs uppercase">
+                        <span className="bg-card px-2 text-muted-foreground">
+                          Or
+                        </span>
+                      </div>
+                    </div>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full h-11 border-border hover:bg-muted/50 transition-all"
+                      onClick={() => handleGoogleSignIn('user')}
+                      disabled={googleLoading || adminLoading}
+                    >
+                      {googleLoading ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
+                          <path
+                            fill="currentColor"
+                            d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                          />
+                          <path
+                            fill="currentColor"
+                            d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                          />
+                          <path
+                            fill="currentColor"
+                            d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                          />
+                          <path
+                            fill="currentColor"
+                            d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                          />
+                        </svg>
+                      )}
+                      Continue with Google
+                    </Button>
+                  </>
+                )}
+
+                {/* Admin Sign In - Always visible at bottom */}
+                <div className="relative pt-2">
+                  <div className="absolute inset-0 flex items-center">
+                    <Separator className="w-full" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-card px-2 text-muted-foreground">
+                      Admin access
+                    </span>
                   </div>
                 </div>
 
                 <Button
-                  type="submit"
-                  className="w-full gradient-bg hover:opacity-90 transition-opacity"
-                  disabled={loading}
+                  type="button"
+                  variant="outline"
+                  className="w-full h-11 border-primary/30 hover:bg-primary/10 hover:border-primary/50 transition-all"
+                  onClick={() => handleGoogleSignIn('admin')}
+                  disabled={googleLoading || adminLoading}
                 >
-                  {loading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Sending code...
-                    </>
+                  {adminLoading ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   ) : (
-                    <>
-                      Continue
-                      <ArrowRight className="w-4 h-4 ml-2" />
-                    </>
+                    <Shield className="w-4 h-4 mr-2" />
                   )}
+                  Continue as Admin
                 </Button>
-              </form>
+              </>
             )}
 
             {step === 'otp' && (
-              <form onSubmit={handleVerifyOtp} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="otp">Verification code</Label>
-                  <div className="relative">
-                    <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                      id="otp"
-                      type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      maxLength={6}
-                      placeholder="000000"
-                      value={otp}
-                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                      className="pl-10 text-center tracking-widest text-lg font-mono"
-                      autoFocus
-                      required
-                    />
+              <div className="space-y-4">
+                <div className="text-center py-4">
+                  <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                    <Mail className="w-8 h-8 text-primary" />
                   </div>
+                  <p className="text-sm text-muted-foreground">
+                    We sent a magic link to <strong>{email}</strong>
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Click the link in your email to sign in.
+                  </p>
                 </div>
 
-                <Button
-                  type="submit"
-                  className="w-full gradient-bg hover:opacity-90 transition-opacity"
-                  disabled={loading || otp.length !== 6}
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Verifying...
-                    </>
-                  ) : (
-                    <>
-                      Verify code
-                      <ArrowRight className="w-4 h-4 ml-2" />
-                    </>
-                  )}
-                </Button>
-
-                <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center justify-between text-sm pt-4">
                   <button
                     type="button"
                     onClick={() => setStep('email')}
@@ -292,10 +433,10 @@ export default function LoginPage() {
                     disabled={loading}
                     className="text-primary hover:underline"
                   >
-                    Resend code
+                    {loading ? 'Sending...' : 'Resend link'}
                   </button>
                 </div>
-              </form>
+              </div>
             )}
 
             {step === 'password' && (
@@ -360,30 +501,6 @@ export default function LoginPage() {
           </CardContent>
         </Card>
 
-        {/* Demo Login Option */}
-        <div className="mt-6 animate-in-up stagger-2">
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <Separator className="w-full" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">
-                Or try without account
-              </span>
-            </div>
-          </div>
-
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full mt-4 border-primary/30 hover:border-primary/60 hover:bg-primary/5 transition-all"
-            onClick={handleDemoLogin}
-          >
-            <Play className="w-4 h-4 mr-2" />
-            Try Demo
-          </Button>
-        </div>
-
         <p className="text-center text-sm text-muted-foreground mt-6 animate-in-up stagger-3">
           Need help? Contact{' '}
           <a href="mailto:support@rethink.systems" className="text-primary hover:underline">
@@ -392,5 +509,17 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    }>
+      <LoginContent />
+    </Suspense>
   );
 }
