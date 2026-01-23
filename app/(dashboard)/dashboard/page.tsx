@@ -9,7 +9,7 @@ import { StatsCards } from '@/components/dashboard/stats-cards';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
+import { PageLoader } from '@/components/ui/page-loader';
 import { Calendar, Clock, Video, ChevronRight, BookOpen, FolderOpen } from 'lucide-react';
 import Link from 'next/link';
 import { format, isToday, isTomorrow, parseISO } from 'date-fns';
@@ -150,23 +150,9 @@ export default function DashboardPage() {
     return format(sessionDate, 'EEE, MMM d');
   };
 
-  // Only show skeletons while checking if user is logged in
-  // Once userLoading is false, show dashboard (even with empty data)
+  // Show explicit loader while checking if user is logged in
   if (userLoading) {
-    return (
-      <div className="space-y-6">
-        <Skeleton className="h-32 w-full rounded-xl" />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <Skeleton key={i} className="h-28 rounded-xl" />
-          ))}
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Skeleton className="h-64 rounded-xl" />
-          <Skeleton className="h-64 rounded-xl" />
-        </div>
-      </div>
-    );
+    return <PageLoader message="Loading dashboard..." />;
   }
 
   return (

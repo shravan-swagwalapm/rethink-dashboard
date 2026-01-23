@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Skeleton } from '@/components/ui/skeleton';
+import { PageLoader } from '@/components/ui/page-loader';
 import {
   Dialog,
   DialogContent,
@@ -220,12 +220,7 @@ export default function CalendarPage() {
   };
 
   if (userLoading || loading) {
-    return (
-      <div className="space-y-6">
-        <Skeleton className="h-12 w-full rounded-xl" />
-        <Skeleton className="h-[500px] w-full rounded-xl" />
-      </div>
-    );
+    return <PageLoader message="Loading calendar..." />;
   }
 
   return (

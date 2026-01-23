@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Skeleton } from '@/components/ui/skeleton';
+import { PageLoader } from '@/components/ui/page-loader';
 import {
   Table,
   TableBody,
@@ -294,74 +294,7 @@ export default function UsersPage() {
   };
 
   if (loading) {
-    return (
-      <div className="space-y-6">
-        {/* Header skeleton */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <Skeleton className="h-8 w-48 mb-2" />
-            <Skeleton className="h-4 w-64" />
-          </div>
-          <div className="flex gap-2">
-            <Skeleton className="h-10 w-32" />
-            <Skeleton className="h-10 w-32" />
-          </div>
-        </div>
-
-        {/* Filters skeleton */}
-        <div className="flex flex-col sm:flex-row gap-4">
-          <Skeleton className="h-10 flex-1" />
-          <Skeleton className="h-10 w-[150px]" />
-        </div>
-
-        {/* Stats cards skeleton */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <Card key={i}>
-              <CardContent className="p-4">
-                <Skeleton className="h-4 w-20 mb-2" />
-                <Skeleton className="h-8 w-12" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {/* Table skeleton */}
-        <Card>
-          <CardHeader>
-            <Skeleton className="h-6 w-24 mb-1" />
-            <Skeleton className="h-4 w-16" />
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {/* Table header */}
-              <div className="flex items-center gap-4 pb-2 border-b">
-                <Skeleton className="h-4 w-32" />
-                <Skeleton className="h-4 w-20" />
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-4 w-20" />
-              </div>
-              {/* Table rows */}
-              {[...Array(8)].map((_, i) => (
-                <div key={i} className="flex items-center gap-4 py-3">
-                  <div className="flex items-center gap-3 flex-1">
-                    <Skeleton className="h-10 w-10 rounded-full" />
-                    <div>
-                      <Skeleton className="h-4 w-32 mb-1" />
-                      <Skeleton className="h-3 w-48" />
-                    </div>
-                  </div>
-                  <Skeleton className="h-9 w-[140px]" />
-                  <Skeleton className="h-9 w-[140px]" />
-                  <Skeleton className="h-4 w-24" />
-                  <Skeleton className="h-8 w-8" />
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <PageLoader message="Loading users..." />;
   }
 
   return (
