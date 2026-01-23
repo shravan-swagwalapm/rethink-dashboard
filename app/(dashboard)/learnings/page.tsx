@@ -6,39 +6,97 @@ import { getClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { PageLoader } from '@/components/ui/page-loader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from '@/components/ui/accordion';
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   Search,
   BookOpen,
-  PlayCircle,
   Clock,
   ChevronRight,
   Video,
+  FileText,
+  Presentation,
+  Link2,
+  ExternalLink,
+  FileQuestion,
+  CheckCircle2,
+  Calendar,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { LearningModule, Recording } from '@/types';
+import type { LearningModule, ModuleResource, ModuleResourceType, CaseStudy } from '@/types';
 
-interface ModuleWithRecordings extends LearningModule {
-  recordings: Recording[];
+interface ModuleWithResources extends LearningModule {
+  resources: ModuleResource[];
+}
+
+interface WeekContent {
+  weekNumber: number;
+  modules: ModuleWithResources[];
+  recordings: ModuleResource[];
+  presentations: ModuleResource[];
+  notes: ModuleResource[];
+  caseStudies: CaseStudy[];
+}
+
+// Get icon for content type
+function getContentIcon(type: ModuleResourceType, className?: string) {
+  const iconClass = cn('w-5 h-5', className);
+  switch (type) {
+    case 'video': return <Video className={cn(iconClass, 'text-purple-500')} />;
+    case 'slides': return <Presentation className={cn(iconClass, 'text-orange-500')} />;
+    case 'document': return <FileText className={cn(iconClass, 'text-blue-500')} />;
+    default: return <Link2 className={cn(iconClass, 'text-gray-500')} />;
+  }
+}
+
+// Get embed URL for Google Drive content
+function getEmbedUrl(resource: ModuleResource): string {
+  const id = resource.google_drive_id;
+  if (!id) return resource.external_url || '';
+
+  switch (resource.content_type) {
+    case 'video': return `https://drive.google.com/file/d/${id}/preview`;
+    case 'slides': return `https://docs.google.com/presentation/d/${id}/embed?start=false&loop=false&delayms=3000`;
+    case 'document': return `https://docs.google.com/document/d/${id}/preview`;
+    default: return resource.external_url || '';
+  }
+}
+
+// Get embed URL for case study docs
+function getCaseStudyEmbedUrl(docId: string, docUrl: string | null): string {
+  if (docId) {
+    // Check if it's a presentation, doc, or generic file
+    if (docUrl?.includes('presentation')) {
+      return `https://docs.google.com/presentation/d/${docId}/embed?start=false&loop=false`;
+    }
+    if (docUrl?.includes('document')) {
+      return `https://docs.google.com/document/d/${docId}/preview`;
+    }
+    return `https://drive.google.com/file/d/${docId}/preview`;
+  }
+  return docUrl || '';
 }
 
 export default function LearningsPage() {
   const { profile, loading: userLoading } = useUser();
-  const [modules, setModules] = useState<ModuleWithRecordings[]>([]);
+  const [modules, setModules] = useState<ModuleWithResources[]>([]);
+  const [caseStudies, setCaseStudies] = useState<CaseStudy[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedRecording, setSelectedRecording] = useState<Recording | null>(null);
+  const [selectedResource, setSelectedResource] = useState<ModuleResource | null>(null);
+  const [selectedCaseStudy, setSelectedCaseStudy] = useState<{ caseStudy: CaseStudy; type: 'problem' | 'solution' } | null>(null);
+  const [activeWeek, setActiveWeek] = useState<string>('');
 
   useEffect(() => {
-    const fetchModules = async () => {
+    const fetchData = async () => {
       if (!profile?.cohort_id) {
         setLoading(false);
         return;
@@ -57,68 +115,293 @@ export default function LearningsPage() {
 
         if (modulesError) throw modulesError;
 
-        // Fetch all recordings
-        const { data: recordingsData } = await supabase
-          .from('recordings')
+        // Fetch all module resources
+        const moduleIds = modulesData?.map((m: LearningModule) => m.id) || [];
+        const { data: resourcesData } = await supabase
+          .from('module_resources')
           .select('*')
-          .in('module_id', modulesData?.map((m: LearningModule) => m.id) || [])
-          .order('created_at', { ascending: true });
+          .in('module_id', moduleIds)
+          .order('session_number', { ascending: true })
+          .order('order_index', { ascending: true });
 
-        // Merge recordings with modules
-        const modulesWithRecordings = modulesData?.map((module: LearningModule) => ({
+        // Merge resources with modules
+        const modulesWithResources = modulesData?.map((module: LearningModule) => ({
           ...module,
-          recordings: recordingsData?.filter((r: Recording) => r.module_id === module.id) || [],
+          resources: resourcesData?.filter((r: ModuleResource) => r.module_id === module.id) || [],
         })) || [];
 
-        setModules(modulesWithRecordings);
+        setModules(modulesWithResources);
+
+        // Fetch case studies for the cohort
+        const { data: caseStudiesData } = await supabase
+          .from('case_studies')
+          .select('*')
+          .eq('cohort_id', profile.cohort_id)
+          .order('week_number', { ascending: true })
+          .order('order_index', { ascending: true });
+
+        setCaseStudies(caseStudiesData || []);
+
+        // Set initial active week
+        if (modulesWithResources.length > 0) {
+          const firstWeek = modulesWithResources[0].week_number || 1;
+          setActiveWeek(firstWeek.toString());
+        }
       } catch (error) {
-        console.error('Error fetching modules:', error);
+        console.error('Error fetching data:', error);
       } finally {
         setLoading(false);
       }
     };
 
     if (!userLoading) {
-      fetchModules();
+      fetchData();
     }
   }, [profile, userLoading]);
 
-  // Group modules by week
-  const modulesByWeek = modules.reduce((acc, module) => {
-    const week = module.week_number || 0;
-    if (!acc[week]) {
-      acc[week] = [];
-    }
-    acc[week].push(module);
-    return acc;
-  }, {} as Record<number, ModuleWithRecordings[]>);
+  // Organize content by week
+  const weekContent: Record<number, WeekContent> = {};
 
-  const weeks = Object.keys(modulesByWeek)
+  modules.forEach(module => {
+    const week = module.week_number || 1;
+    if (!weekContent[week]) {
+      weekContent[week] = {
+        weekNumber: week,
+        modules: [],
+        recordings: [],
+        presentations: [],
+        notes: [],
+        caseStudies: [],
+      };
+    }
+    weekContent[week].modules.push(module);
+
+    module.resources.forEach(resource => {
+      switch (resource.content_type) {
+        case 'video':
+          weekContent[week].recordings.push(resource);
+          break;
+        case 'slides':
+          weekContent[week].presentations.push(resource);
+          break;
+        case 'document':
+          weekContent[week].notes.push(resource);
+          break;
+      }
+    });
+  });
+
+  // Add case studies to weeks
+  caseStudies.forEach(cs => {
+    const week = cs.week_number;
+    if (!weekContent[week]) {
+      weekContent[week] = {
+        weekNumber: week,
+        modules: [],
+        recordings: [],
+        presentations: [],
+        notes: [],
+        caseStudies: [],
+      };
+    }
+    weekContent[week].caseStudies.push(cs);
+  });
+
+  const weeks = Object.keys(weekContent)
     .map(Number)
     .sort((a, b) => a - b);
 
-  // Filter modules based on search
-  const filteredModules = searchQuery
-    ? modules.filter(
-        m =>
-          m.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          m.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          m.recordings.some(r =>
-            r.title.toLowerCase().includes(searchQuery.toLowerCase())
-          )
-      )
-    : modules;
+  // Filter for search
+  const filterResources = (resources: ModuleResource[]) => {
+    if (!searchQuery) return resources;
+    return resources.filter(r =>
+      r.title.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  };
+
+  const filterCaseStudies = (studies: CaseStudy[]) => {
+    if (!searchQuery) return studies;
+    return studies.filter(cs =>
+      cs.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      cs.description?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  };
 
   const formatDuration = (seconds: number | null) => {
-    if (!seconds) return '--:--';
+    if (!seconds) return null;
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return null;
+    return new Date(dateStr).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  };
+
+  const handleResourceClick = (resource: ModuleResource) => {
+    if (resource.content_type === 'link' && resource.external_url) {
+      window.open(resource.external_url, '_blank');
+    } else {
+      setSelectedResource(resource);
+    }
+  };
+
+  const handleCaseStudyClick = (caseStudy: CaseStudy, type: 'problem' | 'solution') => {
+    if (type === 'problem' && caseStudy.problem_doc_url) {
+      setSelectedCaseStudy({ caseStudy, type });
+    } else if (type === 'solution' && caseStudy.solution_visible && caseStudy.solution_doc_url) {
+      setSelectedCaseStudy({ caseStudy, type });
+    }
+  };
+
   if (userLoading || loading) {
     return <PageLoader message="Loading learnings..." />;
   }
+
+  const currentWeekContent = activeWeek ? weekContent[parseInt(activeWeek)] : null;
+
+  // Content section component
+  const ContentSection = ({
+    title,
+    icon: Icon,
+    iconColor,
+    resources,
+    emptyMessage
+  }: {
+    title: string;
+    icon: React.ElementType;
+    iconColor: string;
+    resources: ModuleResource[];
+    emptyMessage: string;
+  }) => {
+    const filtered = filterResources(resources);
+    if (resources.length === 0 && !searchQuery) return null;
+
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Icon className={cn('w-5 h-5', iconColor)} />
+          <h3 className="font-semibold">{title}</h3>
+          <Badge variant="secondary" className="ml-auto">
+            {filtered.length}
+          </Badge>
+        </div>
+        {filtered.length === 0 ? (
+          <p className="text-sm text-muted-foreground pl-7">{emptyMessage}</p>
+        ) : (
+          <div className="space-y-2">
+            {filtered.map((resource) => (
+              <button
+                key={resource.id}
+                onClick={() => handleResourceClick(resource)}
+                className="w-full flex items-center gap-3 p-3 rounded-lg border hover:bg-muted transition-colors group"
+              >
+                <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                  {getContentIcon(resource.content_type)}
+                </div>
+                <div className="flex-1 text-left min-w-0">
+                  <p className="font-medium truncate group-hover:text-primary transition-colors">
+                    {resource.title}
+                  </p>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    {resource.session_number && (
+                      <span>Session {resource.session_number}</span>
+                    )}
+                    {resource.duration_seconds && (
+                      <>
+                        {resource.session_number && <span>•</span>}
+                        <Clock className="w-3 h-3" />
+                        <span>{formatDuration(resource.duration_seconds)}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+                {resource.content_type === 'link' ? (
+                  <ExternalLink className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                ) : (
+                  <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Case Studies section component
+  const CaseStudiesSection = ({ studies }: { studies: CaseStudy[] }) => {
+    const filtered = filterCaseStudies(studies);
+    if (studies.length === 0 && !searchQuery) return null;
+
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <FileQuestion className="w-5 h-5 text-emerald-500" />
+          <h3 className="font-semibold">Case Studies</h3>
+          <Badge variant="secondary" className="ml-auto">
+            {filtered.length}
+          </Badge>
+        </div>
+        {filtered.length === 0 ? (
+          <p className="text-sm text-muted-foreground pl-7">No case studies found</p>
+        ) : (
+          <div className="space-y-3">
+            {filtered.map((cs) => (
+              <Card key={cs.id} className="overflow-hidden">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">{cs.title}</CardTitle>
+                  {cs.description && (
+                    <CardDescription>{cs.description}</CardDescription>
+                  )}
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex flex-wrap gap-2">
+                    {cs.problem_doc_url && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleCaseStudyClick(cs, 'problem')}
+                      >
+                        <FileQuestion className="w-4 h-4 mr-2" />
+                        View Problem
+                      </Button>
+                    )}
+                    {cs.solution_visible && cs.solution_doc_url ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleCaseStudyClick(cs, 'solution')}
+                        className="text-emerald-600 border-emerald-200 hover:bg-emerald-50"
+                      >
+                        <CheckCircle2 className="w-4 h-4 mr-2" />
+                        View Solution
+                      </Button>
+                    ) : cs.solution_doc_url && (
+                      <Badge variant="secondary" className="text-muted-foreground">
+                        Solution not yet available
+                      </Badge>
+                    )}
+                  </div>
+                  {cs.due_date && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Calendar className="w-4 h-4" />
+                      <span>Due: {formatDate(cs.due_date)}</span>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -127,13 +410,13 @@ export default function LearningsPage() {
         <div>
           <h1 className="text-2xl font-bold">My Learnings</h1>
           <p className="text-muted-foreground">
-            Access course materials and recordings
+            Access course materials, recordings, and presentations
           </p>
         </div>
         <div className="relative w-full sm:w-64">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            placeholder="Search modules..."
+            placeholder="Search content..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"
@@ -141,194 +424,190 @@ export default function LearningsPage() {
         </div>
       </div>
 
-      {modules.length === 0 ? (
+      {weeks.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16">
             <BookOpen className="w-12 h-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium mb-2">No modules yet</h3>
+            <h3 className="text-lg font-medium mb-2">No content yet</h3>
             <p className="text-muted-foreground text-center max-w-sm">
-              Learning modules will appear here once your cohort begins. Stay tuned!
+              Learning content will appear here once your cohort begins. Stay tuned!
             </p>
           </CardContent>
         </Card>
-      ) : searchQuery ? (
-        // Search Results View
-        <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Found {filteredModules.length} result{filteredModules.length !== 1 ? 's' : ''} for &ldquo;{searchQuery}&rdquo;
-          </p>
-          {filteredModules.map((module) => (
-            <Card key={module.id} className="hover-lift">
-              <CardHeader className="pb-2">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <Badge variant="secondary" className="mb-2">
-                      Week {module.week_number || 'N/A'}
-                    </Badge>
-                    <CardTitle className="text-lg">{module.title}</CardTitle>
-                    {module.description && (
-                      <CardDescription className="mt-1">
-                        {module.description}
-                      </CardDescription>
-                    )}
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {module.recordings.length > 0 && (
-                  <div className="space-y-2">
-                    {module.recordings.map((recording) => (
-                      <button
-                        key={recording.id}
-                        onClick={() => setSelectedRecording(recording)}
-                        className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-muted transition-colors group"
-                      >
-                        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                          <PlayCircle className="w-5 h-5 text-primary" />
-                        </div>
-                        <div className="flex-1 text-left">
-                          <p className="font-medium group-hover:text-primary transition-colors">
-                            {recording.title}
-                          </p>
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Clock className="w-3 h-3" />
-                            <span>{formatDuration(recording.duration_seconds)}</span>
-                          </div>
-                        </div>
-                        <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
       ) : (
-        // Week-by-Week View
-        <Tabs defaultValue={weeks[0]?.toString()} className="space-y-4">
-          <ScrollArea className="w-full">
-            <TabsList className="inline-flex h-10 items-center justify-start rounded-lg bg-muted p-1 w-auto">
-              {weeks.map((week) => (
-                <TabsTrigger
-                  key={week}
-                  value={week.toString()}
-                  className="px-4"
-                >
-                  Week {week || 'Intro'}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </ScrollArea>
-
-          {weeks.map((week) => (
-            <TabsContent key={week} value={week.toString()} className="space-y-4">
-              <Accordion type="single" collapsible className="space-y-2">
-                {modulesByWeek[week].map((module) => (
-                  <AccordionItem
-                    key={module.id}
-                    value={module.id}
-                    className="border rounded-xl overflow-hidden"
+        <div className="space-y-6">
+          {/* Week Tabs */}
+          <Tabs value={activeWeek} onValueChange={setActiveWeek}>
+            <ScrollArea className="w-full">
+              <TabsList className="inline-flex h-10 items-center justify-start rounded-lg bg-muted p-1 w-auto">
+                {weeks.map((week) => (
+                  <TabsTrigger
+                    key={week}
+                    value={week.toString()}
+                    className="px-4"
                   >
-                    <AccordionTrigger className="px-4 hover:no-underline hover:bg-muted/50 [&[data-state=open]]:bg-muted/50">
-                      <div className="flex items-center gap-4 text-left">
-                        <div className="w-10 h-10 rounded-lg gradient-bg flex items-center justify-center text-white flex-shrink-0">
-                          <BookOpen className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <p className="font-medium">{module.title}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {module.recordings.length} recording{module.recordings.length !== 1 ? 's' : ''}
-                          </p>
-                        </div>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent className="px-4 pb-4">
-                      {module.description && (
-                        <p className="text-sm text-muted-foreground mb-4 pl-14">
-                          {module.description}
-                        </p>
-                      )}
-                      {module.recordings.length === 0 ? (
-                        <p className="text-sm text-muted-foreground pl-14">
-                          No recordings available yet
-                        </p>
-                      ) : (
-                        <div className="space-y-2 pl-14">
-                          {module.recordings.map((recording) => (
-                            <button
-                              key={recording.id}
-                              onClick={() => setSelectedRecording(recording)}
-                              className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-muted transition-colors group"
-                            >
-                              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                                <PlayCircle className="w-5 h-5 text-primary" />
-                              </div>
-                              <div className="flex-1 text-left min-w-0">
-                                <p className="font-medium truncate group-hover:text-primary transition-colors">
-                                  {recording.title}
-                                </p>
-                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                  <Clock className="w-3 h-3" />
-                                  <span>{formatDuration(recording.duration_seconds)}</span>
-                                </div>
-                              </div>
-                              <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </AccordionContent>
-                  </AccordionItem>
+                    Week {week}
+                  </TabsTrigger>
                 ))}
-              </Accordion>
-            </TabsContent>
-          ))}
-        </Tabs>
-      )}
+              </TabsList>
+            </ScrollArea>
 
-      {/* Video Player Modal */}
-      {selectedRecording && (
-        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <Card className="w-full max-w-4xl">
-            <CardHeader className="flex flex-row items-start justify-between">
-              <div>
-                <CardTitle>{selectedRecording.title}</CardTitle>
-                <CardDescription>
-                  Duration: {formatDuration(selectedRecording.duration_seconds)}
-                </CardDescription>
-              </div>
-              <button
-                onClick={() => setSelectedRecording(null)}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                &times;
-              </button>
-            </CardHeader>
-            <CardContent>
-              {selectedRecording.video_url ? (
-                <div className="aspect-video bg-black rounded-lg overflow-hidden">
-                  <video
-                    src={selectedRecording.video_url}
-                    controls
-                    autoPlay
-                    className="w-full h-full"
-                  >
-                    Your browser does not support video playback.
-                  </video>
-                </div>
-              ) : (
-                <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
-                  <div className="text-center">
-                    <Video className="w-12 h-12 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-muted-foreground">Video not available</p>
+            {weeks.map((week) => {
+              const content = weekContent[week];
+              return (
+                <TabsContent key={week} value={week.toString()} className="space-y-6 mt-6">
+                  {/* Week Title */}
+                  {content.modules[0]?.title && (
+                    <div>
+                      <h2 className="text-xl font-semibold">
+                        Week {week}: {content.modules[0].title}
+                      </h2>
+                      {content.modules[0]?.description && (
+                        <p className="text-muted-foreground mt-1">
+                          {content.modules[0].description}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Content Sections */}
+                  <div className="grid gap-6">
+                    <ContentSection
+                      title="Recordings"
+                      icon={Video}
+                      iconColor="text-purple-500"
+                      resources={content.recordings}
+                      emptyMessage="No recordings available"
+                    />
+
+                    <ContentSection
+                      title="Presentations"
+                      icon={Presentation}
+                      iconColor="text-orange-500"
+                      resources={content.presentations}
+                      emptyMessage="No presentations available"
+                    />
+
+                    <ContentSection
+                      title="Session Notes"
+                      icon={FileText}
+                      iconColor="text-blue-500"
+                      resources={content.notes}
+                      emptyMessage="No session notes available"
+                    />
+
+                    <CaseStudiesSection studies={content.caseStudies} />
                   </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+
+                  {/* Empty state for week with no content */}
+                  {content.recordings.length === 0 &&
+                   content.presentations.length === 0 &&
+                   content.notes.length === 0 &&
+                   content.caseStudies.length === 0 && (
+                    <Card>
+                      <CardContent className="flex flex-col items-center justify-center py-12">
+                        <BookOpen className="w-10 h-10 text-muted-foreground mb-3" />
+                        <p className="text-muted-foreground text-center">
+                          No content available for this week yet
+                        </p>
+                      </CardContent>
+                    </Card>
+                  )}
+                </TabsContent>
+              );
+            })}
+          </Tabs>
         </div>
       )}
+
+      {/* Resource Viewer Modal */}
+      <Dialog open={!!selectedResource} onOpenChange={() => setSelectedResource(null)}>
+        <DialogContent className="max-w-5xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 pr-8">
+              {selectedResource && getContentIcon(selectedResource.content_type)}
+              {selectedResource?.title}
+            </DialogTitle>
+            {selectedResource?.duration_seconds && (
+              <p className="text-sm text-muted-foreground flex items-center gap-1">
+                <Clock className="w-3 h-3" />
+                {formatDuration(selectedResource.duration_seconds)}
+              </p>
+            )}
+          </DialogHeader>
+          <div className="aspect-video bg-black rounded-lg overflow-hidden">
+            {selectedResource && (
+              <iframe
+                src={getEmbedUrl(selectedResource)}
+                className="w-full h-full"
+                allow="autoplay; encrypted-media; fullscreen"
+                allowFullScreen
+              />
+            )}
+          </div>
+          {selectedResource?.external_url && (
+            <div className="flex justify-end">
+              <Button variant="outline" size="sm" asChild>
+                <a href={selectedResource.external_url} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  Open in new tab
+                </a>
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Case Study Viewer Modal */}
+      <Dialog open={!!selectedCaseStudy} onOpenChange={() => setSelectedCaseStudy(null)}>
+        <DialogContent className="max-w-5xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 pr-8">
+              {selectedCaseStudy?.type === 'problem' ? (
+                <FileQuestion className="w-5 h-5 text-emerald-500" />
+              ) : (
+                <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+              )}
+              {selectedCaseStudy?.caseStudy.title} - {selectedCaseStudy?.type === 'problem' ? 'Problem' : 'Solution'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="aspect-video bg-muted rounded-lg overflow-hidden">
+            {selectedCaseStudy && (
+              <iframe
+                src={getCaseStudyEmbedUrl(
+                  selectedCaseStudy.type === 'problem'
+                    ? selectedCaseStudy.caseStudy.problem_doc_id || ''
+                    : selectedCaseStudy.caseStudy.solution_doc_id || '',
+                  selectedCaseStudy.type === 'problem'
+                    ? selectedCaseStudy.caseStudy.problem_doc_url
+                    : selectedCaseStudy.caseStudy.solution_doc_url
+                )}
+                className="w-full h-full"
+                allow="autoplay; fullscreen"
+                allowFullScreen
+              />
+            )}
+          </div>
+          {selectedCaseStudy && (
+            <div className="flex justify-end">
+              <Button variant="outline" size="sm" asChild>
+                <a
+                  href={
+                    selectedCaseStudy.type === 'problem'
+                      ? selectedCaseStudy.caseStudy.problem_doc_url || ''
+                      : selectedCaseStudy.caseStudy.solution_doc_url || ''
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  Open in new tab
+                </a>
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

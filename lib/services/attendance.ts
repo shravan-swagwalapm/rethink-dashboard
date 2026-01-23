@@ -27,19 +27,108 @@ export interface ImportResult {
 class AttendanceService {
   /**
    * Match a Zoom participant email to a user profile
+   * First tries direct email match, then checks email aliases
    */
   async matchParticipantToUser(email: string): Promise<string | null> {
     if (!email) return null;
 
     const supabase = await createAdminClient();
+    const normalizedEmail = email.toLowerCase();
 
+    // First try direct match on profiles
     const { data: profile } = await supabase
       .from('profiles')
       .select('id')
-      .eq('email', email.toLowerCase())
+      .eq('email', normalizedEmail)
       .single();
 
-    return profile?.id || null;
+    if (profile) return profile.id;
+
+    // Try matching via email aliases
+    const { data: alias } = await supabase
+      .from('user_email_aliases')
+      .select('user_id')
+      .eq('alias_email', normalizedEmail)
+      .single();
+
+    return alias?.user_id || null;
+  }
+
+  /**
+   * Add an email alias for a user (for matching attendance)
+   */
+  async addEmailAlias(userId: string, aliasEmail: string): Promise<{ success: boolean; error?: string }> {
+    const supabase = await createAdminClient();
+
+    const { error } = await supabase
+      .from('user_email_aliases')
+      .insert({
+        user_id: userId,
+        alias_email: aliasEmail.toLowerCase(),
+      });
+
+    if (error) {
+      if (error.code === '23505') {
+        return { success: false, error: 'This email is already linked to a user' };
+      }
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  }
+
+  /**
+   * Remove an email alias
+   */
+  async removeEmailAlias(aliasId: string): Promise<{ success: boolean; error?: string }> {
+    const supabase = await createAdminClient();
+
+    const { error } = await supabase
+      .from('user_email_aliases')
+      .delete()
+      .eq('id', aliasId);
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  }
+
+  /**
+   * Get all email aliases for a user
+   */
+  async getEmailAliases(userId: string): Promise<{ id: string; alias_email: string; created_at: string }[]> {
+    const supabase = await createAdminClient();
+
+    const { data } = await supabase
+      .from('user_email_aliases')
+      .select('id, alias_email, created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    return data || [];
+  }
+
+  /**
+   * Re-match unlinked attendance records after adding an alias
+   */
+  async rematchAttendanceByEmail(email: string, userId: string): Promise<number> {
+    const supabase = await createAdminClient();
+
+    const { data, error } = await supabase
+      .from('attendance')
+      .update({ user_id: userId })
+      .eq('zoom_user_email', email.toLowerCase())
+      .is('user_id', null)
+      .select();
+
+    if (error) {
+      console.error('Error re-matching attendance:', error);
+      return 0;
+    }
+
+    return data?.length || 0;
   }
 
   /**

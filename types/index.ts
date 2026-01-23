@@ -16,6 +16,8 @@ export type NotificationType = 'session_reminder' | 'new_resource' | 'system';
 
 export type ResourceType = 'file' | 'folder' | 'link';
 
+export type ModuleResourceType = 'video' | 'slides' | 'document' | 'link';
+
 export type FileType = 'pdf' | 'doc' | 'docx' | 'xls' | 'xlsx' | 'mp4' | 'other';
 
 // Core Types
@@ -120,6 +122,36 @@ export interface Recording {
   created_at: string;
 }
 
+export interface ModuleResource {
+  id: string;
+  module_id: string | null;
+  title: string;
+  content_type: ModuleResourceType;
+  google_drive_id: string | null;
+  external_url: string | null;
+  duration_seconds: number | null;
+  thumbnail_url: string | null;
+  order_index: number;
+  session_number: number | null;
+  created_at: string;
+}
+
+export interface UserEmailAlias {
+  id: string;
+  user_id: string;
+  alias_email: string;
+  created_at: string;
+}
+
+export interface AttendanceSegment {
+  id: string;
+  attendance_id: string;
+  join_time: string;
+  leave_time: string | null;
+  duration_seconds: number | null;
+  created_at: string;
+}
+
 export interface Invoice {
   id: string;
   user_id: string;
@@ -202,6 +234,85 @@ export interface AttendanceWithDetails extends Attendance {
 export interface ResourceWithChildren extends Resource {
   children?: Resource[];
   uploaded_by_profile?: Profile;
+}
+
+export interface LearningModuleWithResources extends LearningModule {
+  resources: ModuleResource[];
+  recordings?: Recording[];
+}
+
+export interface AttendanceWithSegments extends Attendance {
+  segments?: AttendanceSegment[];
+}
+
+// Case Studies
+export interface CaseStudy {
+  id: string;
+  cohort_id: string;
+  week_number: number;
+  title: string;
+  description: string | null;
+  problem_doc_id: string | null;
+  problem_doc_url: string | null;
+  solution_doc_id: string | null;
+  solution_doc_url: string | null;
+  solution_visible: boolean;
+  due_date: string | null;
+  order_index: number;
+  created_at: string;
+}
+
+// Groups
+export interface Group {
+  id: string;
+  cohort_id: string;
+  name: string;
+  created_at: string;
+}
+
+export interface GroupMember {
+  id: string;
+  group_id: string;
+  user_id: string;
+  created_at: string;
+  user?: Profile;
+}
+
+export interface GroupWithMembers extends Group {
+  members: GroupMember[];
+}
+
+// Assignments
+export interface Assignment {
+  id: string;
+  cohort_id: string;
+  week_number: number;
+  title: string;
+  description: string | null;
+  due_date: string | null;
+  max_score: number;
+  created_at: string;
+}
+
+export interface AssignmentSubmission {
+  id: string;
+  assignment_id: string;
+  group_id: string | null;
+  user_id: string | null;
+  file_url: string | null;
+  file_name: string | null;
+  google_drive_url: string | null;
+  submitted_at: string;
+  grade: number | null;
+  feedback: string | null;
+  graded_by: string | null;
+  graded_at: string | null;
+  status: 'draft' | 'submitted' | 'graded';
+  created_at: string;
+}
+
+export interface AssignmentWithSubmissions extends Assignment {
+  submissions?: AssignmentSubmission[];
 }
 
 // Form types
