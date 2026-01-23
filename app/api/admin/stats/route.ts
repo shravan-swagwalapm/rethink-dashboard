@@ -1,6 +1,5 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
-import { isSuperuserDomain } from '@/lib/auth/allowed-domains';
 
 export async function GET() {
   const supabase = await createClient();
@@ -10,19 +9,15 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // Check superuser domain or admin role
-  const userEmail = user.email;
-  let isAdmin = userEmail ? isSuperuserDomain(userEmail) : false;
+  // Check admin role from database only - no domain-based bypass
+  const adminClient = await createAdminClient();
+  const { data: profile } = await adminClient
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single();
 
-  if (!isAdmin) {
-    const adminClient = await createAdminClient();
-    const { data: profile } = await adminClient
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-    isAdmin = profile?.role === 'admin' || profile?.role === 'company_user';
-  }
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'company_user';
 
   if (!isAdmin) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });

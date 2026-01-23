@@ -37,6 +37,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import {
   Plus,
@@ -51,7 +52,10 @@ import {
   ExternalLink,
   Check,
   X,
+  CalendarPlus,
+  Link2,
 } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 import { format, parseISO, isPast } from 'date-fns';
 import type { Session, Cohort } from '@/types';
 
@@ -62,10 +66,16 @@ interface SessionWithStats extends Session {
 }
 
 export default function SessionsPage() {
+  const searchParams = useSearchParams();
   const [sessions, setSessions] = useState<SessionWithStats[]>([]);
   const [cohorts, setCohorts] = useState<Cohort[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  // Integration status
+  const [zoomConfigured, setZoomConfigured] = useState(false);
+  const [calendarConnected, setCalendarConnected] = useState(false);
+  const [calendarEmail, setCalendarEmail] = useState<string | null>(null);
 
   const [showForm, setShowForm] = useState(false);
   const [editingSession, setEditingSession] = useState<Session | null>(null);
@@ -77,17 +87,35 @@ export default function SessionsPage() {
     scheduled_time: '',
     duration_minutes: 60,
     zoom_link: '',
+    auto_create_zoom: false,
+    send_calendar_invites: false,
   });
 
   const fetchData = useCallback(async () => {
     try {
-      const response = await fetch('/api/admin/sessions');
-      if (!response.ok) {
-        throw new Error('Failed to fetch sessions');
+      // Fetch sessions, zoom status, and calendar status in parallel
+      const [sessionsRes, zoomRes, calendarRes] = await Promise.all([
+        fetch('/api/admin/sessions'),
+        fetch('/api/admin/zoom'),
+        fetch('/api/admin/calendar'),
+      ]);
+
+      if (sessionsRes.ok) {
+        const data = await sessionsRes.json();
+        setSessions(data.sessions || []);
+        setCohorts(data.cohorts || []);
       }
-      const data = await response.json();
-      setSessions(data.sessions || []);
-      setCohorts(data.cohorts || []);
+
+      if (zoomRes.ok) {
+        const zoomData = await zoomRes.json();
+        setZoomConfigured(zoomData.configured && zoomData.status === 'connected');
+      }
+
+      if (calendarRes.ok) {
+        const calendarData = await calendarRes.json();
+        setCalendarConnected(calendarData.connected);
+        setCalendarEmail(calendarData.email);
+      }
     } catch (error) {
       console.error('Error fetching data:', error);
       toast.error('Failed to load sessions');
@@ -99,6 +127,19 @@ export default function SessionsPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Handle calendar connection status from URL params
+  useEffect(() => {
+    if (searchParams.get('calendar_connected') === 'true') {
+      toast.success('Google Calendar connected successfully!');
+      // Clean up URL
+      window.history.replaceState({}, '', '/admin/sessions');
+    }
+    if (searchParams.get('calendar_error')) {
+      toast.error('Failed to connect Google Calendar. Please try again.');
+      window.history.replaceState({}, '', '/admin/sessions');
+    }
+  }, [searchParams]);
 
   const handleOpenForm = (session?: Session) => {
     if (session) {
@@ -112,6 +153,8 @@ export default function SessionsPage() {
         scheduled_time: format(scheduledDate, 'HH:mm'),
         duration_minutes: session.duration_minutes,
         zoom_link: session.zoom_link || '',
+        auto_create_zoom: false, // Don't auto-create for edits
+        send_calendar_invites: false, // Don't re-send for edits
       });
     } else {
       setEditingSession(null);
@@ -123,12 +166,18 @@ export default function SessionsPage() {
         scheduled_time: '',
         duration_minutes: 60,
         zoom_link: '',
+        auto_create_zoom: zoomConfigured, // Default to true if Zoom is configured
+        send_calendar_invites: calendarConnected, // Default to true if Calendar is connected
       });
     }
     setShowForm(true);
   };
 
   const handleSave = async () => {
+    if (!formData.cohort_id) {
+      toast.error('Please select a cohort');
+      return;
+    }
     if (!formData.title.trim()) {
       toast.error('Title is required');
       return;
@@ -160,6 +209,8 @@ export default function SessionsPage() {
             scheduled_at: scheduledAt.toISOString(),
             duration_minutes: formData.duration_minutes,
             zoom_link: formData.zoom_link || null,
+            auto_create_zoom: formData.auto_create_zoom,
+            send_calendar_invites: formData.send_calendar_invites,
           };
 
       const response = await fetch('/api/admin/sessions', {
@@ -172,7 +223,13 @@ export default function SessionsPage() {
         throw new Error('Failed to save session');
       }
 
-      toast.success(editingSession ? 'Session updated' : 'Session created');
+      let message = editingSession ? 'Session updated' : 'Session created';
+      if (!editingSession) {
+        if (formData.auto_create_zoom) message += ' with Zoom meeting';
+        if (formData.send_calendar_invites) message += formData.auto_create_zoom ? ' and calendar invites sent' : ' and calendar invites sent';
+      }
+
+      toast.success(message);
       setShowForm(false);
       fetchData();
     } catch (error) {
@@ -449,7 +506,7 @@ export default function SessionsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="cohort">Cohort</Label>
+              <Label htmlFor="cohort">Cohort *</Label>
               <Select
                 value={formData.cohort_id}
                 onValueChange={(value) => setFormData({ ...formData, cohort_id: value })}
@@ -502,15 +559,89 @@ export default function SessionsPage() {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="zoom_link">Zoom Link (optional)</Label>
-              <Input
-                id="zoom_link"
-                value={formData.zoom_link}
-                onChange={(e) => setFormData({ ...formData, zoom_link: e.target.value })}
-                placeholder="https://zoom.us/j/..."
-              />
-            </div>
+            {/* Zoom section */}
+            {!editingSession && (
+              <div className="space-y-3 p-4 rounded-lg bg-muted/50">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Video className="w-4 h-4 text-blue-500" />
+                    <Label htmlFor="auto_zoom" className="cursor-pointer">Auto-create Zoom meeting</Label>
+                  </div>
+                  <Switch
+                    id="auto_zoom"
+                    checked={formData.auto_create_zoom}
+                    onCheckedChange={(checked) => setFormData({ ...formData, auto_create_zoom: checked, zoom_link: checked ? '' : formData.zoom_link })}
+                    disabled={!zoomConfigured}
+                  />
+                </div>
+                {!zoomConfigured && (
+                  <p className="text-xs text-muted-foreground">
+                    Zoom is not configured. Add ZOOM_ACCOUNT_ID, ZOOM_CLIENT_ID, and ZOOM_CLIENT_SECRET to enable.
+                  </p>
+                )}
+                {!formData.auto_create_zoom && (
+                  <div className="space-y-2">
+                    <Label htmlFor="zoom_link">Zoom Link (manual)</Label>
+                    <Input
+                      id="zoom_link"
+                      value={formData.zoom_link}
+                      onChange={(e) => setFormData({ ...formData, zoom_link: e.target.value })}
+                      placeholder="https://zoom.us/j/..."
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {editingSession && (
+              <div className="space-y-2">
+                <Label htmlFor="zoom_link">Zoom Link</Label>
+                <Input
+                  id="zoom_link"
+                  value={formData.zoom_link}
+                  onChange={(e) => setFormData({ ...formData, zoom_link: e.target.value })}
+                  placeholder="https://zoom.us/j/..."
+                />
+              </div>
+            )}
+
+            {/* Calendar section */}
+            {!editingSession && (
+              <div className="space-y-3 p-4 rounded-lg bg-muted/50">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CalendarPlus className="w-4 h-4 text-green-500" />
+                    <Label htmlFor="calendar_invites" className="cursor-pointer">Send calendar invites to cohort</Label>
+                  </div>
+                  <Switch
+                    id="calendar_invites"
+                    checked={formData.send_calendar_invites}
+                    onCheckedChange={(checked) => setFormData({ ...formData, send_calendar_invites: checked })}
+                    disabled={!calendarConnected}
+                  />
+                </div>
+                {!calendarConnected ? (
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-muted-foreground">
+                      Connect Google Calendar to send invites
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.location.href = '/api/calendar/auth'}
+                    >
+                      <Link2 className="w-3 h-3 mr-1" />
+                      Connect
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Connected as {calendarEmail}. {formData.cohort_id ? 'All cohort members will receive calendar invites.' : 'Select a cohort to send invites.'}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           <DialogFooter>

@@ -53,12 +53,11 @@ export default function DashboardPage() {
             }
           }
 
-          // Fetch stats
+          // Fetch stats - count all users in cohort
           const { count: studentsCount } = await supabase
             .from('profiles')
             .select('*', { count: 'exact', head: true })
-            .eq('cohort_id', profile.cohort_id)
-            .eq('role', 'student');
+            .eq('cohort_id', profile.cohort_id);
 
           // Fetch attendance
           const { data: attendance } = await supabase
@@ -78,18 +77,17 @@ export default function DashboardPage() {
             .eq('cohort_id', profile.cohort_id)
             .single();
 
-          // Fetch upcoming sessions count
-          const { count: sessionsCount } = await supabase
-            .from('sessions')
+          // Fetch total resources count for the cohort
+          const { count: resourcesCount } = await supabase
+            .from('resources')
             .select('*', { count: 'exact', head: true })
-            .eq('cohort_id', profile.cohort_id)
-            .gte('scheduled_at', new Date().toISOString());
+            .eq('cohort_id', profile.cohort_id);
 
           setStats({
             total_students: studentsCount || 0,
             attendance_percentage: Math.round(avgAttendance),
             current_rank: ranking?.rank || null,
-            upcoming_sessions: sessionsCount || 0,
+            total_resources: resourcesCount || 0,
           });
 
           // Fetch upcoming sessions

@@ -4,7 +4,7 @@
 
 export const ALLOWED_EMAIL_DOMAINS = [
   'gmail.com',
-  'naum.systems', // Superuser domain - auto-admin access
+  'naum.systems', // Company domain - bypasses whitelist but NOT auto-admin
   // Future domains to add:
   // 'yahoo.com',
   // 'yahoo.co.in',
@@ -15,9 +15,10 @@ export const ALLOWED_EMAIL_DOMAINS = [
   // 'live.com',
 ];
 
-// Superuser domains - all emails from these domains get auto-admin access
-// No need to be in invites table, bypasses whitelist check
-export const SUPERUSER_DOMAINS = [
+// Domains that bypass the whitelist/invite check
+// Users from these domains can login without being invited
+// NOTE: This does NOT grant admin access - admin role must be set in database
+export const WHITELIST_BYPASS_DOMAINS = [
   'naum.systems',
 ];
 
@@ -41,9 +42,9 @@ export function getEmailDomain(email: string): string | null {
   return email.split('@')[1]?.toLowerCase() || null;
 }
 
-// Check if email is from a superuser domain
-// Superuser domains bypass whitelist check and get auto-admin access
-export function isSuperuserDomain(email: string): boolean {
+// Check if email bypasses whitelist check (can login without being invited)
+// NOTE: This does NOT grant admin access - admin role must be set in database
+export function bypassesWhitelist(email: string): boolean {
   const domain = getEmailDomain(email);
-  return domain ? SUPERUSER_DOMAINS.includes(domain) : false;
+  return domain ? WHITELIST_BYPASS_DOMAINS.includes(domain) : false;
 }

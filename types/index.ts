@@ -223,7 +223,7 @@ export interface DashboardStats {
   total_students: number;
   attendance_percentage: number;
   current_rank: number | null;
-  upcoming_sessions: number;
+  total_resources: number;
 }
 
 // API Response types

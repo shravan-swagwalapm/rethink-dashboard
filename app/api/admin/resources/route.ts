@@ -1,6 +1,5 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
-import { isSuperuserDomain } from '@/lib/auth/allowed-domains';
 
 async function verifyAdmin() {
   const supabase = await createClient();
@@ -10,11 +9,7 @@ async function verifyAdmin() {
     return { authorized: false, error: 'Unauthorized', status: 401 };
   }
 
-  const userEmail = user.email;
-  if (userEmail && isSuperuserDomain(userEmail)) {
-    return { authorized: true, userId: user.id };
-  }
-
+  // Check admin role from database only - no domain-based bypass
   const adminClient = await createAdminClient();
   const { data: profile } = await adminClient
     .from('profiles')

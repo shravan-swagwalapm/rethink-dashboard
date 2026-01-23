@@ -16,3 +16,8 @@ export function getClient() {
   }
   return browserClient;
 }
+
+// Reset the client singleton (call after sign out or when session changes)
+export function resetClient() {
+  browserClient = null;
+}

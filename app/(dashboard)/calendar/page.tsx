@@ -3,13 +3,11 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useUser } from '@/hooks/use-user';
 import { getClient } from '@/lib/supabase/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Dialog,
   DialogContent,
@@ -76,7 +74,6 @@ export default function CalendarPage() {
       const end = endOfMonth(currentMonth);
 
       try {
-        // Fetch sessions for the current month
         const { data: sessionsData, error: sessionsError } = await supabase
           .from('sessions')
           .select('*')
@@ -87,14 +84,12 @@ export default function CalendarPage() {
 
         if (sessionsError) throw sessionsError;
 
-        // Fetch RSVPs for the user
         const { data: rsvpsData } = await supabase
           .from('rsvps')
           .select('*')
           .eq('user_id', profile.id)
           .in('session_id', sessionsData?.map((s: Session) => s.id) || []);
 
-        // Merge RSVPs with sessions
         const sessionsWithRsvp = sessionsData?.map((session: Session) => ({
           ...session,
           user_rsvp: rsvpsData?.find((r: Rsvp) => r.session_id === session.id),
@@ -132,7 +127,6 @@ export default function CalendarPage() {
 
       if (error) throw error;
 
-      // Update local state
       setSessions(prev =>
         prev.map(s =>
           s.id === selectedSession.id
@@ -205,14 +199,12 @@ export default function CalendarPage() {
     }
   };
 
-  // Generate calendar days
   const calendarDays = useMemo(() => {
     const start = startOfWeek(startOfMonth(currentMonth));
     const end = endOfWeek(endOfMonth(currentMonth));
     return eachDayOfInterval({ start, end });
   }, [currentMonth]);
 
-  // Get sessions for a specific day
   const getSessionsForDay = (day: Date) => {
     return sessions.filter(session =>
       isSameDay(parseISO(session.scheduled_at), day)
@@ -230,126 +222,146 @@ export default function CalendarPage() {
   if (userLoading || loading) {
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <Skeleton className="h-8 w-48" />
-          <Skeleton className="h-10 w-32" />
-        </div>
-        <Skeleton className="h-96 w-full rounded-xl" />
+        <Skeleton className="h-12 w-full rounded-xl" />
+        <Skeleton className="h-[500px] w-full rounded-xl" />
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Calendar</h1>
-          <p className="text-muted-foreground">View and RSVP to upcoming sessions</p>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Globe className="w-4 h-4 text-muted-foreground" />
-            <Label htmlFor="utc-toggle" className="text-sm text-muted-foreground">
-              Show UTC
-            </Label>
-            <Switch
-              id="utc-toggle"
-              checked={showUTC}
-              onCheckedChange={setShowUTC}
-            />
+      {/* Header Card */}
+      <Card className="gradient-bg border-0">
+        <CardContent className="p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="text-white">
+              <h1 className="text-2xl font-bold flex items-center gap-2">
+                <CalendarIcon className="w-6 h-6" />
+                Session Calendar
+              </h1>
+              <p className="text-white/80 mt-1">View and RSVP to your upcoming sessions</p>
+            </div>
+            <div className="flex items-center gap-3 bg-white/10 rounded-lg px-3 py-2">
+              <Globe className="w-4 h-4 text-white/70" />
+              <Label htmlFor="utc-toggle" className="text-sm text-white/90 cursor-pointer">
+                Show UTC
+              </Label>
+              <Switch
+                id="utc-toggle"
+                checked={showUTC}
+                onCheckedChange={setShowUTC}
+              />
+            </div>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
-      {/* Calendar Card */}
-      <Card className="overflow-hidden">
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-lg">
+      {/* Calendar */}
+      <Card className="overflow-hidden shadow-lg">
+        {/* Month Navigation */}
+        <div className="flex items-center justify-between p-4 border-b bg-muted/30">
+          <h2 className="text-xl font-semibold">
             {format(currentMonth, 'MMMM yyyy')}
-          </CardTitle>
-          <div className="flex items-center gap-2">
+          </h2>
+          <div className="flex items-center gap-1">
             <Button
-              variant="outline"
+              variant="ghost"
               size="icon"
               onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+              className="hover:bg-primary/10"
             >
-              <ChevronLeft className="w-4 h-4" />
+              <ChevronLeft className="w-5 h-5" />
             </Button>
             <Button
               variant="outline"
               size="sm"
               onClick={() => setCurrentMonth(new Date())}
+              className="px-4"
             >
               Today
             </Button>
             <Button
-              variant="outline"
+              variant="ghost"
               size="icon"
               onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+              className="hover:bg-primary/10"
             >
-              <ChevronRight className="w-4 h-4" />
+              <ChevronRight className="w-5 h-5" />
             </Button>
           </div>
-        </CardHeader>
+        </div>
+
         <CardContent className="p-0">
-          {/* Calendar Grid */}
-          <div className="grid grid-cols-7">
-            {/* Weekday headers */}
+          {/* Weekday Headers */}
+          <div className="grid grid-cols-7 bg-muted/50">
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
               <div
                 key={day}
-                className="p-2 text-center text-sm font-medium text-muted-foreground border-b"
+                className="p-3 text-center text-sm font-semibold text-muted-foreground border-b"
               >
                 {day}
               </div>
             ))}
+          </div>
 
-            {/* Calendar days */}
-            {calendarDays.map(day => {
+          {/* Calendar Grid */}
+          <div className="grid grid-cols-7">
+            {calendarDays.map((day, index) => {
               const daySessions = getSessionsForDay(day);
               const isCurrentMonth = isSameMonth(day, currentMonth);
               const isDayToday = isToday(day);
+              const isLastRow = index >= calendarDays.length - 7;
 
               return (
                 <div
                   key={day.toISOString()}
                   className={cn(
-                    'min-h-[100px] p-2 border-b border-r relative',
-                    !isCurrentMonth && 'bg-muted/30'
+                    'min-h-[120px] p-2 border-r transition-colors',
+                    !isLastRow && 'border-b',
+                    !isCurrentMonth && 'bg-muted/20',
+                    isCurrentMonth && 'hover:bg-muted/30',
+                    isDayToday && 'bg-primary/5'
                   )}
                 >
-                  <span
-                    className={cn(
-                      'inline-flex items-center justify-center w-7 h-7 text-sm rounded-full',
-                      isDayToday && 'bg-primary text-primary-foreground font-medium',
-                      !isCurrentMonth && 'text-muted-foreground'
-                    )}
-                  >
-                    {format(day, 'd')}
-                  </span>
+                  <div className="flex items-center justify-center mb-2">
+                    <span
+                      className={cn(
+                        'inline-flex items-center justify-center w-8 h-8 text-sm rounded-full font-medium transition-colors',
+                        isDayToday && 'bg-primary text-primary-foreground shadow-md',
+                        !isCurrentMonth && 'text-muted-foreground/50',
+                        isCurrentMonth && !isDayToday && 'text-foreground'
+                      )}
+                    >
+                      {format(day, 'd')}
+                    </span>
+                  </div>
 
-                  <div className="mt-1 space-y-1">
+                  <div className="space-y-1">
                     {daySessions.slice(0, 2).map(session => (
                       <button
                         key={session.id}
                         onClick={() => setSelectedSession(session)}
                         className={cn(
-                          'w-full text-left p-1.5 rounded-md text-xs font-medium truncate transition-colors',
+                          'w-full text-left px-2 py-1.5 rounded-md text-xs font-medium truncate transition-all hover:scale-[1.02] shadow-sm',
                           session.user_rsvp?.response === 'yes'
-                            ? 'bg-green-500/10 text-green-600 dark:text-green-400 hover:bg-green-500/20'
+                            ? 'bg-green-500 text-white hover:bg-green-600'
                             : session.user_rsvp?.response === 'no'
-                            ? 'bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500/20'
-                            : 'bg-primary/10 text-primary hover:bg-primary/20'
+                            ? 'bg-red-500/80 text-white hover:bg-red-600'
+                            : 'bg-primary text-primary-foreground hover:bg-primary/90'
                         )}
                       >
-                        {format(parseISO(session.scheduled_at), 'h:mm a')} - {session.title}
+                        <span className="opacity-90">{format(parseISO(session.scheduled_at), 'h:mm a')}</span>
+                        <span className="mx-1">·</span>
+                        <span>{session.title}</span>
                       </button>
                     ))}
                     {daySessions.length > 2 && (
-                      <p className="text-xs text-muted-foreground pl-1">
+                      <button
+                        onClick={() => setSelectedSession(daySessions[2])}
+                        className="w-full text-xs text-primary hover:underline text-left pl-2"
+                      >
                         +{daySessions.length - 2} more
-                      </p>
+                      </button>
                     )}
                   </div>
                 </div>
@@ -360,17 +372,17 @@ export default function CalendarPage() {
       </Card>
 
       {/* Legend */}
-      <div className="flex items-center gap-4 text-sm">
+      <div className="flex flex-wrap items-center justify-center gap-6 text-sm">
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-green-500/20 border border-green-500" />
+          <div className="w-4 h-4 rounded bg-green-500 shadow-sm" />
           <span className="text-muted-foreground">Attending</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-red-500/20 border border-red-500" />
+          <div className="w-4 h-4 rounded bg-red-500/80 shadow-sm" />
           <span className="text-muted-foreground">Not attending</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-primary/20 border border-primary" />
+          <div className="w-4 h-4 rounded bg-primary shadow-sm" />
           <span className="text-muted-foreground">Pending RSVP</span>
         </div>
       </div>
@@ -379,45 +391,64 @@ export default function CalendarPage() {
       <Dialog open={!!selectedSession} onOpenChange={(open) => !open && setSelectedSession(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{selectedSession?.title}</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-xl">{selectedSession?.title}</DialogTitle>
+            <DialogDescription className="text-base">
               {selectedSession && format(parseISO(selectedSession.scheduled_at), 'EEEE, MMMM d, yyyy')}
             </DialogDescription>
           </DialogHeader>
 
           {selectedSession && (
-            <div className="space-y-4">
-              {/* Time */}
-              <div className="flex items-center gap-3 text-sm">
-                <Clock className="w-4 h-4 text-muted-foreground" />
-                <span>
-                  {formatTime(selectedSession.scheduled_at)} • {selectedSession.duration_minutes} min
+            <div className="space-y-4 pt-2">
+              {/* Time Badge */}
+              <div className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-muted">
+                <Clock className="w-4 h-4 text-primary" />
+                <span className="font-medium">
+                  {formatTime(selectedSession.scheduled_at)}
                 </span>
+                <span className="text-muted-foreground">·</span>
+                <span className="text-muted-foreground">{selectedSession.duration_minutes} min</span>
               </div>
 
               {/* Description */}
               {selectedSession.description && (
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground leading-relaxed">
                   {selectedSession.description}
                 </p>
               )}
 
-              {/* Zoom Link */}
-              {selectedSession.zoom_link && (
+              {/* Action Buttons */}
+              <div className="space-y-2">
+                {/* Zoom Link */}
+                {selectedSession.zoom_link && (
+                  <Button
+                    className="w-full gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+                    onClick={() => window.open(selectedSession.zoom_link!, '_blank')}
+                  >
+                    <Video className="w-4 h-4" />
+                    Join Zoom Meeting
+                    <ExternalLink className="w-3 h-3 ml-auto" />
+                  </Button>
+                )}
+
+                {/* Open in Google Calendar */}
                 <Button
                   variant="outline"
                   className="w-full gap-2"
-                  onClick={() => window.open(selectedSession.zoom_link!, '_blank')}
+                  onClick={() => {
+                    const date = parseISO(selectedSession.scheduled_at);
+                    const gcalUrl = `https://calendar.google.com/calendar/r/day/${format(date, 'yyyy')}/${format(date, 'M')}/${format(date, 'd')}`;
+                    window.open(gcalUrl, '_blank');
+                  }}
                 >
-                  <Video className="w-4 h-4" />
-                  Join Zoom Meeting
+                  <CalendarIcon className="w-4 h-4" />
+                  Open in Google Calendar
                   <ExternalLink className="w-3 h-3 ml-auto" />
                 </Button>
-              )}
+              </div>
 
-              {/* RSVP Buttons */}
-              <div className="space-y-3">
-                <Label className="text-sm font-medium">Your RSVP</Label>
+              {/* RSVP Section */}
+              <div className="space-y-3 pt-2 border-t">
+                <Label className="text-sm font-semibold">Your RSVP</Label>
                 <div className="flex gap-2">
                   <Button
                     variant={selectedSession.user_rsvp?.response === 'yes' ? 'default' : 'outline'}
@@ -455,7 +486,7 @@ export default function CalendarPage() {
                     ) : (
                       <BellOff className="w-4 h-4 text-muted-foreground" />
                     )}
-                    <span className="text-sm">Session reminder</span>
+                    <span className="text-sm font-medium">Session reminder</span>
                   </div>
                   <Switch
                     checked={selectedSession.user_rsvp.reminder_enabled}
@@ -464,8 +495,8 @@ export default function CalendarPage() {
                 </div>
               )}
 
-              {/* Timezone note */}
-              <p className="text-xs text-muted-foreground text-center">
+              {/* Timezone Note */}
+              <p className="text-xs text-muted-foreground text-center pt-2">
                 Times shown in {showUTC ? 'UTC' : userTimezone}
               </p>
             </div>

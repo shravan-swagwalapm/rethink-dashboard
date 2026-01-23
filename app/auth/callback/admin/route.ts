@@ -1,6 +1,6 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
-import { isEmailDomainAllowed, isSuperuserDomain } from '@/lib/auth/allowed-domains';
+import { isEmailDomainAllowed, bypassesWhitelist } from '@/lib/auth/allowed-domains';
 import { isEmailWhitelisted, markInviteAsAccepted } from '@/lib/auth/whitelist';
 
 // This route handles ADMIN login mode
@@ -41,13 +41,23 @@ export async function GET(request: Request) {
     const adminClient = await createAdminClient();
     let userRole = 'student'; // default role
 
-    // Step 2: Check if superuser domain - bypass whitelist, auto-admin access
-    if (isSuperuserDomain(userEmail)) {
+    // Step 2: Check if domain bypasses whitelist (can login without invite)
+    // NOTE: This does NOT grant admin access - admin role must be set in database
+    if (bypassesWhitelist(userEmail)) {
+      // Check if profile already exists to get existing role
+      const { data: existingProfile } = await adminClient
+        .from('profiles')
+        .select('role')
+        .eq('id', data.session.user.id)
+        .maybeSingle();
+
+      const existingRole = existingProfile?.role || 'student';
+
       const { error: upsertError } = await adminClient.from('profiles').upsert(
         {
           id: data.session.user.id,
           email: userEmail.toLowerCase(),
-          role: 'admin',
+          role: existingRole, // Preserve existing role or default to student
           full_name:
             data.session.user.user_metadata?.full_name ||
             data.session.user.user_metadata?.name ||
@@ -57,9 +67,9 @@ export async function GET(request: Request) {
       );
 
       if (upsertError) {
-        console.error('Error creating superuser profile:', upsertError);
+        console.error('Error creating whitelist-bypass profile:', upsertError);
       }
-      userRole = 'admin';
+      userRole = existingRole;
     } else {
       // Step 3: Check if email is whitelisted (exists in invites or profiles)
       const whitelist = await isEmailWhitelisted(userEmail);

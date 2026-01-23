@@ -3,7 +3,7 @@
  * Two-way sync for session management
  */
 
-interface CalendarEvent {
+export interface CalendarEvent {
   id?: string;
   summary: string;
   description?: string;
@@ -15,6 +15,11 @@ interface CalendarEvent {
     dateTime: string;
     timeZone: string;
   };
+  attendees?: {
+    email: string;
+    displayName?: string;
+    responseStatus?: string;
+  }[];
   conferenceData?: {
     entryPoints?: {
       entryPointType: string;
@@ -49,7 +54,7 @@ export class GoogleCalendarService {
       client_id: this.config.clientId,
       redirect_uri: this.config.redirectUri,
       response_type: 'code',
-      scope: 'https://www.googleapis.com/auth/calendar',
+      scope: 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/userinfo.email',
       access_type: 'offline',
       prompt: 'consent',
       ...(state && { state }),
@@ -123,6 +128,31 @@ export class GoogleCalendarService {
   }
 
   /**
+   * Check if calendar is configured
+   */
+  isConfigured(): boolean {
+    return !!(this.config.clientId && this.config.clientSecret);
+  }
+
+  /**
+   * Get user info from access token
+   */
+  async getUserInfo(accessToken: string): Promise<{ email: string; name?: string }> {
+    const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to get user info');
+    }
+
+    const data = await response.json();
+    return { email: data.email, name: data.name };
+  }
+
+  /**
    * Create calendar event
    */
   async createEvent(
@@ -145,6 +175,41 @@ export class GoogleCalendarService {
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.error?.message || 'Failed to create event');
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Create calendar event with attendees (sends invites)
+   */
+  async createEventWithAttendees(
+    accessToken: string,
+    event: CalendarEvent,
+    attendeeEmails: string[],
+    calendarId = 'primary'
+  ): Promise<CalendarEvent> {
+    const eventWithAttendees = {
+      ...event,
+      attendees: attendeeEmails.map(email => ({ email })),
+    };
+
+    // Add sendUpdates=all to send email invites
+    const response = await fetch(
+      `${this.baseUrl}/calendars/${calendarId}/events?sendUpdates=all`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(eventWithAttendees),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error?.message || 'Failed to create event with attendees');
     }
 
     return response.json();

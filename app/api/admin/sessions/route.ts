@@ -1,6 +1,7 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
-import { isSuperuserDomain } from '@/lib/auth/allowed-domains';
+import { zoomService } from '@/lib/integrations/zoom';
+import { googleCalendar } from '@/lib/integrations/google-calendar';
 
 async function verifyAdmin() {
   const supabase = await createClient();
@@ -10,11 +11,7 @@ async function verifyAdmin() {
     return { authorized: false, error: 'Unauthorized', status: 401 };
   }
 
-  const userEmail = user.email;
-  if (userEmail && isSuperuserDomain(userEmail)) {
-    return { authorized: true, userId: user.id };
-  }
-
+  // Check admin role from database only - no domain-based bypass
   const adminClient = await createAdminClient();
   const { data: profile } = await adminClient
     .from('profiles')
@@ -29,6 +26,40 @@ async function verifyAdmin() {
   }
 
   return { authorized: true, userId: user.id };
+}
+
+// Helper to get valid calendar access token
+async function getValidCalendarToken(userId: string): Promise<string | null> {
+  const adminClient = await createAdminClient();
+
+  const { data: tokenData } = await adminClient
+    .from('calendar_tokens')
+    .select('*')
+    .eq('user_id', userId)
+    .single();
+
+  if (!tokenData) return null;
+
+  // Check if token is expired (with 5 min buffer)
+  const expiresAt = new Date(tokenData.expires_at);
+  if (expiresAt.getTime() < Date.now() + 300000) {
+    try {
+      const refreshed = await googleCalendar.refreshAccessToken(tokenData.refresh_token);
+      await adminClient
+        .from('calendar_tokens')
+        .update({
+          access_token: refreshed.accessToken,
+          expires_at: new Date(Date.now() + refreshed.expiresIn * 1000).toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('user_id', userId);
+      return refreshed.accessToken;
+    } catch {
+      return null;
+    }
+  }
+
+  return tokenData.access_token;
 }
 
 // GET - Fetch sessions and cohorts
@@ -50,7 +81,7 @@ export async function GET() {
       adminClient
         .from('cohorts')
         .select('*')
-        .in('status', ['active', 'completed'])
+        .eq('status', 'active')
         .order('name', { ascending: true }),
     ]);
 
@@ -94,7 +125,16 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { title, description, cohort_id, scheduled_at, duration_minutes, zoom_link } = body;
+    const {
+      title,
+      description,
+      cohort_id,
+      scheduled_at,
+      duration_minutes,
+      zoom_link,
+      auto_create_zoom,
+      send_calendar_invites
+    } = body;
 
     if (!title?.trim()) {
       return NextResponse.json({ error: 'Title is required' }, { status: 400 });
@@ -104,25 +144,102 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Scheduled time is required' }, { status: 400 });
     }
 
-    const adminClient = await createAdminClient();
+    if (!cohort_id) {
+      return NextResponse.json({ error: 'Cohort is required' }, { status: 400 });
+    }
 
-    const { data, error } = await adminClient
+    const adminClient = await createAdminClient();
+    const duration = duration_minutes || 60;
+
+    // Prepare session data
+    const sessionData: Record<string, unknown> = {
+      title: title.trim(),
+      description: description || null,
+      cohort_id: cohort_id || null,
+      scheduled_at,
+      duration_minutes: duration,
+      zoom_link: zoom_link || null,
+      created_by: auth.userId,
+      auto_create_zoom: !!auto_create_zoom,
+      send_calendar_invites: !!send_calendar_invites,
+    };
+
+    // Create Zoom meeting if requested
+    if (auto_create_zoom && zoomService.isConfigured()) {
+      try {
+        const meeting = await zoomService.createMeeting({
+          topic: title.trim(),
+          startTime: scheduled_at,
+          duration,
+          agenda: description || undefined,
+        });
+        sessionData.zoom_meeting_id = String(meeting.id);
+        sessionData.zoom_link = meeting.join_url;
+        sessionData.zoom_start_url = meeting.start_url;
+      } catch (zoomError) {
+        console.error('Failed to create Zoom meeting:', zoomError);
+        // Continue without Zoom - don't fail the session creation
+      }
+    }
+
+    // Insert session
+    const { data: session, error } = await adminClient
       .from('sessions')
-      .insert({
-        title: title.trim(),
-        description: description || null,
-        cohort_id: cohort_id || null,
-        scheduled_at,
-        duration_minutes: duration_minutes || 60,
-        zoom_link: zoom_link || null,
-        created_by: auth.userId,
-      })
+      .insert(sessionData)
       .select()
       .single();
 
     if (error) throw error;
 
-    return NextResponse.json(data, { status: 201 });
+    // Create calendar event if requested
+    if (send_calendar_invites && cohort_id && session) {
+      const accessToken = await getValidCalendarToken(auth.userId!);
+      if (accessToken) {
+        try {
+          // Get cohort members' emails
+          const { data: members } = await adminClient
+            .from('profiles')
+            .select('email')
+            .eq('cohort_id', cohort_id);
+
+          const attendeeEmails = members?.map(m => m.email) || [];
+
+          if (attendeeEmails.length > 0) {
+            const startTime = new Date(scheduled_at);
+            const endTime = new Date(startTime.getTime() + duration * 60000);
+
+            let eventDescription = description || '';
+            if (sessionData.zoom_link) {
+              eventDescription += `\n\nZoom Link: ${sessionData.zoom_link}`;
+            }
+
+            const calendarEvent = await googleCalendar.createEventWithAttendees(
+              accessToken,
+              {
+                summary: title.trim(),
+                description: eventDescription,
+                start: { dateTime: startTime.toISOString(), timeZone: 'Asia/Kolkata' },
+                end: { dateTime: endTime.toISOString(), timeZone: 'Asia/Kolkata' },
+              },
+              attendeeEmails
+            );
+
+            // Update session with calendar event ID
+            await adminClient
+              .from('sessions')
+              .update({ calendar_event_id: calendarEvent.id })
+              .eq('id', session.id);
+
+            session.calendar_event_id = calendarEvent.id;
+          }
+        } catch (calendarError) {
+          console.error('Failed to create calendar event:', calendarError);
+          // Continue without calendar - don't fail the session creation
+        }
+      }
+    }
+
+    return NextResponse.json(session, { status: 201 });
   } catch (error) {
     console.error('Error creating session:', error);
     return NextResponse.json({ error: 'Failed to create session' }, { status: 500 });
@@ -146,21 +263,77 @@ export async function PUT(request: NextRequest) {
 
     const adminClient = await createAdminClient();
 
+    // Get existing session to check for Zoom/Calendar updates
+    const { data: existingSession } = await adminClient
+      .from('sessions')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    const updateData: Record<string, unknown> = {
+      title: title?.trim(),
+      description: description || null,
+      cohort_id: cohort_id || null,
+      scheduled_at,
+      duration_minutes: duration_minutes || 60,
+      zoom_link: zoom_link || null,
+    };
+
+    // Update Zoom meeting if it exists and time/title changed
+    if (existingSession?.zoom_meeting_id && zoomService.isConfigured()) {
+      const needsUpdate =
+        existingSession.scheduled_at !== scheduled_at ||
+        existingSession.title !== title?.trim() ||
+        existingSession.duration_minutes !== (duration_minutes || 60);
+
+      if (needsUpdate) {
+        try {
+          await zoomService.updateMeeting(existingSession.zoom_meeting_id, {
+            topic: title?.trim(),
+            startTime: scheduled_at,
+            duration: duration_minutes || 60,
+            agenda: description || undefined,
+          });
+        } catch (zoomError) {
+          console.error('Failed to update Zoom meeting:', zoomError);
+        }
+      }
+    }
+
+    // Update session in database
     const { data, error } = await adminClient
       .from('sessions')
-      .update({
-        title: title?.trim(),
-        description: description || null,
-        cohort_id: cohort_id || null,
-        scheduled_at,
-        duration_minutes: duration_minutes || 60,
-        zoom_link: zoom_link || null,
-      })
+      .update(updateData)
       .eq('id', id)
       .select()
       .single();
 
     if (error) throw error;
+
+    // Update calendar event if it exists
+    if (existingSession?.calendar_event_id) {
+      const accessToken = await getValidCalendarToken(auth.userId!);
+      if (accessToken) {
+        try {
+          const startTime = new Date(scheduled_at);
+          const endTime = new Date(startTime.getTime() + (duration_minutes || 60) * 60000);
+
+          let eventDescription = description || '';
+          if (data.zoom_link) {
+            eventDescription += `\n\nZoom Link: ${data.zoom_link}`;
+          }
+
+          await googleCalendar.updateEvent(accessToken, existingSession.calendar_event_id, {
+            summary: title?.trim(),
+            description: eventDescription,
+            start: { dateTime: startTime.toISOString(), timeZone: 'Asia/Kolkata' },
+            end: { dateTime: endTime.toISOString(), timeZone: 'Asia/Kolkata' },
+          });
+        } catch (calendarError) {
+          console.error('Failed to update calendar event:', calendarError);
+        }
+      }
+    }
 
     return NextResponse.json(data);
   } catch (error) {
@@ -186,6 +359,37 @@ export async function DELETE(request: NextRequest) {
 
     const adminClient = await createAdminClient();
 
+    // Get session to clean up Zoom/Calendar
+    const { data: session } = await adminClient
+      .from('sessions')
+      .select('zoom_meeting_id, calendar_event_id')
+      .eq('id', id)
+      .single();
+
+    // Delete Zoom meeting if exists
+    if (session?.zoom_meeting_id && zoomService.isConfigured()) {
+      try {
+        await zoomService.deleteMeeting(session.zoom_meeting_id);
+      } catch (zoomError) {
+        console.error('Failed to delete Zoom meeting:', zoomError);
+        // Continue with session deletion
+      }
+    }
+
+    // Delete calendar event if exists
+    if (session?.calendar_event_id) {
+      const accessToken = await getValidCalendarToken(auth.userId!);
+      if (accessToken) {
+        try {
+          await googleCalendar.deleteEvent(accessToken, session.calendar_event_id);
+        } catch (calendarError) {
+          console.error('Failed to delete calendar event:', calendarError);
+          // Continue with session deletion
+        }
+      }
+    }
+
+    // Delete session from database
     const { error } = await adminClient
       .from('sessions')
       .delete()

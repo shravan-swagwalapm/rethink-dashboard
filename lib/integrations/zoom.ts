@@ -1,9 +1,15 @@
 /**
  * Zoom Integration
- * Webhook handling for attendance tracking
+ * Server-to-Server OAuth, meeting management, and webhook handling
  */
 
 import crypto from 'crypto';
+
+// Environment variables for Server-to-Server OAuth
+const ZOOM_ACCOUNT_ID = process.env.ZOOM_ACCOUNT_ID || '';
+const ZOOM_CLIENT_ID = process.env.ZOOM_CLIENT_ID || '';
+const ZOOM_CLIENT_SECRET = process.env.ZOOM_CLIENT_SECRET || '';
+const ZOOM_WEBHOOK_SECRET = process.env.ZOOM_WEBHOOK_SECRET || '';
 
 interface ZoomWebhookEvent {
   event: string;
@@ -26,7 +32,7 @@ interface ZoomWebhookEvent {
   };
 }
 
-interface ZoomParticipant {
+export interface ZoomParticipant {
   userId: string;
   email: string;
   name: string;
@@ -35,15 +41,289 @@ interface ZoomParticipant {
   duration?: number;
 }
 
+export interface ZoomMeeting {
+  id: number;
+  uuid: string;
+  topic: string;
+  start_time: string;
+  duration: number;
+  join_url: string;
+  start_url: string;
+  password?: string;
+}
+
+export interface ZoomMeetingListItem {
+  id: number;
+  uuid: string;
+  topic: string;
+  start_time: string;
+  duration: number;
+  total_minutes: number;
+  participants_count: number;
+}
+
+export interface ZoomPastParticipant {
+  id: string;
+  user_id: string;
+  name: string;
+  user_email: string;
+  join_time: string;
+  leave_time: string;
+  duration: number;
+}
+
+interface TokenCache {
+  token: string;
+  expiresAt: number;
+}
+
 export class ZoomService {
-  private apiKey: string;
-  private apiSecret: string;
   private webhookSecret: string;
+  private tokenCache: TokenCache | null = null;
 
   constructor() {
-    this.apiKey = process.env.ZOOM_API_KEY || '';
-    this.apiSecret = process.env.ZOOM_API_SECRET || '';
-    this.webhookSecret = process.env.ZOOM_WEBHOOK_SECRET || '';
+    this.webhookSecret = ZOOM_WEBHOOK_SECRET;
+  }
+
+  /**
+   * Check if Zoom is configured
+   */
+  isConfigured(): boolean {
+    return !!(ZOOM_ACCOUNT_ID && ZOOM_CLIENT_ID && ZOOM_CLIENT_SECRET);
+  }
+
+  /**
+   * Get Server-to-Server OAuth access token
+   */
+  async getAccessToken(): Promise<string> {
+    // Return cached token if still valid (with 5 min buffer)
+    if (this.tokenCache && this.tokenCache.expiresAt > Date.now() + 300000) {
+      return this.tokenCache.token;
+    }
+
+    if (!this.isConfigured()) {
+      throw new Error('Zoom credentials not configured');
+    }
+
+    const credentials = Buffer.from(`${ZOOM_CLIENT_ID}:${ZOOM_CLIENT_SECRET}`).toString('base64');
+
+    const response = await fetch('https://zoom.us/oauth/token', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${credentials}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        grant_type: 'account_credentials',
+        account_id: ZOOM_ACCOUNT_ID,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to get Zoom access token: ${error}`);
+    }
+
+    const data = await response.json();
+
+    // Cache the token
+    this.tokenCache = {
+      token: data.access_token,
+      expiresAt: Date.now() + (data.expires_in * 1000),
+    };
+
+    return data.access_token;
+  }
+
+  /**
+   * Create a Zoom meeting
+   */
+  async createMeeting(options: {
+    topic: string;
+    startTime: string; // ISO 8601 format
+    duration: number; // in minutes
+    timezone?: string;
+    agenda?: string;
+  }): Promise<ZoomMeeting> {
+    const token = await this.getAccessToken();
+
+    const response = await fetch('https://api.zoom.us/v2/users/me/meetings', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        topic: options.topic,
+        type: 2, // Scheduled meeting
+        start_time: options.startTime,
+        duration: options.duration,
+        timezone: options.timezone || 'Asia/Kolkata',
+        agenda: options.agenda || '',
+        settings: {
+          host_video: true,
+          participant_video: true,
+          join_before_host: true,
+          mute_upon_entry: true,
+          waiting_room: false,
+          auto_recording: 'cloud',
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to create Zoom meeting: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Update a Zoom meeting
+   */
+  async updateMeeting(meetingId: string, options: {
+    topic?: string;
+    startTime?: string;
+    duration?: number;
+    agenda?: string;
+  }): Promise<void> {
+    const token = await this.getAccessToken();
+
+    const body: Record<string, unknown> = {};
+    if (options.topic) body.topic = options.topic;
+    if (options.startTime) body.start_time = options.startTime;
+    if (options.duration) body.duration = options.duration;
+    if (options.agenda) body.agenda = options.agenda;
+
+    const response = await fetch(`https://api.zoom.us/v2/meetings/${meetingId}`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to update Zoom meeting: ${error}`);
+    }
+  }
+
+  /**
+   * Delete a Zoom meeting
+   */
+  async deleteMeeting(meetingId: string): Promise<void> {
+    const token = await this.getAccessToken();
+
+    const response = await fetch(`https://api.zoom.us/v2/meetings/${meetingId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok && response.status !== 404) {
+      const error = await response.text();
+      throw new Error(`Failed to delete Zoom meeting: ${error}`);
+    }
+  }
+
+  /**
+   * List past meetings (for import)
+   */
+  async listPastMeetings(options: {
+    from: string; // YYYY-MM-DD
+    to: string; // YYYY-MM-DD
+    pageSize?: number;
+    nextPageToken?: string;
+  }): Promise<{
+    meetings: ZoomMeetingListItem[];
+    nextPageToken?: string;
+  }> {
+    const token = await this.getAccessToken();
+
+    const params = new URLSearchParams({
+      from: options.from,
+      to: options.to,
+      page_size: String(options.pageSize || 30),
+      type: 'past',
+    });
+
+    if (options.nextPageToken) {
+      params.set('next_page_token', options.nextPageToken);
+    }
+
+    const response = await fetch(
+      `https://api.zoom.us/v2/users/me/meetings?${params}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to list past meetings: ${error}`);
+    }
+
+    const data = await response.json();
+    return {
+      meetings: data.meetings || [],
+      nextPageToken: data.next_page_token,
+    };
+  }
+
+  /**
+   * Get past meeting participants (for attendance import)
+   */
+  async getPastMeetingParticipants(meetingUuid: string): Promise<ZoomPastParticipant[]> {
+    const token = await this.getAccessToken();
+
+    // Double-encode UUID if it starts with / or contains //
+    const encodedUuid = meetingUuid.startsWith('/') || meetingUuid.includes('//')
+      ? encodeURIComponent(encodeURIComponent(meetingUuid))
+      : encodeURIComponent(meetingUuid);
+
+    const response = await fetch(
+      `https://api.zoom.us/v2/past_meetings/${encodedUuid}/participants?page_size=300`,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to get meeting participants: ${error}`);
+    }
+
+    const data = await response.json();
+    return data.participants || [];
+  }
+
+  /**
+   * Get meeting details
+   */
+  async getMeeting(meetingId: string): Promise<ZoomMeeting | null> {
+    const token = await this.getAccessToken();
+
+    const response = await fetch(`https://api.zoom.us/v2/meetings/${meetingId}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      if (response.status === 404) return null;
+      const error = await response.text();
+      throw new Error(`Failed to get meeting: ${error}`);
+    }
+
+    return response.json();
   }
 
   /**
@@ -152,29 +432,6 @@ export class ZoomService {
     return Math.min(100, Math.round(percentage * 100) / 100); // Cap at 100%, round to 2 decimals
   }
 
-  /**
-   * Generate JWT for API calls (if needed)
-   */
-  generateJWT(): string {
-    const header = Buffer.from(
-      JSON.stringify({ alg: 'HS256', typ: 'JWT' })
-    ).toString('base64url');
-
-    const now = Math.floor(Date.now() / 1000);
-    const payload = Buffer.from(
-      JSON.stringify({
-        iss: this.apiKey,
-        exp: now + 3600, // 1 hour
-      })
-    ).toString('base64url');
-
-    const signature = crypto
-      .createHmac('sha256', this.apiSecret)
-      .update(`${header}.${payload}`)
-      .digest('base64url');
-
-    return `${header}.${payload}.${signature}`;
-  }
 }
 
 export const zoomService = new ZoomService();

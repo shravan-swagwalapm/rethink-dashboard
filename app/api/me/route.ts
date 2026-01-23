@@ -1,13 +1,18 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 
+// Force dynamic rendering - no caching
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) {
-      return NextResponse.json({ user: null, profile: null });
+      const response = NextResponse.json({ user: null, profile: null });
+      response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+      return response;
     }
 
     // Fetch profile
@@ -19,12 +24,18 @@ export async function GET() {
 
     if (profileError) {
       console.error('Error fetching profile:', profileError);
-      return NextResponse.json({ user, profile: null });
+      const response = NextResponse.json({ user, profile: null });
+      response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+      return response;
     }
 
-    return NextResponse.json({ user, profile });
+    const response = NextResponse.json({ user, profile });
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+    return response;
   } catch (error) {
     console.error('Error in /api/me:', error);
-    return NextResponse.json({ user: null, profile: null }, { status: 500 });
+    const response = NextResponse.json({ user: null, profile: null }, { status: 500 });
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+    return response;
   }
 }

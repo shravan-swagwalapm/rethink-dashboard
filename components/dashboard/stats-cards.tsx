@@ -2,7 +2,7 @@
 
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Users, TrendingUp, Trophy, Calendar } from 'lucide-react';
+import { Users, TrendingUp, Trophy, FolderOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface StatsCardsProps {
@@ -10,7 +10,7 @@ interface StatsCardsProps {
     total_students: number;
     attendance_percentage: number;
     current_rank: number | null;
-    upcoming_sessions: number;
+    total_resources: number;
   };
   loading?: boolean;
 }
@@ -18,7 +18,7 @@ interface StatsCardsProps {
 export function StatsCards({ stats, loading }: StatsCardsProps) {
   const cards = [
     {
-      title: 'Total Students',
+      title: 'Cohort Members',
       value: stats?.total_students || 0,
       icon: Users,
       color: 'text-chart-1',
@@ -43,12 +43,12 @@ export function StatsCards({ stats, loading }: StatsCardsProps) {
       description: 'In leaderboard',
     },
     {
-      title: 'Upcoming Sessions',
-      value: stats?.upcoming_sessions || 0,
-      icon: Calendar,
+      title: 'Total Resources',
+      value: stats?.total_resources || 0,
+      icon: FolderOpen,
       color: 'text-chart-3',
       bgColor: 'bg-chart-3/10',
-      description: 'This week',
+      description: 'In your cohort',
     },
   ];
 

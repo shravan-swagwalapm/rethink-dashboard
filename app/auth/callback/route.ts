@@ -1,6 +1,6 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
-import { isEmailDomainAllowed, isSuperuserDomain } from '@/lib/auth/allowed-domains';
+import { isEmailDomainAllowed, bypassesWhitelist } from '@/lib/auth/allowed-domains';
 import { isEmailWhitelisted, markInviteAsAccepted } from '@/lib/auth/whitelist';
 
 // This route handles USER login mode (default)
@@ -65,13 +65,21 @@ export async function GET(request: Request) {
     // Use admin client for all profile operations to bypass RLS
     const adminClient = await createAdminClient();
 
-    // Step 2: Check if superuser domain - bypass whitelist, auto-admin access
-    if (isSuperuserDomain(userEmail)) {
+    // Step 2: Check if domain bypasses whitelist (can login without invite)
+    // NOTE: This does NOT grant admin access - admin role must be set in database
+    if (bypassesWhitelist(userEmail)) {
+      // Check if profile already exists to preserve existing role
+      const { data: existingProfile } = await adminClient
+        .from('profiles')
+        .select('role')
+        .eq('id', data.session.user.id)
+        .maybeSingle();
+
       const { error: upsertError } = await adminClient.from('profiles').upsert(
         {
           id: data.session.user.id,
           email: userEmail.toLowerCase(),
-          role: 'admin',
+          role: existingProfile?.role || 'student', // Preserve existing role or default to student
           full_name:
             data.session.user.user_metadata?.full_name ||
             data.session.user.user_metadata?.name ||
@@ -81,7 +89,7 @@ export async function GET(request: Request) {
       );
 
       if (upsertError) {
-        console.error('Error creating superuser profile:', upsertError);
+        console.error('Error creating whitelist-bypass profile:', upsertError);
       }
     } else {
       // Step 3: Check if email is whitelisted (exists in invites or profiles)

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { User, AuthChangeEvent, Session } from '@supabase/supabase-js';
-import { getClient } from '@/lib/supabase/client';
+import { getClient, resetClient } from '@/lib/supabase/client';
 import type { Profile } from '@/types';
 
 export function useUser() {
@@ -25,19 +25,19 @@ export function useUser() {
       }
     };
 
-    // Safety timeout - ensure loading becomes false within 3000ms max
+    // Safety timeout - ensure loading becomes false within 1500ms max
     const timeoutId = setTimeout(() => {
       if (!loadingCompletedRef.current) {
-        console.warn('useUser: Auth check timed out after 3000ms, forcing loading to false');
+        console.warn('useUser: Auth check timed out after 1500ms, forcing loading to false');
         completeLoading();
       }
-    }, 3000);
+    }, 1500);
 
     // Get initial session via API (more reliable)
     const getUser = async () => {
       console.log('useUser: Starting getUser via API...');
       try {
-        const response = await fetch('/api/me');
+        const response = await fetch('/api/me', { cache: 'no-store' });
         const data = await response.json();
         console.log('useUser: API result:', { user: data.user?.email, profile: data.profile?.full_name });
 
@@ -62,10 +62,17 @@ export function useUser() {
         if (!isMountedRef.current) return;
 
         if (session?.user) {
+          // IMPORTANT: Clear old data immediately to prevent showing wrong user's data
+          // This ensures we show loading state instead of stale data
+          setUser(null);
+          setProfile(null);
+          setLoading(true);
+          loadingCompletedRef.current = false;
+
           // Fetch profile via API when auth state changes
           console.log('useUser: Fetching profile via API for auth change');
           try {
-            const response = await fetch('/api/me');
+            const response = await fetch('/api/me', { cache: 'no-store' });
             const data = await response.json();
             console.log('useUser: Auth change API result:', { user: data.user?.email, profile: data.profile?.full_name });
 
@@ -95,6 +102,10 @@ export function useUser() {
 
   const signOut = async () => {
     console.log('useUser.signOut: Starting Supabase sign out...');
+    // Clear state immediately
+    setUser(null);
+    setProfile(null);
+
     try {
       const supabase = getClient();
       // Use scope: 'global' to sign out from all sessions
@@ -103,12 +114,11 @@ export function useUser() {
         console.error('useUser.signOut: Error signing out:', error);
       }
       console.log('useUser.signOut: Supabase sign out successful');
-      setUser(null);
-      setProfile(null);
+      // Reset the client singleton to clear any cached session
+      resetClient();
     } catch (error) {
       console.error('useUser.signOut: Exception during sign out:', error);
-      setUser(null);
-      setProfile(null);
+      resetClient();
     }
   };
 
