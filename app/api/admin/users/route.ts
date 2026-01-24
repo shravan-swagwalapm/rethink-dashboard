@@ -109,6 +109,53 @@ async function sendCalendarInvitesToNewMember(
   return { sent, failed };
 }
 
+// Helper to remove calendar invites when leaving a cohort
+async function removeCalendarInvitesFromOldCohort(
+  userEmail: string,
+  oldCohortId: string,
+  adminUserId: string
+): Promise<{ removed: number; failed: number }> {
+  const adminClient = await createAdminClient();
+
+  // Get future sessions for the OLD cohort that have calendar events
+  const now = new Date().toISOString();
+  const { data: futureSessions } = await adminClient
+    .from('sessions')
+    .select('id, calendar_event_id')
+    .eq('cohort_id', oldCohortId)
+    .gt('scheduled_at', now)
+    .not('calendar_event_id', 'is', null);
+
+  if (!futureSessions || futureSessions.length === 0) {
+    return { removed: 0, failed: 0 };
+  }
+
+  const accessToken = await getValidCalendarToken(adminUserId);
+  if (!accessToken) {
+    console.log('No valid calendar token available for removing invites');
+    return { removed: 0, failed: futureSessions.length };
+  }
+
+  let removed = 0;
+  let failed = 0;
+
+  for (const session of futureSessions) {
+    try {
+      await googleCalendar.removeAttendeeFromEvent(
+        accessToken,
+        session.calendar_event_id!,
+        userEmail
+      );
+      removed++;
+    } catch (error) {
+      console.error(`Failed to remove attendee from session ${session.id}:`, error);
+      failed++;
+    }
+  }
+
+  return { removed, failed };
+}
+
 // GET - Fetch users and cohorts
 export async function GET() {
   const auth = await verifyAdmin();
@@ -154,6 +201,15 @@ export async function PUT(request: NextRequest) {
 
     const adminClient = await createAdminClient();
 
+    // Get current user data BEFORE update (to know old cohort)
+    const { data: currentUser } = await adminClient
+      .from('profiles')
+      .select('email, cohort_id')
+      .eq('id', id)
+      .single();
+
+    const oldCohortId = currentUser?.cohort_id;
+
     const updateData: { role?: string; cohort_id?: string | null } = {};
     if (role !== undefined) updateData.role = role;
     if (cohort_id !== undefined) updateData.cohort_id = cohort_id || null;
@@ -167,16 +223,32 @@ export async function PUT(request: NextRequest) {
 
     if (error) throw error;
 
-    // If cohort was updated, send calendar invites for future sessions
-    if (cohort_id && data?.email) {
-      try {
-        const result = await sendCalendarInvitesToNewMember(data.email, cohort_id, auth.userId!);
-        if (result.sent > 0) {
-          console.log(`Sent ${result.sent} calendar invites to ${data.email} for cohort ${cohort_id}`);
+    // Handle cohort change - remove from old, add to new
+    if (cohort_id !== undefined && data?.email) {
+      const newCohortId = cohort_id || null;
+
+      // Remove from old cohort's sessions (if had one and it changed)
+      if (oldCohortId && oldCohortId !== newCohortId) {
+        try {
+          const removeResult = await removeCalendarInvitesFromOldCohort(data.email, oldCohortId, auth.userId!);
+          if (removeResult.removed > 0) {
+            console.log(`Removed ${removeResult.removed} calendar invites from ${data.email} for old cohort ${oldCohortId}`);
+          }
+        } catch (calendarError) {
+          console.error('Failed to remove old calendar invites:', calendarError);
         }
-      } catch (calendarError) {
-        console.error('Failed to send calendar invites:', calendarError);
-        // Don't fail the request - cohort update was successful
+      }
+
+      // Add to new cohort's sessions (if has new one and it changed)
+      if (newCohortId && newCohortId !== oldCohortId) {
+        try {
+          const addResult = await sendCalendarInvitesToNewMember(data.email, newCohortId, auth.userId!);
+          if (addResult.sent > 0) {
+            console.log(`Sent ${addResult.sent} calendar invites to ${data.email} for new cohort ${newCohortId}`);
+          }
+        } catch (calendarError) {
+          console.error('Failed to send new calendar invites:', calendarError);
+        }
       }
     }
 

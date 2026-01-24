@@ -326,6 +326,62 @@ export class GoogleCalendarService {
   }
 
   /**
+   * Remove attendee from existing event (notifies removed attendee)
+   */
+  async removeAttendeeFromEvent(
+    accessToken: string,
+    eventId: string,
+    attendeeEmail: string,
+    calendarId = 'primary'
+  ): Promise<CalendarEvent> {
+    // Get existing event to retrieve current attendees
+    const getResponse = await fetch(
+      `${this.baseUrl}/calendars/${calendarId}/events/${eventId}`,
+      {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      }
+    );
+
+    if (!getResponse.ok) {
+      const error = await getResponse.json();
+      throw new Error(error.error?.message || 'Failed to get event');
+    }
+
+    const existingEvent = await getResponse.json();
+    const currentAttendees = existingEvent.attendees || [];
+
+    // Filter out the attendee to remove
+    const updatedAttendees = currentAttendees.filter(
+      (a: { email: string }) => a.email.toLowerCase() !== attendeeEmail.toLowerCase()
+    );
+
+    // If no change (attendee wasn't in list), return existing event
+    if (updatedAttendees.length === currentAttendees.length) {
+      return existingEvent;
+    }
+
+    // Update the event with sendUpdates=all to notify removed attendee
+    const updateResponse = await fetch(
+      `${this.baseUrl}/calendars/${calendarId}/events/${eventId}?sendUpdates=all`,
+      {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ attendees: updatedAttendees }),
+      }
+    );
+
+    if (!updateResponse.ok) {
+      const error = await updateResponse.json();
+      throw new Error(error.error?.message || 'Failed to remove attendee from event');
+    }
+
+    return updateResponse.json();
+  }
+
+  /**
    * List calendar events
    */
   async listEvents(
