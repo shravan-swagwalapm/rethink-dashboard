@@ -56,6 +56,7 @@ import {
   Plus,
   Trash2,
   Star,
+  Pencil,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import * as XLSX from 'xlsx';
@@ -107,6 +108,12 @@ export default function UsersPage() {
   const [bulkResults, setBulkResults] = useState<BulkResult[] | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const hasFetchedRef = useRef(false);
+
+  // Edit user dialog state
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<UserWithCohort | null>(null);
+  const [editRoleAssignments, setEditRoleAssignments] = useState<RoleAssignmentInput[]>([]);
+  const [editLoading, setEditLoading] = useState(false);
 
   const fetchData = useCallback(async (force = false) => {
     // Prevent re-fetching on tab switch unless forced
@@ -241,6 +248,103 @@ export default function UsersPage() {
       updated[index].cohort_id = null;
     }
     setRoleAssignments(updated);
+  };
+
+  // Get available cohorts for a role (mentor cannot be in same cohort as student)
+  const getAvailableCohortsForRole = (role: string, assignments: RoleAssignmentInput[]) => {
+    if (role === 'mentor') {
+      // Get cohorts where user is a student
+      const studentCohorts = assignments
+        .filter(a => a.role === 'student' && a.cohort_id)
+        .map(a => a.cohort_id);
+      // Filter out those cohorts for mentor selection
+      return cohorts.filter(c => !studentCohorts.includes(c.id));
+    }
+    return cohorts;
+  };
+
+  // Edit user handlers
+  const handleEditRoles = (user: UserWithCohort) => {
+    setEditingUser(user);
+    // Convert user's role_assignments to input format, or fall back to legacy single role
+    if (user.role_assignments && user.role_assignments.length > 0) {
+      setEditRoleAssignments(user.role_assignments.map(ra => ({
+        role: ra.role,
+        cohort_id: ra.cohort_id,
+      })));
+    } else {
+      // Fall back to legacy single role/cohort
+      setEditRoleAssignments([{
+        role: user.role,
+        cohort_id: user.cohort_id,
+      }]);
+    }
+    setEditDialogOpen(true);
+  };
+
+  const handleSaveRoles = async () => {
+    if (!editingUser) return;
+
+    const validAssignments = editRoleAssignments.filter(ra => ra.role);
+    if (validAssignments.length === 0) {
+      toast.error('At least one role is required');
+      return;
+    }
+
+    // Check if student/mentor roles have cohorts
+    const needsCohort = validAssignments.some(ra =>
+      ['student', 'mentor'].includes(ra.role) && !ra.cohort_id
+    );
+    if (needsCohort) {
+      toast.error('Student and Mentor roles require a cohort');
+      return;
+    }
+
+    setEditLoading(true);
+    try {
+      const response = await fetch('/api/admin/users', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editingUser.id,
+          role_assignments: validAssignments,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to update roles');
+      }
+
+      toast.success('Roles updated successfully');
+      setEditDialogOpen(false);
+      setEditingUser(null);
+      fetchData(true);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to update roles');
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  const addEditRoleAssignment = () => {
+    setEditRoleAssignments([...editRoleAssignments, { role: 'student', cohort_id: null }]);
+  };
+
+  const removeEditRoleAssignment = (index: number) => {
+    if (editRoleAssignments.length > 1) {
+      setEditRoleAssignments(editRoleAssignments.filter((_, i) => i !== index));
+    }
+  };
+
+  const updateEditRoleAssignment = (index: number, field: 'role' | 'cohort_id', value: string | null) => {
+    const updated = [...editRoleAssignments];
+    updated[index] = { ...updated[index], [field]: value };
+    // Clear cohort if role doesn't need it
+    if (field === 'role' && ['admin', 'company_user', 'master'].includes(value as string)) {
+      updated[index].cohort_id = null;
+    }
+    setEditRoleAssignments(updated);
   };
 
   // Handle file upload for bulk import
@@ -422,58 +526,73 @@ export default function UsersPage() {
                 <div className="space-y-3">
                   <Label>Role Assignments *</Label>
                   <div className="space-y-2">
-                    {roleAssignments.map((assignment, index) => (
-                      <div key={index} className="flex gap-2 items-start">
-                        <Select
-                          value={assignment.role}
-                          onValueChange={(value) => updateRoleAssignment(index, 'role', value)}
-                        >
-                          <SelectTrigger className="w-[140px]">
-                            <SelectValue placeholder="Role" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="student">Student</SelectItem>
-                            <SelectItem value="mentor">Mentor</SelectItem>
-                            <SelectItem value="master">Guest</SelectItem>
-                            <SelectItem value="company_user">Company User</SelectItem>
-                            <SelectItem value="admin">Admin</SelectItem>
-                          </SelectContent>
-                        </Select>
+                    {roleAssignments.map((assignment, index) => {
+                      const availableCohorts = getAvailableCohortsForRole(assignment.role, roleAssignments);
+                      const showCohortWarning = assignment.role === 'mentor' && availableCohorts.length < cohorts.length;
 
-                        {['student', 'mentor'].includes(assignment.role) ? (
-                          <Select
-                            value={assignment.cohort_id || ''}
-                            onValueChange={(value) => updateRoleAssignment(index, 'cohort_id', value || null)}
-                          >
-                            <SelectTrigger className="flex-1">
-                              <SelectValue placeholder="Select cohort" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {cohorts.map((cohort) => (
-                                <SelectItem key={cohort.id} value={cohort.id}>
-                                  {cohort.name} ({cohort.tag})
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <div className="flex-1 px-3 py-2 text-sm text-muted-foreground border rounded-md bg-muted/50">
-                            No cohort needed
+                      return (
+                        <div key={index} className="space-y-1">
+                          <div className="flex gap-2 items-start">
+                            <Select
+                              value={assignment.role}
+                              onValueChange={(value) => updateRoleAssignment(index, 'role', value)}
+                            >
+                              <SelectTrigger className="w-[140px]">
+                                <SelectValue placeholder="Role" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="student">Student</SelectItem>
+                                <SelectItem value="mentor">Mentor</SelectItem>
+                                <SelectItem value="master">Guest</SelectItem>
+                                <SelectItem value="company_user">Company User</SelectItem>
+                                <SelectItem value="admin">Admin</SelectItem>
+                              </SelectContent>
+                            </Select>
+
+                            {['student', 'mentor', 'master'].includes(assignment.role) ? (
+                              <Select
+                                value={assignment.cohort_id || ''}
+                                onValueChange={(value) => updateRoleAssignment(index, 'cohort_id', value || null)}
+                              >
+                                <SelectTrigger className="flex-1">
+                                  <SelectValue placeholder={assignment.role === 'master' ? 'No cohort (optional)' : 'Select cohort'} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {assignment.role === 'master' && (
+                                    <SelectItem value="">No cohort</SelectItem>
+                                  )}
+                                  {availableCohorts.map((cohort) => (
+                                    <SelectItem key={cohort.id} value={cohort.id}>
+                                      {cohort.name} ({cohort.tag})
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <div className="flex-1 px-3 py-2 text-sm text-muted-foreground border rounded-md bg-muted/50">
+                                No cohort needed
+                              </div>
+                            )}
+
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => removeRoleAssignment(index)}
+                              disabled={roleAssignments.length === 1}
+                              className="shrink-0"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
                           </div>
-                        )}
-
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeRoleAssignment(index)}
-                          disabled={roleAssignments.length === 1}
-                          className="shrink-0"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    ))}
+                          {showCohortWarning && (
+                            <p className="text-xs text-amber-500 ml-1">
+                              Some cohorts hidden (user is a student there)
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                   <Button
                     type="button"
@@ -622,6 +741,121 @@ export default function UsersPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Edit Roles Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Roles</DialogTitle>
+            <DialogDescription>
+              {editingUser && `Manage role assignments for ${editingUser.full_name || editingUser.email}`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-3">
+              <Label>Role Assignments</Label>
+              <div className="space-y-2">
+                {editRoleAssignments.map((assignment, index) => {
+                  const availableCohorts = getAvailableCohortsForRole(assignment.role, editRoleAssignments);
+                  const showCohortWarning = assignment.role === 'mentor' && availableCohorts.length < cohorts.length;
+
+                  return (
+                    <div key={index} className="space-y-1">
+                      <div className="flex gap-2 items-start">
+                        <Select
+                          value={assignment.role}
+                          onValueChange={(value) => updateEditRoleAssignment(index, 'role', value)}
+                        >
+                          <SelectTrigger className="w-[140px]">
+                            <SelectValue placeholder="Role" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="student">Student</SelectItem>
+                            <SelectItem value="mentor">Mentor</SelectItem>
+                            <SelectItem value="master">Guest</SelectItem>
+                            <SelectItem value="company_user">Company User</SelectItem>
+                            <SelectItem value="admin">Admin</SelectItem>
+                          </SelectContent>
+                        </Select>
+
+                        {['student', 'mentor', 'master'].includes(assignment.role) ? (
+                          <Select
+                            value={assignment.cohort_id || ''}
+                            onValueChange={(value) => updateEditRoleAssignment(index, 'cohort_id', value || null)}
+                          >
+                            <SelectTrigger className="flex-1">
+                              <SelectValue placeholder={assignment.role === 'master' ? 'No cohort (optional)' : 'Select cohort'} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {assignment.role === 'master' && (
+                                <SelectItem value="">No cohort</SelectItem>
+                              )}
+                              {availableCohorts.map((cohort) => (
+                                <SelectItem key={cohort.id} value={cohort.id}>
+                                  {cohort.name} ({cohort.tag})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <div className="flex-1 px-3 py-2 text-sm text-muted-foreground border rounded-md bg-muted/50">
+                            No cohort needed
+                          </div>
+                        )}
+
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeEditRoleAssignment(index)}
+                          disabled={editRoleAssignments.length === 1}
+                          className="shrink-0"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      {showCohortWarning && (
+                        <p className="text-xs text-amber-500 ml-1">
+                          Some cohorts hidden (user is a student there)
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addEditRoleAssignment}
+                className="w-full"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add Another Role
+              </Button>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveRoles}
+              disabled={editLoading || editRoleAssignments.length === 0}
+              className="gradient-bg"
+            >
+              {editLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Save Roles'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
@@ -692,86 +926,89 @@ export default function UsersPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>User</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Cohort</TableHead>
+                  <TableHead>Roles</TableHead>
                   <TableHead>Joined</TableHead>
                   <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredUsers.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-10 w-10">
-                          <AvatarImage src={user.avatar_url || ''} />
-                          <AvatarFallback className="gradient-bg text-white">
-                            {user.full_name?.charAt(0) || user.email.charAt(0).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-medium">{user.full_name || 'Unnamed'}</p>
-                          <p className="text-sm text-muted-foreground">{user.email}</p>
+                {filteredUsers.map((user) => {
+                  // Get role assignments to display
+                  const assignments = user.role_assignments && user.role_assignments.length > 0
+                    ? user.role_assignments
+                    : [{ role: user.role, cohort_id: user.cohort_id, cohort: user.cohort }];
+
+                  return (
+                    <TableRow key={user.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-10 w-10">
+                            <AvatarImage src={user.avatar_url || ''} />
+                            <AvatarFallback className="gradient-bg text-white">
+                              {user.full_name?.charAt(0) || user.email.charAt(0).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-medium">{user.full_name || 'Unnamed'}</p>
+                            <p className="text-sm text-muted-foreground">{user.email}</p>
+                          </div>
                         </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Select
-                        value={user.role}
-                        onValueChange={(value) => handleRoleChange(user.id, value)}
-                      >
-                        <SelectTrigger className="w-[140px]">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="student">Student</SelectItem>
-                          <SelectItem value="mentor">Mentor</SelectItem>
-                          <SelectItem value="master">Guest</SelectItem>
-                          <SelectItem value="company_user">Company User</SelectItem>
-                          <SelectItem value="admin">Admin</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell>
-                      <Select
-                        value={user.cohort_id || 'none'}
-                        onValueChange={(value) => handleCohortChange(user.id, value === 'none' ? '' : value)}
-                      >
-                        <SelectTrigger className="w-[140px]">
-                          <SelectValue placeholder="No cohort" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">No cohort</SelectItem>
-                          {cohorts.map((cohort) => (
-                            <SelectItem key={cohort.id} value={cohort.id}>
-                              {cohort.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell>
-                      {format(new Date(user.created_at), 'MMM d, yyyy')}
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreVertical className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem asChild>
-                            <a href={`mailto:${user.email}`}>
-                              <Mail className="w-4 h-4 mr-2" />
-                              Send Email
-                            </a>
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {assignments.map((ra, idx) => {
+                            const cohortName = ra.cohort?.name ||
+                              cohorts.find(c => c.id === ra.cohort_id)?.name;
+                            return (
+                              <Badge
+                                key={idx}
+                                className={
+                                  ra.role === 'admin' ? 'bg-red-500/10 text-red-600' :
+                                  ra.role === 'company_user' ? 'bg-purple-500/10 text-purple-600' :
+                                  ra.role === 'mentor' ? 'bg-blue-500/10 text-blue-600' :
+                                  ra.role === 'master' ? 'bg-yellow-500/10 text-yellow-600' :
+                                  'bg-green-500/10 text-green-600'
+                                }
+                              >
+                                <span className="flex items-center gap-1">
+                                  {getRoleIcon(ra.role)}
+                                  <span className="capitalize">
+                                    {ra.role === 'master' ? 'Guest' : ra.role.replace('_', ' ')}
+                                    {cohortName && ` (${cohortName})`}
+                                  </span>
+                                </span>
+                              </Badge>
+                            );
+                          })}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {format(new Date(user.created_at), 'MMM d, yyyy')}
+                      </TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <MoreVertical className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleEditRoles(user)}>
+                              <Pencil className="w-4 h-4 mr-2" />
+                              Edit Roles
+                            </DropdownMenuItem>
+                            <DropdownMenuItem asChild>
+                              <a href={`mailto:${user.email}`}>
+                                <Mail className="w-4 h-4 mr-2" />
+                                Send Email
+                              </a>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
