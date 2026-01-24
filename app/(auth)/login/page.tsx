@@ -262,8 +262,8 @@ function LoginContent() {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl gradient-bg mb-4 glow-sm">
             <Sparkles className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-2xl font-bold gradient-text">Rethink Systems</h1>
-          <p className="text-muted-foreground text-sm mt-1">Learning Dashboard</p>
+          <h1 className="text-3xl font-bold gradient-text">Rethink Systems</h1>
+          <p className="text-muted-foreground text-base mt-1">Your Learning Journey Starts Here</p>
         </div>
 
         {/* Error Alert */}
@@ -276,15 +276,15 @@ function LoginContent() {
 
         <Card className="glass-strong animate-in-up stagger-1">
           <CardHeader className="text-center pb-2">
-            <CardTitle className="text-xl">
-              {step === 'email' && 'Welcome'}
-              {step === 'otp' && 'Verify your email'}
-              {step === 'password' && 'Set your password'}
+            <CardTitle className="text-2xl">
+              {step === 'email' && 'Welcome Back'}
+              {step === 'otp' && 'Check Your Inbox'}
+              {step === 'password' && 'Secure Your Account'}
             </CardTitle>
-            <CardDescription>
-              {step === 'email' && 'Sign in to access your dashboard'}
-              {step === 'otp' && 'Check your inbox'}
-              {step === 'password' && 'Create a secure password for your account'}
+            <CardDescription className="text-base">
+              {step === 'email' && 'Sign in to continue your learning'}
+              {step === 'otp' && 'A magic link is on its way!'}
+              {step === 'password' && 'Create a password for quick access'}
             </CardDescription>
           </CardHeader>
 
@@ -294,16 +294,16 @@ function LoginContent() {
                 {/* Email Input Form */}
                 <form onSubmit={handleSendOtp} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="email">Email address</Label>
+                    <Label htmlFor="email" className="text-base font-medium">Email address</Label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <Input
                         id="email"
                         type="email"
-                        placeholder="you@example.com"
+                        placeholder="Enter your registered email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="pl-10"
+                        className="pl-10 text-base"
                         required
                       />
                     </div>
@@ -312,7 +312,7 @@ function LoginContent() {
                   {/* Send OTP Button - Always visible */}
                   <Button
                     type="submit"
-                    className="w-full gradient-bg hover:opacity-90 transition-opacity"
+                    className="w-full gradient-bg hover:opacity-90 transition-opacity text-base"
                     disabled={loading || !email}
                   >
                     {loading ? (
@@ -322,11 +322,16 @@ function LoginContent() {
                       </>
                     ) : (
                       <>
-                        Send Magic Link
+                        Get Magic Link
                         <ArrowRight className="w-4 h-4 ml-2" />
                       </>
                     )}
                   </Button>
+
+                  {/* Helper microcopy */}
+                  <p className="text-sm text-muted-foreground text-center">
+                    We&apos;ll send a secure link to your email. No password needed.
+                  </p>
                 </form>
 
                 {/* Google Sign In - Available for all emails (supports Google Workspace) */}
@@ -338,7 +343,7 @@ function LoginContent() {
                       </div>
                       <div className="relative flex justify-center text-xs uppercase">
                         <span className="bg-card px-2 text-muted-foreground">
-                          Or
+                          Or sign in with
                         </span>
                       </div>
                     </div>
@@ -346,7 +351,7 @@ function LoginContent() {
                     <Button
                       type="button"
                       variant="outline"
-                      className="w-full h-11 border-border hover:bg-muted/50 transition-all"
+                      className="w-full h-11 border-border hover:bg-muted/50 transition-all text-base"
                       onClick={() => handleGoogleSignIn('user')}
                       disabled={googleLoading || adminLoading}
                     >
@@ -384,7 +389,7 @@ function LoginContent() {
                   </div>
                   <div className="relative flex justify-center text-xs uppercase">
                     <span className="bg-card px-2 text-muted-foreground">
-                      Admin access
+                      Admin Portal
                     </span>
                   </div>
                 </div>
@@ -392,7 +397,7 @@ function LoginContent() {
                 <Button
                   type="button"
                   variant="outline"
-                  className="w-full h-11 border-primary/30 hover:bg-primary/10 hover:border-primary/50 transition-all"
+                  className="w-full h-11 border-primary/30 hover:bg-primary/10 hover:border-primary/50 transition-all text-base"
                   onClick={() => handleGoogleSignIn('admin')}
                   disabled={googleLoading || adminLoading}
                 >
@@ -401,8 +406,13 @@ function LoginContent() {
                   ) : (
                     <Shield className="w-4 h-4 mr-2" />
                   )}
-                  Continue as Admin
+                  Sign in as Administrator
                 </Button>
+
+                {/* Admin helper text */}
+                <p className="text-sm text-muted-foreground text-center">
+                  For course managers and instructors
+                </p>
               </>
             )}
 
@@ -412,15 +422,25 @@ function LoginContent() {
                   <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
                     <Mail className="w-8 h-8 text-primary" />
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    We sent a magic link to <strong>{email}</strong>
+                  <p className="text-base text-muted-foreground">
+                    We&apos;ve sent a secure sign-in link to:
                   </p>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Click the link in your email to sign in.
+                  <p className="text-base font-semibold mt-1">{email}</p>
+                  <p className="text-base text-muted-foreground mt-3">
+                    Click the link in your email to access your dashboard instantly.
                   </p>
                 </div>
 
-                <div className="flex items-center justify-between text-sm pt-4">
+                {/* Tips section */}
+                <div className="bg-muted/30 rounded-lg p-4 text-sm">
+                  <p className="font-medium text-foreground mb-2">Didn&apos;t receive it?</p>
+                  <ul className="text-muted-foreground space-y-1">
+                    <li>• Check your spam folder</li>
+                    <li>• Make sure the email is correct</li>
+                  </ul>
+                </div>
+
+                <div className="flex items-center justify-between text-base pt-4">
                   <button
                     type="button"
                     onClick={() => setStep('email')}
@@ -443,32 +463,35 @@ function LoginContent() {
             {step === 'password' && (
               <form onSubmit={handleSetPassword} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="password">New password</Label>
+                  <Label htmlFor="password" className="text-base font-medium">Create password</Label>
                   <Input
                     id="password"
                     type="password"
-                    placeholder="Min 8 chars, 1 uppercase, 1 number"
+                    placeholder="Enter your password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    className="text-base"
                     autoFocus
                     required
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Confirm password</Label>
+                  <Label htmlFor="confirmPassword" className="text-base font-medium">Confirm password</Label>
                   <Input
                     id="confirmPassword"
                     type="password"
-                    placeholder="Confirm your password"
+                    placeholder="Re-enter your password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="text-base"
                     required
                   />
                 </div>
 
                 {/* Password requirements */}
-                <div className="text-xs space-y-1 text-muted-foreground">
+                <div className="text-sm space-y-1 text-muted-foreground">
+                  <p className="font-medium text-foreground mb-2">Password requirements:</p>
                   <p className={password.length >= 8 ? 'text-green-500' : ''}>
                     {password.length >= 8 ? '✓' : '○'} At least 8 characters
                   </p>
@@ -482,7 +505,7 @@ function LoginContent() {
 
                 <Button
                   type="submit"
-                  className="w-full gradient-bg hover:opacity-90 transition-opacity"
+                  className="w-full gradient-bg hover:opacity-90 transition-opacity text-base"
                   disabled={loading}
                 >
                   {loading ? (
@@ -492,7 +515,7 @@ function LoginContent() {
                     </>
                   ) : (
                     <>
-                      Complete setup
+                      Complete Setup
                       <ArrowRight className="w-4 h-4 ml-2" />
                     </>
                   )}
@@ -502,10 +525,12 @@ function LoginContent() {
           </CardContent>
         </Card>
 
-        <p className="text-center text-sm text-muted-foreground mt-6 animate-in-up stagger-3">
-          Need help? Contact{' '}
-          <a href="mailto:support@rethink.systems" className="text-primary hover:underline">
-            support@rethink.systems
+        <p className="text-center text-base text-muted-foreground mt-6 animate-in-up stagger-3">
+          Questions? We&apos;re here to help.{' '}
+          <br className="sm:hidden" />
+          Reach out at{' '}
+          <a href="mailto:shravan@naum.systems" className="text-primary hover:underline">
+            shravan@naum.systems
           </a>
         </p>
       </div>
