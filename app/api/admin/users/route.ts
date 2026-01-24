@@ -1,5 +1,6 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { googleCalendar } from '@/lib/integrations/google-calendar';
 
 async function verifyAdmin() {
   const supabase = await createClient();
@@ -24,6 +25,88 @@ async function verifyAdmin() {
   }
 
   return { authorized: true, userId: user.id };
+}
+
+// Helper to get valid calendar access token
+async function getValidCalendarToken(userId: string): Promise<string | null> {
+  const adminClient = await createAdminClient();
+
+  const { data: tokenData } = await adminClient
+    .from('calendar_tokens')
+    .select('*')
+    .eq('user_id', userId)
+    .single();
+
+  if (!tokenData) return null;
+
+  // Check if token is expired (with 5 min buffer)
+  const expiresAt = new Date(tokenData.expires_at);
+  if (expiresAt.getTime() < Date.now() + 300000) {
+    try {
+      const refreshed = await googleCalendar.refreshAccessToken(tokenData.refresh_token);
+      await adminClient
+        .from('calendar_tokens')
+        .update({
+          access_token: refreshed.accessToken,
+          expires_at: new Date(Date.now() + refreshed.expiresIn * 1000).toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('user_id', userId);
+      return refreshed.accessToken;
+    } catch {
+      return null;
+    }
+  }
+
+  return tokenData.access_token;
+}
+
+// Helper to send calendar invites for future sessions to a new cohort member
+async function sendCalendarInvitesToNewMember(
+  userEmail: string,
+  cohortId: string,
+  adminUserId: string
+): Promise<{ sent: number; failed: number }> {
+  const adminClient = await createAdminClient();
+
+  // Get future sessions for this cohort that have calendar events
+  const now = new Date().toISOString();
+  const { data: futureSessions } = await adminClient
+    .from('sessions')
+    .select('id, calendar_event_id')
+    .eq('cohort_id', cohortId)
+    .gt('scheduled_at', now)
+    .not('calendar_event_id', 'is', null);
+
+  if (!futureSessions || futureSessions.length === 0) {
+    return { sent: 0, failed: 0 };
+  }
+
+  // Get calendar access token
+  const accessToken = await getValidCalendarToken(adminUserId);
+  if (!accessToken) {
+    console.log('No valid calendar token available for sending invites');
+    return { sent: 0, failed: futureSessions.length };
+  }
+
+  let sent = 0;
+  let failed = 0;
+
+  for (const session of futureSessions) {
+    try {
+      await googleCalendar.addAttendeeToEvent(
+        accessToken,
+        session.calendar_event_id!,
+        userEmail
+      );
+      sent++;
+    } catch (error) {
+      console.error(`Failed to add attendee to session ${session.id}:`, error);
+      failed++;
+    }
+  }
+
+  return { sent, failed };
 }
 
 // GET - Fetch users and cohorts
@@ -83,6 +166,19 @@ export async function PUT(request: NextRequest) {
       .single();
 
     if (error) throw error;
+
+    // If cohort was updated, send calendar invites for future sessions
+    if (cohort_id && data?.email) {
+      try {
+        const result = await sendCalendarInvitesToNewMember(data.email, cohort_id, auth.userId!);
+        if (result.sent > 0) {
+          console.log(`Sent ${result.sent} calendar invites to ${data.email} for cohort ${cohort_id}`);
+        }
+      } catch (calendarError) {
+        console.error('Failed to send calendar invites:', calendarError);
+        // Don't fail the request - cohort update was successful
+      }
+    }
 
     return NextResponse.json(data);
   } catch (error) {

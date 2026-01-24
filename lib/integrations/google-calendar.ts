@@ -269,6 +269,63 @@ export class GoogleCalendarService {
   }
 
   /**
+   * Add attendee to existing event (sends invite to new attendee)
+   */
+  async addAttendeeToEvent(
+    accessToken: string,
+    eventId: string,
+    newAttendeeEmail: string,
+    calendarId = 'primary'
+  ): Promise<CalendarEvent> {
+    // First, get the existing event to retrieve current attendees
+    const getResponse = await fetch(
+      `${this.baseUrl}/calendars/${calendarId}/events/${eventId}`,
+      {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      }
+    );
+
+    if (!getResponse.ok) {
+      const error = await getResponse.json();
+      throw new Error(error.error?.message || 'Failed to get event');
+    }
+
+    const existingEvent = await getResponse.json();
+    const currentAttendees = existingEvent.attendees || [];
+
+    // Check if attendee already exists
+    const alreadyAttendee = currentAttendees.some(
+      (a: { email: string }) => a.email.toLowerCase() === newAttendeeEmail.toLowerCase()
+    );
+    if (alreadyAttendee) {
+      return existingEvent; // Already an attendee, no action needed
+    }
+
+    // Add new attendee
+    const updatedAttendees = [...currentAttendees, { email: newAttendeeEmail }];
+
+    // Update the event with sendUpdates=all to send invite to new attendee
+    const updateResponse = await fetch(
+      `${this.baseUrl}/calendars/${calendarId}/events/${eventId}?sendUpdates=all`,
+      {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ attendees: updatedAttendees }),
+      }
+    );
+
+    if (!updateResponse.ok) {
+      const error = await updateResponse.json();
+      throw new Error(error.error?.message || 'Failed to add attendee to event');
+    }
+
+    return updateResponse.json();
+  }
+
+  /**
    * List calendar events
    */
   async listEvents(
