@@ -196,13 +196,22 @@ export async function POST(request: NextRequest) {
       const accessToken = await getValidCalendarToken(auth.userId!);
       if (accessToken) {
         try {
-          // Get cohort members' emails
+          // Get cohort members' emails (students)
           const { data: members } = await adminClient
             .from('profiles')
             .select('email')
             .eq('cohort_id', cohort_id);
 
-          const attendeeEmails = members?.map(m => m.email) || [];
+          // Get ALL admin emails (admin + company_user roles)
+          const { data: admins } = await adminClient
+            .from('profiles')
+            .select('email')
+            .in('role', ['admin', 'company_user']);
+
+          // Combine and deduplicate emails (students + all admins)
+          const studentEmails = members?.map(m => m.email) || [];
+          const adminEmails = admins?.map(a => a.email) || [];
+          const attendeeEmails = [...new Set([...studentEmails, ...adminEmails])];
 
           if (attendeeEmails.length > 0) {
             const startTime = new Date(scheduled_at);
