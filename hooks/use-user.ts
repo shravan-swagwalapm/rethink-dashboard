@@ -11,6 +11,8 @@ export function useUser() {
   const [loading, setLoading] = useState(true);
   const loadingCompletedRef = useRef(false);
   const isMountedRef = useRef(true);
+  const currentUserIdRef = useRef<string | null>(null);
+  const initialFetchDoneRef = useRef(false);
 
   useEffect(() => {
     const supabase = getClient();
@@ -20,7 +22,6 @@ export function useUser() {
     const completeLoading = () => {
       if (!loadingCompletedRef.current && isMountedRef.current) {
         loadingCompletedRef.current = true;
-        console.log('useUser: Setting loading to false');
         setLoading(false);
       }
     };
@@ -35,16 +36,18 @@ export function useUser() {
 
     // Get initial session via API (more reliable)
     const getUser = async () => {
-      console.log('useUser: Starting getUser via API...');
+      if (initialFetchDoneRef.current) return;
+      initialFetchDoneRef.current = true;
+
       try {
         const response = await fetch('/api/me', { cache: 'no-store' });
         const data = await response.json();
-        console.log('useUser: API result:', { user: data.user?.email, profile: data.profile?.full_name });
 
         if (!isMountedRef.current) return;
 
         setUser(data.user);
         setProfile(data.profile);
+        currentUserIdRef.current = data.user?.id || null;
       } catch (error) {
         console.error('useUser: Error fetching user:', error);
       } finally {
@@ -55,36 +58,43 @@ export function useUser() {
 
     getUser();
 
-    // Listen for auth changes
+    // Listen for auth changes - only react to actual user changes, not visibility events
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event: AuthChangeEvent, session: Session | null) => {
-        console.log('useUser: Auth state changed:', _event, session?.user?.email);
         if (!isMountedRef.current) return;
 
+        const newUserId = session?.user?.id || null;
+
+        // Skip if user hasn't actually changed (prevents refresh on tab focus)
+        if (newUserId === currentUserIdRef.current && loadingCompletedRef.current) {
+          return;
+        }
+
         if (session?.user) {
-          // IMPORTANT: Clear old data immediately to prevent showing wrong user's data
-          // This ensures we show loading state instead of stale data
-          setUser(null);
-          setProfile(null);
-          setLoading(true);
-          loadingCompletedRef.current = false;
-
-          // Fetch profile via API when auth state changes
-          console.log('useUser: Fetching profile via API for auth change');
-          try {
-            const response = await fetch('/api/me', { cache: 'no-store' });
-            const data = await response.json();
-            console.log('useUser: Auth change API result:', { user: data.user?.email, profile: data.profile?.full_name });
-
-            if (!isMountedRef.current) return;
-            setUser(data.user);
-            setProfile(data.profile);
-          } catch (err) {
-            console.error('useUser: Profile fetch error:', err);
-            setUser(session.user);
+          // Only clear and show loading if user actually changed
+          if (newUserId !== currentUserIdRef.current) {
+            setUser(null);
             setProfile(null);
+            setLoading(true);
+            loadingCompletedRef.current = false;
+            currentUserIdRef.current = newUserId;
+
+            try {
+              const response = await fetch('/api/me', { cache: 'no-store' });
+              const data = await response.json();
+
+              if (!isMountedRef.current) return;
+              setUser(data.user);
+              setProfile(data.profile);
+            } catch (err) {
+              console.error('useUser: Profile fetch error:', err);
+              setUser(session.user);
+              setProfile(null);
+            }
           }
         } else {
+          // User signed out
+          currentUserIdRef.current = null;
           setUser(null);
           setProfile(null);
         }

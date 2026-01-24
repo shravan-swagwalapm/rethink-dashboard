@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -74,8 +74,13 @@ export default function CohortsPage() {
   const [showRetagDialog, setShowRetagDialog] = useState(false);
   const [retagCohort, setRetagCohort] = useState<Cohort | null>(null);
   const [newTag, setNewTag] = useState('');
+  const hasFetchedRef = useRef(false);
 
-  const fetchCohorts = useCallback(async () => {
+  const fetchCohorts = useCallback(async (force = false) => {
+    // Prevent re-fetching on tab switch unless forced
+    if (hasFetchedRef.current && !force) return;
+    hasFetchedRef.current = true;
+
     try {
       const response = await fetch('/api/admin/cohorts');
       if (!response.ok) {
@@ -157,7 +162,7 @@ export default function CohortsPage() {
 
       toast.success(editingCohort ? 'Cohort updated' : 'Cohort created');
       setShowForm(false);
-      fetchCohorts();
+      fetchCohorts(true);
     } catch (error) {
       console.error('Error saving cohort:', error);
       toast.error('Failed to save cohort');
@@ -181,7 +186,7 @@ export default function CohortsPage() {
       }
 
       toast.success('Cohort deleted');
-      fetchCohorts();
+      fetchCohorts(true);
     } catch (error) {
       console.error('Error deleting cohort:', error);
       toast.error('Failed to delete cohort');
@@ -201,7 +206,7 @@ export default function CohortsPage() {
       }
 
       toast.success('Cohort archived');
-      fetchCohorts();
+      fetchCohorts(true);
     } catch (error) {
       console.error('Error archiving cohort:', error);
       toast.error('Failed to archive cohort');
@@ -236,7 +241,7 @@ export default function CohortsPage() {
       setShowRetagDialog(false);
       setRetagCohort(null);
       setNewTag('');
-      fetchCohorts();
+      fetchCohorts(true);
     } catch (error) {
       console.error('Error retagging cohort:', error);
       toast.error('Failed to retag cohort');

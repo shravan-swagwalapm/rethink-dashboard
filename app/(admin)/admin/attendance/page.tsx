@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -70,8 +70,13 @@ export default function AdminAttendancePage() {
   const [selectedEmail, setSelectedEmail] = useState<string>('');
   const [selectedUserId, setSelectedUserId] = useState<string>('');
   const [linking, setLinking] = useState(false);
+  const hasFetchedRef = useRef(false);
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (force = false) => {
+    // Prevent re-fetching on tab switch unless forced
+    if (hasFetchedRef.current && !force) return;
+    hasFetchedRef.current = true;
+
     try {
       const [unmatchedRes, aliasesRes, usersRes] = await Promise.all([
         fetch('/api/admin/attendance/aliases?action=unmatched'),
@@ -148,7 +153,7 @@ export default function AdminAttendancePage() {
       setShowLinkDialog(false);
       setSelectedEmail('');
       setSelectedUserId('');
-      fetchData();
+      fetchData(true);
     } catch (error) {
       console.error('Error linking email:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to link email');
@@ -170,7 +175,7 @@ export default function AdminAttendancePage() {
       }
 
       toast.success('Email alias removed');
-      fetchData();
+      fetchData(true);
     } catch (error) {
       console.error('Error deleting alias:', error);
       toast.error('Failed to delete alias');

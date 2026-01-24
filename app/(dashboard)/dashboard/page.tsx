@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser } from '@/hooks/use-user';
 import { getClient } from '@/lib/supabase/client';
@@ -26,6 +26,7 @@ export default function DashboardPage() {
   const [cohortStartDate, setCohortStartDate] = useState<Date | null>(null);
   const [cohortName, setCohortName] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const hasFetchedRef = useRef(false);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -34,6 +35,10 @@ export default function DashboardPage() {
         setLoading(false);
         return;
       }
+
+      // Prevent re-fetching on tab switch
+      if (hasFetchedRef.current) return;
+      hasFetchedRef.current = true;
 
       const supabase = getClient();
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -164,7 +164,13 @@ export default function LearningsPage() {
   const [previewResource, setPreviewResource] = useState<ModuleResource | null>(null);
   const [previewCaseStudy, setPreviewCaseStudy] = useState<{ url: string; title: string } | null>(null);
 
-  const fetchCohorts = useCallback(async () => {
+  const hasFetchedCohortsRef = useRef(false);
+
+  const fetchCohorts = useCallback(async (force = false) => {
+    // Prevent re-fetching on tab switch unless forced
+    if (hasFetchedCohortsRef.current && !force) return;
+    hasFetchedCohortsRef.current = true;
+
     try {
       const response = await fetch('/api/admin/cohorts');
       const data = await response.json();

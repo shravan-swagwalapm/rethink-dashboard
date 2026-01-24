@@ -31,7 +31,14 @@ async function verifyAdmin() {
   return { authorized: true, userId: user.id };
 }
 
-async function getValidAccessToken(userId: string): Promise<string | null> {
+interface TokenResult {
+  accessToken: string | null;
+  needsReconnect: boolean;
+  error?: string;
+  refreshedAt?: string;
+}
+
+async function getValidAccessToken(userId: string): Promise<TokenResult> {
   const adminClient = await createAdminClient();
 
   const { data: tokenData } = await adminClient
@@ -40,7 +47,9 @@ async function getValidAccessToken(userId: string): Promise<string | null> {
     .eq('user_id', userId)
     .single();
 
-  if (!tokenData) return null;
+  if (!tokenData) {
+    return { accessToken: null, needsReconnect: true, error: 'No calendar token found' };
+  }
 
   // Check if token is expired (with 5 min buffer)
   const expiresAt = new Date(tokenData.expires_at);
@@ -49,27 +58,43 @@ async function getValidAccessToken(userId: string): Promise<string | null> {
     try {
       const refreshed = await googleCalendar.refreshAccessToken(tokenData.refresh_token);
 
+      const newExpiresAt = new Date(Date.now() + refreshed.expiresIn * 1000).toISOString();
+      const now = new Date().toISOString();
+
       // Update stored token
       await adminClient
         .from('calendar_tokens')
         .update({
           access_token: refreshed.accessToken,
-          expires_at: new Date(Date.now() + refreshed.expiresIn * 1000).toISOString(),
-          updated_at: new Date().toISOString(),
+          expires_at: newExpiresAt,
+          updated_at: now,
         })
         .eq('user_id', userId);
 
-      return refreshed.accessToken;
-    } catch {
+      return {
+        accessToken: refreshed.accessToken,
+        needsReconnect: false,
+        refreshedAt: now
+      };
+    } catch (error) {
       // Token refresh failed, user needs to re-auth
-      return null;
+      console.error('Calendar token refresh failed:', error);
+      return {
+        accessToken: null,
+        needsReconnect: true,
+        error: 'Token refresh failed. Please reconnect Google Calendar.'
+      };
     }
   }
 
-  return tokenData.access_token;
+  return {
+    accessToken: tokenData.access_token,
+    needsReconnect: false,
+    refreshedAt: tokenData.updated_at
+  };
 }
 
-// GET - Check calendar connection status
+// GET - Check calendar connection status with health info
 export async function GET() {
   const auth = await verifyAdmin();
   if (!auth.authorized) {
@@ -80,14 +105,39 @@ export async function GET() {
 
   const { data: tokenData } = await adminClient
     .from('calendar_tokens')
-    .select('calendar_email, updated_at')
+    .select('calendar_email, updated_at, expires_at')
     .eq('user_id', auth.userId)
     .single();
 
+  if (!tokenData) {
+    return NextResponse.json({
+      connected: false,
+      email: null,
+      connectedAt: null,
+      health: 'disconnected',
+      needsReconnect: true
+    });
+  }
+
+  // Check token health
+  const expiresAt = new Date(tokenData.expires_at);
+  const now = Date.now();
+  const hoursUntilExpiry = (expiresAt.getTime() - now) / (1000 * 60 * 60);
+
+  let health: 'healthy' | 'expiring_soon' | 'expired' = 'healthy';
+  if (expiresAt.getTime() < now) {
+    health = 'expired';
+  } else if (hoursUntilExpiry < 1) {
+    health = 'expiring_soon';
+  }
+
   return NextResponse.json({
-    connected: !!tokenData,
-    email: tokenData?.calendar_email || null,
-    connectedAt: tokenData?.updated_at || null,
+    connected: true,
+    email: tokenData.calendar_email,
+    connectedAt: tokenData.updated_at,
+    expiresAt: tokenData.expires_at,
+    health,
+    needsReconnect: health === 'expired'
   });
 }
 
@@ -107,13 +157,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Get access token
-    const accessToken = await getValidAccessToken(auth.userId!);
-    if (!accessToken) {
+    const tokenResult = await getValidAccessToken(auth.userId!);
+    if (!tokenResult.accessToken || tokenResult.needsReconnect) {
       return NextResponse.json(
-        { error: 'Calendar not connected. Please reconnect Google Calendar.' },
+        { error: tokenResult.error || 'Calendar not connected. Please reconnect Google Calendar.', needsReconnect: true },
         { status: 401 }
       );
     }
+    const accessToken = tokenResult.accessToken;
 
     const adminClient = await createAdminClient();
 
@@ -209,13 +260,14 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Session ID is required' }, { status: 400 });
     }
 
-    const accessToken = await getValidAccessToken(auth.userId!);
-    if (!accessToken) {
+    const tokenResult = await getValidAccessToken(auth.userId!);
+    if (!tokenResult.accessToken || tokenResult.needsReconnect) {
       return NextResponse.json(
-        { error: 'Calendar not connected. Please reconnect Google Calendar.' },
+        { error: tokenResult.error || 'Calendar not connected. Please reconnect Google Calendar.', needsReconnect: true },
         { status: 401 }
       );
     }
+    const accessToken = tokenResult.accessToken;
 
     const adminClient = await createAdminClient();
 
@@ -279,13 +331,14 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Session ID is required' }, { status: 400 });
     }
 
-    const accessToken = await getValidAccessToken(auth.userId!);
-    if (!accessToken) {
+    const tokenResult = await getValidAccessToken(auth.userId!);
+    if (!tokenResult.accessToken || tokenResult.needsReconnect) {
       return NextResponse.json(
-        { error: 'Calendar not connected. Please reconnect Google Calendar.' },
+        { error: tokenResult.error || 'Calendar not connected. Please reconnect Google Calendar.', needsReconnect: true },
         { status: 401 }
       );
     }
+    const accessToken = tokenResult.accessToken;
 
     const adminClient = await createAdminClient();
 

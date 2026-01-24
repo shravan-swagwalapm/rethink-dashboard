@@ -94,8 +94,13 @@ export default function UsersPage() {
   const [bulkLoading, setBulkLoading] = useState(false);
   const [bulkResults, setBulkResults] = useState<BulkResult[] | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const hasFetchedRef = useRef(false);
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (force = false) => {
+    // Prevent re-fetching on tab switch unless forced
+    if (hasFetchedRef.current && !force) return;
+    hasFetchedRef.current = true;
+
     try {
       const response = await fetch('/api/admin/users');
       if (!response.ok) {
@@ -127,7 +132,7 @@ export default function UsersPage() {
       if (!response.ok) throw new Error('Failed to update role');
 
       toast.success('Role updated');
-      fetchData();
+      fetchData(true);
     } catch (error) {
       toast.error('Failed to update role');
     }
@@ -144,7 +149,7 @@ export default function UsersPage() {
       if (!response.ok) throw new Error('Failed to update cohort');
 
       toast.success('Cohort updated');
-      fetchData();
+      fetchData(true);
     } catch (error) {
       toast.error('Failed to update cohort');
     }
@@ -180,7 +185,7 @@ export default function UsersPage() {
       setNewUserEmail('');
       setNewUserName('');
       setNewUserCohort('');
-      fetchData();
+      fetchData(true);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to create user');
     } finally {
@@ -243,7 +248,7 @@ export default function UsersPage() {
 
       setBulkResults(data.results);
       toast.success(data.message);
-      fetchData();
+      fetchData(true);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to create users');
     } finally {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -76,6 +76,8 @@ export default function SessionsPage() {
   const [zoomConfigured, setZoomConfigured] = useState(false);
   const [calendarConnected, setCalendarConnected] = useState(false);
   const [calendarEmail, setCalendarEmail] = useState<string | null>(null);
+  const [calendarHealth, setCalendarHealth] = useState<'healthy' | 'expiring_soon' | 'expired' | 'disconnected'>('disconnected');
+  const [calendarNeedsReconnect, setCalendarNeedsReconnect] = useState(false);
 
   const [showForm, setShowForm] = useState(false);
   const [editingSession, setEditingSession] = useState<Session | null>(null);
@@ -91,7 +93,12 @@ export default function SessionsPage() {
     send_calendar_invites: false,
   });
 
-  const fetchData = useCallback(async () => {
+  const hasFetchedRef = useRef(false);
+
+  const fetchData = useCallback(async (force = false) => {
+    // Prevent re-fetching on tab switch unless forced
+    if (hasFetchedRef.current && !force) return;
+    hasFetchedRef.current = true;
     try {
       // Fetch sessions, zoom status, and calendar status in parallel
       const [sessionsRes, zoomRes, calendarRes] = await Promise.all([
@@ -115,6 +122,8 @@ export default function SessionsPage() {
         const calendarData = await calendarRes.json();
         setCalendarConnected(calendarData.connected);
         setCalendarEmail(calendarData.email);
+        setCalendarHealth(calendarData.health || 'disconnected');
+        setCalendarNeedsReconnect(calendarData.needsReconnect || false);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -187,6 +196,20 @@ export default function SessionsPage() {
       return;
     }
 
+    // Duration validation
+    if (!formData.duration_minutes || formData.duration_minutes < 15) {
+      toast.error('Duration must be at least 15 minutes');
+      return;
+    }
+    if (formData.duration_minutes > 480) {
+      toast.error('Duration cannot exceed 480 minutes (8 hours)');
+      return;
+    }
+    if (formData.auto_create_zoom && formData.duration_minutes < 60) {
+      toast.error('Zoom meetings require a minimum duration of 60 minutes');
+      return;
+    }
+
     setSaving(true);
     const scheduledAt = new Date(`${formData.scheduled_at}T${formData.scheduled_time}`);
 
@@ -231,7 +254,7 @@ export default function SessionsPage() {
 
       toast.success(message);
       setShowForm(false);
-      fetchData();
+      fetchData(true); // Force refresh after save
     } catch (error) {
       console.error('Error saving session:', error);
       toast.error('Failed to save session');
@@ -253,7 +276,7 @@ export default function SessionsPage() {
       if (!response.ok) throw new Error('Failed to delete');
 
       toast.success('Session deleted');
-      fetchData();
+      fetchData(true); // Force refresh after delete
     } catch (error) {
       toast.error('Failed to delete session');
     }
@@ -544,11 +567,22 @@ export default function SessionsPage() {
                 type="number"
                 min="15"
                 max="480"
-                value={formData.duration_minutes}
-                onChange={(e) =>
-                  setFormData({ ...formData, duration_minutes: parseInt(e.target.value) || 60 })
-                }
+                value={formData.duration_minutes || ''}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value === '') {
+                    setFormData({ ...formData, duration_minutes: 0 });
+                  } else {
+                    const parsed = parseInt(value, 10);
+                    if (!isNaN(parsed)) {
+                      setFormData({ ...formData, duration_minutes: parsed });
+                    }
+                  }
+                }}
               />
+              {formData.auto_create_zoom && formData.duration_minutes > 0 && formData.duration_minutes < 60 && (
+                <p className="text-xs text-amber-500">Zoom requires minimum 60 minutes</p>
+              )}
             </div>
 
             {/* Zoom section */}
@@ -627,10 +661,28 @@ export default function SessionsPage() {
                       Connect
                     </Button>
                   </div>
+                ) : calendarNeedsReconnect ? (
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-amber-500">
+                      Calendar token expired. Please reconnect.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.location.href = '/api/calendar/auth'}
+                    >
+                      <Link2 className="w-3 h-3 mr-1" />
+                      Reconnect
+                    </Button>
+                  </div>
                 ) : (
-                  <p className="text-xs text-muted-foreground">
-                    Connected as {calendarEmail}. {formData.cohort_id ? 'All cohort members will receive calendar invites.' : 'Select a cohort to send invites.'}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <span className={`w-2 h-2 rounded-full ${calendarHealth === 'healthy' ? 'bg-green-500' : calendarHealth === 'expiring_soon' ? 'bg-amber-500' : 'bg-red-500'}`} />
+                    <p className="text-xs text-muted-foreground">
+                      Connected as {calendarEmail}. {formData.cohort_id ? 'All cohort members will receive calendar invites.' : 'Select a cohort to send invites.'}
+                    </p>
+                  </div>
                 )}
               </div>
             )}
