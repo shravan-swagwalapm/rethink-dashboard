@@ -72,7 +72,13 @@ export async function GET() {
   try {
     const adminClient = await createAdminClient();
 
-    const [{ data: sessions }, { data: cohorts }] = await Promise.all([
+    const [
+      { data: sessions },
+      { data: cohorts },
+      { data: sessionCohorts },
+      { data: sessionGuests },
+      { data: masterUsers },
+    ] = await Promise.all([
       adminClient
         .from('sessions')
         .select(`*, cohort:cohorts(*)`)
@@ -83,10 +89,20 @@ export async function GET() {
         .select('*')
         .eq('status', 'active')
         .order('name', { ascending: true }),
+      adminClient
+        .from('session_cohorts')
+        .select('*, cohort:cohorts(*)'),
+      adminClient
+        .from('session_guests')
+        .select('*, user:profiles(id, email, full_name)'),
+      adminClient
+        .from('profiles')
+        .select('id, email, full_name, role')
+        .eq('role', 'master'),
     ]);
 
-    // Fetch RSVP counts for each session
-    const sessionsWithRsvp = await Promise.all(
+    // Fetch RSVP counts and attach cohorts/guests for each session
+    const sessionsWithDetails = await Promise.all(
       (sessions || []).map(async (session) => {
         const [{ count: yesCount }, { count: noCount }] = await Promise.all([
           adminClient
@@ -105,11 +121,17 @@ export async function GET() {
           ...session,
           rsvp_yes_count: yesCount || 0,
           rsvp_no_count: noCount || 0,
+          cohorts: (sessionCohorts || []).filter(sc => sc.session_id === session.id),
+          guests: (sessionGuests || []).filter(sg => sg.session_id === session.id),
         };
       })
     );
 
-    return NextResponse.json({ sessions: sessionsWithRsvp, cohorts: cohorts || [] });
+    return NextResponse.json({
+      sessions: sessionsWithDetails,
+      cohorts: cohorts || [],
+      masterUsers: masterUsers || [],
+    });
   } catch (error) {
     console.error('Error fetching sessions:', error);
     return NextResponse.json({ error: 'Failed to fetch sessions' }, { status: 500 });
@@ -128,7 +150,9 @@ export async function POST(request: NextRequest) {
     const {
       title,
       description,
-      cohort_id,
+      cohort_id,      // Legacy single cohort
+      cohort_ids,     // New: array of cohort IDs
+      guest_ids,      // New: array of guest (master) user IDs
       scheduled_at,
       duration_minutes,
       zoom_link,
@@ -144,18 +168,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Scheduled time is required' }, { status: 400 });
     }
 
-    if (!cohort_id) {
-      return NextResponse.json({ error: 'Cohort is required' }, { status: 400 });
+    // Support both legacy (cohort_id) and new (cohort_ids) modes
+    const cohortIdList: string[] = cohort_ids && Array.isArray(cohort_ids) && cohort_ids.length > 0
+      ? cohort_ids
+      : (cohort_id ? [cohort_id] : []);
+
+    if (cohortIdList.length === 0) {
+      return NextResponse.json({ error: 'At least one cohort is required' }, { status: 400 });
     }
 
     const adminClient = await createAdminClient();
     const duration = duration_minutes || 60;
 
-    // Prepare session data
+    // Prepare session data (use first cohort as legacy cohort_id)
     const sessionData: Record<string, unknown> = {
       title: title.trim(),
       description: description || null,
-      cohort_id: cohort_id || null,
+      cohort_id: cohortIdList[0],  // Legacy: first cohort
       scheduled_at,
       duration_minutes: duration,
       zoom_link: zoom_link || null,
@@ -178,7 +207,6 @@ export async function POST(request: NextRequest) {
         sessionData.zoom_start_url = meeting.start_url;
       } catch (zoomError) {
         console.error('Failed to create Zoom meeting:', zoomError);
-        // Continue without Zoom - don't fail the session creation
       }
     }
 
@@ -191,27 +219,86 @@ export async function POST(request: NextRequest) {
 
     if (error) throw error;
 
+    // Insert session_cohorts for all selected cohorts
+    if (cohortIdList.length > 0) {
+      const sessionCohortInserts = cohortIdList.map(cid => ({
+        session_id: session.id,
+        cohort_id: cid,
+      }));
+
+      await adminClient
+        .from('session_cohorts')
+        .insert(sessionCohortInserts);
+    }
+
+    // Insert session_guests if any guests selected
+    const guestIdList: string[] = guest_ids && Array.isArray(guest_ids) ? guest_ids : [];
+    if (guestIdList.length > 0) {
+      const sessionGuestInserts = guestIdList.map(uid => ({
+        session_id: session.id,
+        user_id: uid,
+      }));
+
+      await adminClient
+        .from('session_guests')
+        .insert(sessionGuestInserts);
+    }
+
     // Create calendar event if requested
-    if (send_calendar_invites && cohort_id && session) {
+    if (send_calendar_invites && session) {
       const accessToken = await getValidCalendarToken(auth.userId!);
       if (accessToken) {
         try {
-          // Get cohort members' emails (students)
-          const { data: members } = await adminClient
+          // Get students from ALL selected cohorts (using role_assignments table)
+          const { data: studentAssignments } = await adminClient
+            .from('user_role_assignments')
+            .select('user_id')
+            .in('cohort_id', cohortIdList)
+            .in('role', ['student', 'mentor']);
+
+          const studentUserIds = [...new Set((studentAssignments || []).map(sa => sa.user_id))];
+
+          // Get emails for those users
+          let studentEmails: string[] = [];
+          if (studentUserIds.length > 0) {
+            const { data: studentProfiles } = await adminClient
+              .from('profiles')
+              .select('email')
+              .in('id', studentUserIds);
+            studentEmails = (studentProfiles || []).map(p => p.email);
+          }
+
+          // Also get students from legacy cohort_id field (for backwards compatibility)
+          const { data: legacyStudents } = await adminClient
             .from('profiles')
             .select('email')
-            .eq('cohort_id', cohort_id);
+            .in('cohort_id', cohortIdList);
+          const legacyStudentEmails = (legacyStudents || []).map(m => m.email);
 
           // Get ALL admin emails (admin + company_user roles)
           const { data: admins } = await adminClient
             .from('profiles')
             .select('email')
             .in('role', ['admin', 'company_user']);
+          const adminEmails = (admins || []).map(a => a.email);
 
-          // Combine and deduplicate emails (students + all admins)
-          const studentEmails = members?.map(m => m.email) || [];
-          const adminEmails = admins?.map(a => a.email) || [];
-          const attendeeEmails = [...new Set([...studentEmails, ...adminEmails])];
+          // Get guest emails
+          let guestEmails: string[] = [];
+          if (guestIdList.length > 0) {
+            const { data: guestProfiles } = await adminClient
+              .from('profiles')
+              .select('email')
+              .in('id', guestIdList);
+            guestEmails = (guestProfiles || []).map(g => g.email);
+          }
+
+          // Combine and deduplicate all emails
+          const attendeeEmails = [...new Set([
+            ...studentEmails,
+            ...legacyStudentEmails,
+            ...adminEmails,
+            ...guestEmails,
+          ])];
 
           if (attendeeEmails.length > 0) {
             const startTime = new Date(scheduled_at);
@@ -243,12 +330,27 @@ export async function POST(request: NextRequest) {
           }
         } catch (calendarError) {
           console.error('Failed to create calendar event:', calendarError);
-          // Continue without calendar - don't fail the session creation
         }
       }
     }
 
-    return NextResponse.json(session, { status: 201 });
+    // Fetch the session cohorts and guests for the response
+    const [{ data: sessionCohorts }, { data: sessionGuests }] = await Promise.all([
+      adminClient
+        .from('session_cohorts')
+        .select('*, cohort:cohorts(*)')
+        .eq('session_id', session.id),
+      adminClient
+        .from('session_guests')
+        .select('*, user:profiles(id, email, full_name)')
+        .eq('session_id', session.id),
+    ]);
+
+    return NextResponse.json({
+      ...session,
+      cohorts: sessionCohorts || [],
+      guests: sessionGuests || [],
+    }, { status: 201 });
   } catch (error) {
     console.error('Error creating session:', error);
     return NextResponse.json({ error: 'Failed to create session' }, { status: 500 });

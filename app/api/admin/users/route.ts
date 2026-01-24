@@ -166,7 +166,7 @@ export async function GET() {
   try {
     const adminClient = await createAdminClient();
 
-    const [{ data: users }, { data: cohorts }] = await Promise.all([
+    const [{ data: users }, { data: cohorts }, { data: roleAssignments }] = await Promise.all([
       adminClient
         .from('profiles')
         .select('*, cohort:cohorts!fk_profile_cohort(*)')
@@ -175,16 +175,40 @@ export async function GET() {
         .from('cohorts')
         .select('*')
         .order('name', { ascending: true }),
+      adminClient
+        .from('user_role_assignments')
+        .select('*, cohort:cohorts(*)'),
     ]);
 
-    return NextResponse.json({ users: users || [], cohorts: cohorts || [] });
+    // Attach role assignments to each user
+    const usersWithRoles = (users || []).map(user => ({
+      ...user,
+      role_assignments: (roleAssignments || []).filter(ra => ra.user_id === user.id),
+    }));
+
+    // Also fetch master users (guests) for session guest selection
+    const masterUsers = usersWithRoles.filter(u =>
+      u.role === 'master' ||
+      u.role_assignments?.some((ra: { role: string }) => ra.role === 'master')
+    );
+
+    return NextResponse.json({
+      users: usersWithRoles,
+      cohorts: cohorts || [],
+      masterUsers: masterUsers,
+    });
   } catch (error) {
     console.error('Error fetching users:', error);
     return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 });
   }
 }
 
-// PUT - Update user (role or cohort)
+interface RoleAssignment {
+  role: string;
+  cohort_id: string | null;
+}
+
+// PUT - Update user (role, cohort, or role_assignments)
 export async function PUT(request: NextRequest) {
   const auth = await verifyAdmin();
   if (!auth.authorized) {
@@ -193,7 +217,7 @@ export async function PUT(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { id, role, cohort_id } = body;
+    const { id, role, cohort_id, role_assignments } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
@@ -201,58 +225,149 @@ export async function PUT(request: NextRequest) {
 
     const adminClient = await createAdminClient();
 
-    // Get current user data BEFORE update (to know old cohort)
+    // Get current user data and role assignments BEFORE update
     const { data: currentUser } = await adminClient
       .from('profiles')
       .select('email, cohort_id')
       .eq('id', id)
       .single();
 
+    const { data: currentAssignments } = await adminClient
+      .from('user_role_assignments')
+      .select('*')
+      .eq('user_id', id);
+
     const oldCohortId = currentUser?.cohort_id;
+    const oldCohortIds = new Set((currentAssignments || []).map(a => a.cohort_id).filter(Boolean));
 
-    const updateData: { role?: string; cohort_id?: string | null } = {};
-    if (role !== undefined) updateData.role = role;
-    if (cohort_id !== undefined) updateData.cohort_id = cohort_id || null;
+    // Handle role_assignments update (new multi-role mode)
+    if (role_assignments !== undefined && Array.isArray(role_assignments)) {
+      // Delete existing assignments
+      await adminClient
+        .from('user_role_assignments')
+        .delete()
+        .eq('user_id', id);
 
-    const { data, error } = await adminClient
-      .from('profiles')
-      .update(updateData)
-      .eq('id', id)
-      .select()
-      .single();
+      // Insert new assignments
+      if (role_assignments.length > 0) {
+        const assignmentsToInsert = (role_assignments as RoleAssignment[]).map(ra => ({
+          user_id: id,
+          role: ra.role,
+          cohort_id: ra.cohort_id,
+        }));
 
-    if (error) throw error;
+        await adminClient
+          .from('user_role_assignments')
+          .insert(assignmentsToInsert);
 
-    // Handle cohort change - remove from old, add to new
-    if (cohort_id !== undefined && data?.email) {
-      const newCohortId = cohort_id || null;
-
-      // Remove from old cohort's sessions (if had one and it changed)
-      if (oldCohortId && oldCohortId !== newCohortId) {
-        try {
-          const removeResult = await removeCalendarInvitesFromOldCohort(data.email, oldCohortId, auth.userId!);
-          if (removeResult.removed > 0) {
-            console.log(`Removed ${removeResult.removed} calendar invites from ${data.email} for old cohort ${oldCohortId}`);
-          }
-        } catch (calendarError) {
-          console.error('Failed to remove old calendar invites:', calendarError);
-        }
+        // Update legacy profile fields with first assignment
+        const firstAssignment = role_assignments[0] as RoleAssignment;
+        await adminClient
+          .from('profiles')
+          .update({
+            role: firstAssignment.role,
+            cohort_id: firstAssignment.cohort_id,
+          })
+          .eq('id', id);
       }
 
-      // Add to new cohort's sessions (if has new one and it changed)
-      if (newCohortId && newCohortId !== oldCohortId) {
-        try {
-          const addResult = await sendCalendarInvitesToNewMember(data.email, newCohortId, auth.userId!);
-          if (addResult.sent > 0) {
-            console.log(`Sent ${addResult.sent} calendar invites to ${data.email} for new cohort ${newCohortId}`);
+      // Handle calendar invite changes
+      const newCohortIds = new Set(
+        (role_assignments as RoleAssignment[])
+          .map(ra => ra.cohort_id)
+          .filter(Boolean) as string[]
+      );
+
+      if (currentUser?.email) {
+        // Remove invites for cohorts no longer assigned
+        for (const oldCid of oldCohortIds) {
+          if (!newCohortIds.has(oldCid)) {
+            try {
+              await removeCalendarInvitesFromOldCohort(currentUser.email, oldCid, auth.userId!);
+            } catch (e) {
+              console.error('Failed to remove calendar invites:', e);
+            }
           }
-        } catch (calendarError) {
-          console.error('Failed to send new calendar invites:', calendarError);
+        }
+
+        // Add invites for newly assigned cohorts
+        for (const newCid of newCohortIds) {
+          if (!oldCohortIds.has(newCid)) {
+            try {
+              await sendCalendarInvitesToNewMember(currentUser.email, newCid, auth.userId!);
+            } catch (e) {
+              console.error('Failed to send calendar invites:', e);
+            }
+          }
+        }
+      }
+    } else {
+      // Legacy mode: update role and/or cohort_id directly
+      const updateData: { role?: string; cohort_id?: string | null } = {};
+      if (role !== undefined) updateData.role = role;
+      if (cohort_id !== undefined) updateData.cohort_id = cohort_id || null;
+
+      if (Object.keys(updateData).length > 0) {
+        const { error } = await adminClient
+          .from('profiles')
+          .update(updateData)
+          .eq('id', id);
+
+        if (error) throw error;
+      }
+
+      // Handle cohort change - remove from old, add to new
+      if (cohort_id !== undefined && currentUser?.email) {
+        const newCohortId = cohort_id || null;
+
+        if (oldCohortId && oldCohortId !== newCohortId) {
+          try {
+            await removeCalendarInvitesFromOldCohort(currentUser.email, oldCohortId, auth.userId!);
+          } catch (calendarError) {
+            console.error('Failed to remove old calendar invites:', calendarError);
+          }
+        }
+
+        if (newCohortId && newCohortId !== oldCohortId) {
+          try {
+            await sendCalendarInvitesToNewMember(currentUser.email, newCohortId, auth.userId!);
+          } catch (calendarError) {
+            console.error('Failed to send new calendar invites:', calendarError);
+          }
+        }
+
+        // Also update the role assignment table
+        if (newCohortId !== oldCohortId) {
+          // Update or insert role assignment
+          await adminClient
+            .from('user_role_assignments')
+            .upsert({
+              user_id: id,
+              role: role || 'student',
+              cohort_id: newCohortId,
+            }, {
+              onConflict: 'user_id,role,cohort_id',
+            });
         }
       }
     }
 
-    return NextResponse.json(data);
+    // Fetch updated user with role assignments
+    const { data: updatedUser } = await adminClient
+      .from('profiles')
+      .select('*, cohort:cohorts!fk_profile_cohort(*)')
+      .eq('id', id)
+      .single();
+
+    const { data: updatedAssignments } = await adminClient
+      .from('user_role_assignments')
+      .select('*, cohort:cohorts(*)')
+      .eq('user_id', id);
+
+    return NextResponse.json({
+      ...updatedUser,
+      role_assignments: updatedAssignments || [],
+    });
   } catch (error) {
     console.error('Error updating user:', error);
     return NextResponse.json({ error: 'Failed to update user' }, { status: 500 });

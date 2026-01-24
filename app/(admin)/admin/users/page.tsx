@@ -53,13 +53,22 @@ import {
   FileSpreadsheet,
   CheckCircle,
   XCircle,
+  Plus,
+  Trash2,
+  Star,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import * as XLSX from 'xlsx';
-import type { Profile, Cohort } from '@/types';
+import type { Profile, Cohort, UserRoleAssignment } from '@/types';
 
 interface UserWithCohort extends Profile {
   cohort?: Cohort;
+  role_assignments?: UserRoleAssignment[];
+}
+
+interface RoleAssignmentInput {
+  role: string;
+  cohort_id: string | null;
 }
 
 interface BulkUser {
@@ -87,6 +96,9 @@ export default function UsersPage() {
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserName, setNewUserName] = useState('');
   const [newUserCohort, setNewUserCohort] = useState('');
+  const [roleAssignments, setRoleAssignments] = useState<RoleAssignmentInput[]>([
+    { role: 'student', cohort_id: null }
+  ]);
 
   // Bulk upload state
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
@@ -157,8 +169,24 @@ export default function UsersPage() {
 
   // Create single user
   const handleCreateUser = async () => {
-    if (!newUserEmail || !newUserCohort) {
-      toast.error('Email and cohort are required');
+    if (!newUserEmail) {
+      toast.error('Email is required');
+      return;
+    }
+
+    // Validate role assignments
+    const validAssignments = roleAssignments.filter(ra => ra.role);
+    if (validAssignments.length === 0) {
+      toast.error('At least one role is required');
+      return;
+    }
+
+    // Check if non-master/admin roles have cohorts
+    const needsCohort = validAssignments.some(ra =>
+      ['student', 'mentor'].includes(ra.role) && !ra.cohort_id
+    );
+    if (needsCohort) {
+      toast.error('Student and Mentor roles require a cohort');
       return;
     }
 
@@ -170,7 +198,7 @@ export default function UsersPage() {
         body: JSON.stringify({
           email: newUserEmail,
           full_name: newUserName,
-          cohort_id: newUserCohort,
+          role_assignments: validAssignments,
         }),
       });
 
@@ -185,12 +213,34 @@ export default function UsersPage() {
       setNewUserEmail('');
       setNewUserName('');
       setNewUserCohort('');
+      setRoleAssignments([{ role: 'student', cohort_id: null }]);
       fetchData(true);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to create user');
     } finally {
       setCreateLoading(false);
     }
+  };
+
+  // Role assignment helpers
+  const addRoleAssignment = () => {
+    setRoleAssignments([...roleAssignments, { role: 'student', cohort_id: null }]);
+  };
+
+  const removeRoleAssignment = (index: number) => {
+    if (roleAssignments.length > 1) {
+      setRoleAssignments(roleAssignments.filter((_, i) => i !== index));
+    }
+  };
+
+  const updateRoleAssignment = (index: number, field: 'role' | 'cohort_id', value: string | null) => {
+    const updated = [...roleAssignments];
+    updated[index] = { ...updated[index], [field]: value };
+    // Clear cohort if role doesn't need it
+    if (field === 'role' && ['admin', 'company_user', 'master'].includes(value as string)) {
+      updated[index].cohort_id = null;
+    }
+    setRoleAssignments(updated);
   };
 
   // Handle file upload for bulk import
@@ -275,6 +325,8 @@ export default function UsersPage() {
         return <UserCheck className="w-4 h-4 text-purple-500" />;
       case 'mentor':
         return <GraduationCap className="w-4 h-4 text-blue-500" />;
+      case 'master':
+        return <Star className="w-4 h-4 text-yellow-500" />;
       default:
         return <Users className="w-4 h-4 text-green-500" />;
     }
@@ -286,13 +338,14 @@ export default function UsersPage() {
       company_user: 'bg-purple-500/10 text-purple-600',
       mentor: 'bg-blue-500/10 text-blue-600',
       student: 'bg-green-500/10 text-green-600',
+      master: 'bg-yellow-500/10 text-yellow-600',
     };
 
     return (
       <Badge className={colors[role] || 'bg-muted'}>
         <span className="flex items-center gap-1">
           {getRoleIcon(role)}
-          <span className="capitalize">{role.replace('_', ' ')}</span>
+          <span className="capitalize">{role === 'master' ? 'Guest' : role.replace('_', ' ')}</span>
         </span>
       </Badge>
     );
@@ -337,7 +390,7 @@ export default function UsersPage() {
                 Create User
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-lg">
               <DialogHeader>
                 <DialogTitle>Create New User</DialogTitle>
                 <DialogDescription>
@@ -364,20 +417,74 @@ export default function UsersPage() {
                     onChange={(e) => setNewUserName(e.target.value)}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="cohort">Cohort *</Label>
-                  <Select value={newUserCohort} onValueChange={setNewUserCohort}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a cohort" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {cohorts.map((cohort) => (
-                        <SelectItem key={cohort.id} value={cohort.id}>
-                          {cohort.name} ({cohort.tag})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+
+                {/* Role Assignments */}
+                <div className="space-y-3">
+                  <Label>Role Assignments *</Label>
+                  <div className="space-y-2">
+                    {roleAssignments.map((assignment, index) => (
+                      <div key={index} className="flex gap-2 items-start">
+                        <Select
+                          value={assignment.role}
+                          onValueChange={(value) => updateRoleAssignment(index, 'role', value)}
+                        >
+                          <SelectTrigger className="w-[140px]">
+                            <SelectValue placeholder="Role" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="student">Student</SelectItem>
+                            <SelectItem value="mentor">Mentor</SelectItem>
+                            <SelectItem value="master">Guest</SelectItem>
+                            <SelectItem value="company_user">Company User</SelectItem>
+                            <SelectItem value="admin">Admin</SelectItem>
+                          </SelectContent>
+                        </Select>
+
+                        {['student', 'mentor'].includes(assignment.role) ? (
+                          <Select
+                            value={assignment.cohort_id || ''}
+                            onValueChange={(value) => updateRoleAssignment(index, 'cohort_id', value || null)}
+                          >
+                            <SelectTrigger className="flex-1">
+                              <SelectValue placeholder="Select cohort" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {cohorts.map((cohort) => (
+                                <SelectItem key={cohort.id} value={cohort.id}>
+                                  {cohort.name} ({cohort.tag})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <div className="flex-1 px-3 py-2 text-sm text-muted-foreground border rounded-md bg-muted/50">
+                            No cohort needed
+                          </div>
+                        )}
+
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeRoleAssignment(index)}
+                          disabled={roleAssignments.length === 1}
+                          className="shrink-0"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addRoleAssignment}
+                    className="w-full"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Another Role
+                  </Button>
                 </div>
               </div>
               <DialogFooter>
@@ -386,7 +493,7 @@ export default function UsersPage() {
                 </Button>
                 <Button
                   onClick={handleCreateUser}
-                  disabled={createLoading || !newUserEmail || !newUserCohort}
+                  disabled={createLoading || !newUserEmail || roleAssignments.length === 0}
                   className="gradient-bg"
                 >
                   {createLoading ? (
@@ -536,6 +643,7 @@ export default function UsersPage() {
             <SelectItem value="company_user">Company User</SelectItem>
             <SelectItem value="mentor">Mentor</SelectItem>
             <SelectItem value="student">Student</SelectItem>
+            <SelectItem value="master">Guest</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -618,6 +726,7 @@ export default function UsersPage() {
                         <SelectContent>
                           <SelectItem value="student">Student</SelectItem>
                           <SelectItem value="mentor">Mentor</SelectItem>
+                          <SelectItem value="master">Guest</SelectItem>
                           <SelectItem value="company_user">Company User</SelectItem>
                           <SelectItem value="admin">Admin</SelectItem>
                         </SelectContent>

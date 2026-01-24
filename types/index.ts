@@ -1,6 +1,6 @@
 // Database Types for Rethink Systems Dashboard
 
-export type UserRole = 'admin' | 'company_user' | 'mentor' | 'student';
+export type UserRole = 'admin' | 'company_user' | 'mentor' | 'student' | 'master';
 
 export type CohortStatus = 'active' | 'completed' | 'archived';
 
@@ -37,6 +37,36 @@ export interface Profile {
   calendly_shared: boolean;
   created_at: string;
   updated_at: string;
+  // Multi-role support
+  role_assignments?: UserRoleAssignment[];
+}
+
+// User role assignment (for multi-role support)
+export interface UserRoleAssignment {
+  id: string;
+  user_id: string;
+  role: UserRole;
+  cohort_id: string | null;
+  cohort?: Cohort;
+  created_at: string;
+}
+
+// Session cohort mapping (for multi-cohort sessions)
+export interface SessionCohort {
+  id: string;
+  session_id: string;
+  cohort_id: string;
+  cohort?: Cohort;
+  created_at: string;
+}
+
+// Session guest invite (for master/guest users)
+export interface SessionGuest {
+  id: string;
+  session_id: string;
+  user_id: string;
+  user?: Profile;
+  created_at: string;
 }
 
 export interface Cohort {
@@ -54,7 +84,7 @@ export interface Session {
   id: string;
   title: string;
   description: string | null;
-  cohort_id: string | null;
+  cohort_id: string | null;  // Legacy single cohort (deprecated, use cohorts)
   scheduled_at: string;
   duration_minutes: number;
   zoom_link: string | null;
@@ -62,6 +92,9 @@ export interface Session {
   google_event_id: string | null;
   created_by: string | null;
   created_at: string;
+  // Multi-cohort and guest support
+  cohorts?: SessionCohort[];
+  guests?: SessionGuest[];
 }
 
 export interface Rsvp {
@@ -215,15 +248,23 @@ export interface Ranking {
 // Extended types with relations
 export interface SessionWithRsvp extends Session {
   rsvps?: Rsvp[];
-  cohort?: Cohort;
+  cohort?: Cohort;  // Legacy single cohort
+  rsvp_yes_count?: number;
+  rsvp_no_count?: number;
+}
+
+export interface SessionWithCohorts extends Session {
+  cohorts?: SessionCohort[];
+  guests?: SessionGuest[];
   rsvp_yes_count?: number;
   rsvp_no_count?: number;
 }
 
 export interface ProfileWithRelations extends Profile {
-  cohort?: Cohort;
+  cohort?: Cohort;  // Legacy single cohort
   mentor?: Profile;
   team_members?: Profile[];
+  role_assignments?: UserRoleAssignment[];
 }
 
 export interface AttendanceWithDetails extends Attendance {

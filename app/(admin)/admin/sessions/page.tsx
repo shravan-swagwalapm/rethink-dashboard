@@ -57,18 +57,28 @@ import {
 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { format, parseISO, isPast } from 'date-fns';
-import type { Session, Cohort } from '@/types';
+import type { Session, Cohort, SessionCohort, SessionGuest, Profile } from '@/types';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface SessionWithStats extends Session {
   cohort?: Cohort;
+  cohorts?: SessionCohort[];
+  guests?: SessionGuest[];
   rsvp_yes_count?: number;
   rsvp_no_count?: number;
+}
+
+interface MasterUser {
+  id: string;
+  email: string;
+  full_name: string | null;
 }
 
 export default function SessionsPage() {
   const searchParams = useSearchParams();
   const [sessions, setSessions] = useState<SessionWithStats[]>([]);
   const [cohorts, setCohorts] = useState<Cohort[]>([]);
+  const [masterUsers, setMasterUsers] = useState<MasterUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -80,11 +90,13 @@ export default function SessionsPage() {
   const [calendarNeedsReconnect, setCalendarNeedsReconnect] = useState(false);
 
   const [showForm, setShowForm] = useState(false);
-  const [editingSession, setEditingSession] = useState<Session | null>(null);
+  const [editingSession, setEditingSession] = useState<SessionWithStats | null>(null);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     cohort_id: '',
+    cohort_ids: [] as string[],  // Multiple cohorts
+    guest_ids: [] as string[],   // Guest invites
     scheduled_at: '',
     scheduled_time: '',
     duration_minutes: 60,
@@ -111,6 +123,7 @@ export default function SessionsPage() {
         const data = await sessionsRes.json();
         setSessions(data.sessions || []);
         setCohorts(data.cohorts || []);
+        setMasterUsers(data.masterUsers || []);
       }
 
       if (zoomRes.ok) {
@@ -150,14 +163,19 @@ export default function SessionsPage() {
     }
   }, [searchParams]);
 
-  const handleOpenForm = (session?: Session) => {
+  const handleOpenForm = (session?: SessionWithStats) => {
     if (session) {
       setEditingSession(session);
       const scheduledDate = parseISO(session.scheduled_at);
+      // Get cohort IDs from session_cohorts or fall back to legacy cohort_id
+      const cohortIds = session.cohorts?.map(sc => sc.cohort_id) || (session.cohort_id ? [session.cohort_id] : []);
+      const guestIds = session.guests?.map(sg => sg.user_id) || [];
       setFormData({
         title: session.title,
         description: session.description || '',
         cohort_id: session.cohort_id || '',
+        cohort_ids: cohortIds,
+        guest_ids: guestIds,
         scheduled_at: format(scheduledDate, 'yyyy-MM-dd'),
         scheduled_time: format(scheduledDate, 'HH:mm'),
         duration_minutes: session.duration_minutes,
@@ -171,6 +189,8 @@ export default function SessionsPage() {
         title: '',
         description: '',
         cohort_id: '',
+        cohort_ids: [],
+        guest_ids: [],
         scheduled_at: '',
         scheduled_time: '',
         duration_minutes: 60,
@@ -183,8 +203,8 @@ export default function SessionsPage() {
   };
 
   const handleSave = async () => {
-    if (!formData.cohort_id) {
-      toast.error('Please select a cohort');
+    if (formData.cohort_ids.length === 0) {
+      toast.error('Please select at least one cohort');
       return;
     }
     if (!formData.title.trim()) {
@@ -220,7 +240,9 @@ export default function SessionsPage() {
             id: editingSession.id,
             title: formData.title,
             description: formData.description || null,
-            cohort_id: formData.cohort_id || null,
+            cohort_id: formData.cohort_ids[0] || null,  // Legacy: first cohort
+            cohort_ids: formData.cohort_ids,
+            guest_ids: formData.guest_ids,
             scheduled_at: scheduledAt.toISOString(),
             duration_minutes: formData.duration_minutes,
             zoom_link: formData.zoom_link || null,
@@ -228,7 +250,8 @@ export default function SessionsPage() {
         : {
             title: formData.title,
             description: formData.description || null,
-            cohort_id: formData.cohort_id || null,
+            cohort_ids: formData.cohort_ids,
+            guest_ids: formData.guest_ids,
             scheduled_at: scheduledAt.toISOString(),
             duration_minutes: formData.duration_minutes,
             zoom_link: formData.zoom_link || null,
@@ -261,6 +284,26 @@ export default function SessionsPage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  // Toggle cohort selection
+  const toggleCohort = (cohortId: string) => {
+    setFormData(prev => ({
+      ...prev,
+      cohort_ids: prev.cohort_ids.includes(cohortId)
+        ? prev.cohort_ids.filter(id => id !== cohortId)
+        : [...prev.cohort_ids, cohortId]
+    }));
+  };
+
+  // Toggle guest selection
+  const toggleGuest = (userId: string) => {
+    setFormData(prev => ({
+      ...prev,
+      guest_ids: prev.guest_ids.includes(userId)
+        ? prev.guest_ids.filter(id => id !== userId)
+        : [...prev.guest_ids, userId]
+    }));
   };
 
   const handleDelete = async (sessionId: string) => {
@@ -418,11 +461,19 @@ export default function SessionsPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        {session.cohort ? (
-                          <Badge variant="outline">{session.cohort.name}</Badge>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
+                        <div className="flex flex-wrap gap-1">
+                          {session.cohorts && session.cohorts.length > 0 ? (
+                            session.cohorts.map(sc => (
+                              <Badge key={sc.id} variant="outline">
+                                {sc.cohort?.name || 'Unknown'}
+                              </Badge>
+                            ))
+                          ) : session.cohort ? (
+                            <Badge variant="outline">{session.cohort.name}</Badge>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-col">
@@ -520,24 +571,63 @@ export default function SessionsPage() {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="cohort">Cohort *</Label>
-              <Select
-                value={formData.cohort_id}
-                onValueChange={(value) => setFormData({ ...formData, cohort_id: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select cohort" />
-                </SelectTrigger>
-                <SelectContent>
-                  {cohorts.map((cohort) => (
-                    <SelectItem key={cohort.id} value={cohort.id}>
+            <div className="space-y-3">
+              <Label>Cohorts * (select one or more)</Label>
+              <div className="grid grid-cols-2 gap-2 p-3 border rounded-lg bg-muted/30">
+                {cohorts.map((cohort) => (
+                  <div key={cohort.id} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`cohort-${cohort.id}`}
+                      checked={formData.cohort_ids.includes(cohort.id)}
+                      onCheckedChange={() => toggleCohort(cohort.id)}
+                    />
+                    <label
+                      htmlFor={`cohort-${cohort.id}`}
+                      className="text-sm cursor-pointer"
+                    >
                       {cohort.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                    </label>
+                  </div>
+                ))}
+              </div>
+              {formData.cohort_ids.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {formData.cohort_ids.length} cohort{formData.cohort_ids.length !== 1 ? 's' : ''} selected
+                </p>
+              )}
             </div>
+
+            {/* Guest selection */}
+            {masterUsers.length > 0 && (
+              <div className="space-y-3">
+                <Label>Invite Guests (optional)</Label>
+                <div className="grid grid-cols-1 gap-2 p-3 border rounded-lg bg-muted/30 max-h-32 overflow-y-auto">
+                  {masterUsers.map((user) => (
+                    <div key={user.id} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`guest-${user.id}`}
+                        checked={formData.guest_ids.includes(user.id)}
+                        onCheckedChange={() => toggleGuest(user.id)}
+                      />
+                      <label
+                        htmlFor={`guest-${user.id}`}
+                        className="text-sm cursor-pointer"
+                      >
+                        {user.full_name || user.email}
+                        <span className="text-xs text-muted-foreground ml-1">
+                          ({user.email})
+                        </span>
+                      </label>
+                    </div>
+                  ))}
+                </div>
+                {formData.guest_ids.length > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    {formData.guest_ids.length} guest{formData.guest_ids.length !== 1 ? 's' : ''} invited
+                  </p>
+                )}
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -680,7 +770,7 @@ export default function SessionsPage() {
                   <div className="flex items-center gap-2">
                     <span className={`w-2 h-2 rounded-full ${calendarHealth === 'healthy' ? 'bg-green-500' : calendarHealth === 'expiring_soon' ? 'bg-amber-500' : 'bg-red-500'}`} />
                     <p className="text-xs text-muted-foreground">
-                      Connected as {calendarEmail}. {formData.cohort_id ? 'All cohort members will receive calendar invites.' : 'Select a cohort to send invites.'}
+                      Connected as {calendarEmail}. {formData.cohort_ids.length > 0 ? 'All cohort members + admins + guests will receive calendar invites.' : 'Select cohorts to send invites.'}
                     </p>
                   </div>
                 )}
