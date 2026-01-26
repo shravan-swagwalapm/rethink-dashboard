@@ -60,6 +60,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import type { Cohort, LearningModule, ModuleResource, LearningModuleWithResources, CaseStudy } from '@/types';
+import { VideoPlayer } from '@/components/video/VideoPlayer';
 
 // Helper to detect content type from URL
 function detectContentType(url: string): 'video' | 'slides' | 'document' | 'link' {
@@ -1202,23 +1203,36 @@ export default function LearningsPage() {
 
       {/* Resource Preview Modal */}
       <Dialog open={!!previewResource} onOpenChange={() => setPreviewResource(null)}>
-        <DialogContent className="max-w-4xl">
+        <DialogContent className="max-w-7xl max-h-[95vh] w-[95vw]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {previewResource && getContentIcon(previewResource.content_type)}
               {previewResource?.title}
             </DialogTitle>
           </DialogHeader>
-          <div className="aspect-video bg-black rounded-lg overflow-hidden">
-            {previewResource && (
-              <iframe
-                src={getEmbedUrl(previewResource)}
-                className="w-full h-full"
-                allow="autoplay; encrypted-media"
-                allowFullScreen
-              />
-            )}
-          </div>
+
+          {/* Video Player for video content */}
+          {previewResource?.content_type === 'video' && previewResource.google_drive_id ? (
+            <VideoPlayer
+              googleDriveId={previewResource.google_drive_id}
+              resourceId={previewResource.id}
+              title={previewResource.title}
+              duration={previewResource.duration_seconds || undefined}
+              thumbnail={previewResource.thumbnail_url || undefined}
+            />
+          ) : (
+            /* Iframe for slides, documents, and videos without Drive ID */
+            <div className="aspect-video bg-black rounded-lg overflow-hidden">
+              {previewResource && (
+                <iframe
+                  src={getEmbedUrl(previewResource)}
+                  className="w-full h-full"
+                  allow="autoplay; encrypted-media"
+                  allowFullScreen
+                />
+              )}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 

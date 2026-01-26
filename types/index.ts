@@ -356,6 +356,37 @@ export interface AssignmentWithSubmissions extends Assignment {
   submissions?: AssignmentSubmission[];
 }
 
+// Video Progress and Captions
+export interface VideoProgress {
+  id: string;
+  user_id: string;
+  resource_id: string;
+  last_position_seconds: number;
+  watch_percentage: number;
+  completed: boolean;
+  completed_at: string | null;
+  last_watched_at: string;
+  created_at: string;
+}
+
+export interface VideoCaption {
+  id: string;
+  resource_id: string;
+  language_code: string;
+  language_label: string;
+  caption_url: string;
+  google_drive_id: string | null;
+  is_default: boolean;
+  created_at: string;
+}
+
+export interface CaptionTrack {
+  src: string;
+  srclang: string;
+  label: string;
+  default?: boolean;
+}
+
 // Form types
 export interface InviteData {
   name: string;

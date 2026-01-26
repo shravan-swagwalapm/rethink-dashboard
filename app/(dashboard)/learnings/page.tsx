@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { LearningModule, ModuleResource, ModuleResourceType, CaseStudy } from '@/types';
+import { VideoPlayer } from '@/components/video/VideoPlayer';
 
 interface ModuleWithResources extends LearningModule {
   resources: ModuleResource[];
@@ -522,7 +523,7 @@ export default function LearningsPage() {
 
       {/* Resource Viewer Modal */}
       <Dialog open={!!selectedResource} onOpenChange={() => setSelectedResource(null)}>
-        <DialogContent className="max-w-5xl max-h-[90vh]">
+        <DialogContent className="max-w-7xl max-h-[95vh] w-[95vw]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 pr-8">
               {selectedResource && getContentIcon(selectedResource.content_type)}
@@ -535,16 +536,38 @@ export default function LearningsPage() {
               </p>
             )}
           </DialogHeader>
-          <div className="aspect-video bg-black rounded-lg overflow-hidden">
-            {selectedResource && (
-              <iframe
-                src={getEmbedUrl(selectedResource)}
-                className="w-full h-full"
-                allow="autoplay; encrypted-media; fullscreen"
-                allowFullScreen
-              />
-            )}
-          </div>
+
+          {/* Video Player for video content */}
+          {selectedResource?.content_type === 'video' && selectedResource.google_drive_id ? (
+            <VideoPlayer
+              googleDriveId={selectedResource.google_drive_id}
+              resourceId={selectedResource.id}
+              title={selectedResource.title}
+              duration={selectedResource.duration_seconds || undefined}
+              thumbnail={selectedResource.thumbnail_url || undefined}
+              onProgress={(seconds, percentage) => {
+                // Optional: Log progress
+                console.log('Video progress:', { seconds, percentage });
+              }}
+              onComplete={() => {
+                // Optional: Handle completion
+                console.log('Video completed!');
+              }}
+            />
+          ) : (
+            /* Iframe for slides, documents, and videos without Drive ID */
+            <div className="aspect-video bg-black rounded-lg overflow-hidden">
+              {selectedResource && (
+                <iframe
+                  src={getEmbedUrl(selectedResource)}
+                  className="w-full h-full"
+                  allow="autoplay; encrypted-media; fullscreen"
+                  allowFullScreen
+                />
+              )}
+            </div>
+          )}
+
           {selectedResource?.external_url && (
             <div className="flex justify-end">
               <Button variant="outline" size="sm" asChild>

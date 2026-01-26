@@ -433,3 +433,309 @@ input[type="number"]::-webkit-outer-spin-button {
 input[type="number"] {
   -moz-appearance: textfield;
 }
+
+/* ===========================================================================
+ * Video.js Custom Theme - Rethink Systems
+ * Custom styling for the Video.js player to match design system
+ * ========================================================================= */
+
+/* Base player container */
+.video-js {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--foreground);
+  background-color: oklch(0 0 0);
+}
+
+/* Loading spinner */
+.video-js .vjs-loading-spinner {
+  border-color: var(--primary) transparent transparent transparent;
+  border-width: 3px;
+}
+
+/* Big play button (centered) */
+.video-js .vjs-big-play-button {
+  background-color: var(--primary);
+  border: none;
+  border-radius: 50%;
+  width: 80px;
+  height: 80px;
+  line-height: 80px;
+  font-size: 40px;
+  margin-top: -40px;
+  margin-left: -40px;
+  transition: all 0.2s ease;
+}
+
+.video-js .vjs-big-play-button:hover {
+  background-color: var(--primary);
+  filter: brightness(1.1);
+  transform: scale(1.05);
+}
+
+.video-js .vjs-big-play-button .vjs-icon-placeholder::before {
+  font-size: 40px;
+  line-height: 80px;
+}
+
+/* Control bar */
+.video-js .vjs-control-bar {
+  background: linear-gradient(
+    to top,
+    oklch(0 0 0 / 0.8) 0%,
+    oklch(0 0 0 / 0.6) 50%,
+    transparent 100%
+  );
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  height: 60px;
+  padding: 0 12px;
+}
+
+/* Control buttons */
+.video-js .vjs-control {
+  width: 44px;
+}
+
+.video-js .vjs-button > .vjs-icon-placeholder::before {
+  font-size: 20px;
+  line-height: 44px;
+}
+
+.video-js .vjs-control:hover {
+  color: var(--primary);
+  text-shadow: 0 0 10px var(--glow-primary);
+}
+
+/* Progress control */
+.video-js .vjs-progress-control {
+  position: absolute;
+  top: -8px;
+  left: 0;
+  right: 0;
+  width: 100%;
+  height: 8px;
+}
+
+.video-js .vjs-progress-holder {
+  height: 8px;
+  background-color: oklch(1 0 0 / 0.2);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.video-js .vjs-load-progress {
+  background-color: oklch(1 0 0 / 0.3);
+}
+
+.video-js .vjs-play-progress {
+  background-color: var(--primary);
+  border-radius: 4px;
+  position: relative;
+}
+
+.video-js .vjs-play-progress::before {
+  content: '';
+  position: absolute;
+  right: -6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 12px;
+  height: 12px;
+  background-color: var(--primary);
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--glow-primary);
+}
+
+/* Hover state for progress bar */
+.video-js .vjs-progress-control:hover .vjs-progress-holder {
+  height: 10px;
+  font-size: inherit;
+}
+
+.video-js .vjs-progress-control:hover .vjs-play-progress::before {
+  width: 14px;
+  height: 14px;
+  right: -7px;
+}
+
+/* Time tooltip */
+.video-js .vjs-time-tooltip {
+  background-color: var(--card);
+  border: 1px solid var(--border);
+  color: var(--foreground);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  box-shadow: 0 4px 12px oklch(0 0 0 / 0.15);
+}
+
+/* Volume panel */
+.video-js .vjs-volume-panel {
+  width: auto;
+}
+
+.video-js .vjs-volume-bar {
+  background-color: oklch(1 0 0 / 0.2);
+  height: 6px;
+  border-radius: 3px;
+}
+
+.video-js .vjs-volume-level {
+  background-color: var(--primary);
+  border-radius: 3px;
+}
+
+/* Playback rate menu */
+.video-js .vjs-menu-button-popup .vjs-menu {
+  background-color: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 24px oklch(0 0 0 / 0.15);
+  overflow: hidden;
+}
+
+.video-js .vjs-menu-button-popup .vjs-menu .vjs-menu-content {
+  background-color: transparent;
+  padding: 4px;
+}
+
+.video-js .vjs-menu li {
+  background-color: transparent;
+  color: var(--foreground);
+  padding: 8px 16px;
+  border-radius: 4px;
+  margin: 2px 0;
+  transition: background-color 0.15s ease;
+}
+
+.video-js .vjs-menu li:hover {
+  background-color: var(--muted);
+}
+
+.video-js .vjs-menu li.vjs-selected {
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+  font-weight: 600;
+}
+
+/* Captions/subtitles button */
+.video-js .vjs-subs-caps-button .vjs-menu {
+  min-width: 180px;
+}
+
+/* Text track display (captions) */
+.video-js .vjs-text-track-display {
+  font-size: 18px;
+}
+
+.video-js .vjs-text-track-cue {
+  background-color: oklch(0 0 0 / 0.8);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 18px;
+  line-height: 1.5;
+}
+
+/* Fullscreen */
+.video-js.vjs-fullscreen {
+  background-color: oklch(0 0 0);
+}
+
+/* User inactive (controls hidden) */
+.video-js.vjs-user-inactive.vjs-playing .vjs-control-bar {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.video-js.vjs-user-active .vjs-control-bar {
+  opacity: 1;
+  pointer-events: all;
+}
+
+/* Picture-in-picture */
+.video-js .vjs-picture-in-picture-control {
+  cursor: pointer;
+}
+
+/* Error display */
+.video-js .vjs-error-display {
+  background-color: oklch(0 0 0 / 0.9);
+}
+
+.video-js .vjs-error-display .vjs-modal-dialog-content {
+  color: var(--destructive);
+  font-size: 16px;
+  padding: 32px;
+}
+
+/* Poster image */
+.video-js .vjs-poster {
+  background-size: cover;
+  background-position: center;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .video-js .vjs-big-play-button {
+    width: 64px;
+    height: 64px;
+    line-height: 64px;
+    font-size: 32px;
+    margin-top: -32px;
+    margin-left: -32px;
+  }
+
+  .video-js .vjs-control-bar {
+    height: 50px;
+  }
+
+  .video-js .vjs-control {
+    width: 36px;
+  }
+
+  .video-js .vjs-button > .vjs-icon-placeholder::before {
+    font-size: 18px;
+    line-height: 36px;
+  }
+
+  .video-js .vjs-text-track-cue {
+    font-size: 16px;
+  }
+}
+
+/* Dark mode adjustments */
+.dark .video-js .vjs-control-bar {
+  background: linear-gradient(
+    to top,
+    oklch(0.1 0 0 / 0.9) 0%,
+    oklch(0.1 0 0 / 0.7) 50%,
+    transparent 100%
+  );
+}
+
+.dark .video-js .vjs-progress-holder {
+  background-color: oklch(1 0 0 / 0.15);
+}
+
+.dark .video-js .vjs-load-progress {
+  background-color: oklch(1 0 0 / 0.25);
+}
+
+/* Accessibility - keyboard focus */
+.video-js .vjs-control:focus {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* Loading state overlay */
+.video-js .vjs-loading-spinner::before,
+.video-js .vjs-loading-spinner::after {
+  border-width: 3px;
+}
+
+/* Theme variant class */
+.vjs-theme-rethink {
+  /* Custom theme identifier for any additional styling */
+}
