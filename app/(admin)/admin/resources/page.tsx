@@ -321,24 +321,24 @@ export default function AdminResourcesPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 max-w-7xl mx-auto p-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 pb-6 border-b dark:border-gray-800">
         <div>
-          <h1 className="text-2xl font-bold">Resource Management</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-3xl font-bold tracking-tight dark:text-white">Resource Management</h1>
+          <p className="text-base text-gray-600 dark:text-gray-300 mt-2">
             Upload and organize course materials for cohorts
           </p>
         </div>
 
         {/* Cohort Selector */}
         <Select value={selectedCohort} onValueChange={handleCohortChange}>
-          <SelectTrigger className="w-[200px]">
+          <SelectTrigger className="w-[220px] h-11 font-medium border-2 dark:border-gray-700 dark:bg-gray-900 dark:text-white">
             <SelectValue placeholder="Select cohort" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
             {cohorts.map((cohort) => (
-              <SelectItem key={cohort.id} value={cohort.id}>
+              <SelectItem key={cohort.id} value={cohort.id} className="dark:text-white dark:focus:bg-gray-800">
                 {cohort.name} ({cohort.tag})
               </SelectItem>
             ))}
@@ -347,17 +347,19 @@ export default function AdminResourcesPage() {
       </div>
 
       {!selectedCohort ? (
-        <Card>
-          <CardContent className="py-12 text-center text-muted-foreground">
-            <FolderOpen className="w-12 h-12 mx-auto mb-4 opacity-50" />
-            <p className="text-lg font-medium">Select a cohort to manage resources</p>
-            <p className="text-sm">Choose a cohort from the dropdown above</p>
+        <Card className="border-2 dark:border-gray-800 dark:bg-gray-950/50">
+          <CardContent className="py-16 text-center">
+            <div className="w-16 h-16 rounded-full bg-blue-500/10 dark:bg-blue-500/20 flex items-center justify-center mx-auto mb-4">
+              <FolderOpen className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+            </div>
+            <p className="text-lg font-semibold dark:text-white mb-2">Select a cohort to manage resources</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">Choose a cohort from the dropdown above</p>
           </CardContent>
         </Card>
       ) : (
         <>
           {/* Actions */}
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-3">
             <input
               ref={fileInputRef}
               type="file"
@@ -369,7 +371,7 @@ export default function AdminResourcesPage() {
             <Button
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
-              className="gradient-bg"
+              className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white shadow-sm transition-all hover:shadow-md"
             >
               {uploading ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -378,11 +380,19 @@ export default function AdminResourcesPage() {
               )}
               Upload Files
             </Button>
-            <Button variant="outline" onClick={() => setFolderDialogOpen(true)}>
+            <Button
+              variant="outline"
+              onClick={() => setFolderDialogOpen(true)}
+              className="border-2 dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:hover:bg-gray-800 transition-all"
+            >
               <FolderPlus className="w-4 h-4 mr-2" />
               New Folder
             </Button>
-            <Button variant="outline" onClick={() => setLinkDialogOpen(true)}>
+            <Button
+              variant="outline"
+              onClick={() => setLinkDialogOpen(true)}
+              className="border-2 dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:hover:bg-gray-800 transition-all"
+            >
               <LinkIcon className="w-4 h-4 mr-2" />
               Add Link
             </Button>
@@ -390,23 +400,23 @@ export default function AdminResourcesPage() {
 
           {/* Breadcrumbs */}
           {breadcrumbs.length > 0 && (
-            <div className="flex items-center gap-1 text-sm">
+            <div className="flex items-center gap-1 text-sm p-3 rounded-lg bg-gray-50 dark:bg-gray-900 border dark:border-gray-800">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => navigateBack()}
-                className="h-8 px-2"
+                className="h-8 px-2 dark:text-white dark:hover:bg-gray-800"
               >
                 <Home className="w-4 h-4" />
               </Button>
               {breadcrumbs.map((crumb, idx) => (
                 <div key={crumb.id} className="flex items-center">
-                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                  <ChevronRight className="w-4 h-4 text-gray-400 dark:text-gray-600" />
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => navigateBack(idx)}
-                    className="h-8 px-2"
+                    className="h-8 px-2 dark:text-white dark:hover:bg-gray-800 font-medium"
                   >
                     {crumb.name}
                   </Button>
@@ -417,10 +427,10 @@ export default function AdminResourcesPage() {
 
           {/* Upload Drop Zone */}
           <div
-            className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+            className={`border-2 border-dashed rounded-lg p-10 text-center transition-all ${
               dragOver
-                ? 'border-primary bg-primary/5'
-                : 'border-border hover:border-primary/50'
+                ? 'border-blue-500 dark:border-blue-400 bg-blue-50 dark:bg-blue-950/20 scale-[1.02]'
+                : 'border-gray-300 dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-600'
             }`}
             onDragOver={(e) => {
               e.preventDefault();
@@ -433,101 +443,127 @@ export default function AdminResourcesPage() {
               handleFileUpload(e.dataTransfer.files);
             }}
           >
-            <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">
+            <div className={`w-14 h-14 rounded-full mx-auto mb-3 flex items-center justify-center transition-colors ${
+              dragOver
+                ? 'bg-blue-500/20 dark:bg-blue-500/30'
+                : 'bg-gray-100 dark:bg-gray-800'
+            }`}>
+              <Upload className={`w-7 h-7 transition-colors ${
+                dragOver
+                  ? 'text-blue-600 dark:text-blue-400'
+                  : 'text-gray-500 dark:text-gray-400'
+              }`} />
+            </div>
+            <p className={`text-sm font-medium transition-colors ${
+              dragOver
+                ? 'text-blue-700 dark:text-blue-300'
+                : 'text-gray-600 dark:text-gray-400'
+            }`}>
               Drag and drop files here, or click the Upload button
             </p>
           </div>
 
           {/* Resources List */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Resources</CardTitle>
-              <CardDescription>
+          <Card className="border-2 dark:border-gray-800 dark:bg-gray-950/50 shadow-sm">
+            <CardHeader className="border-b dark:border-gray-800 pb-4">
+              <CardTitle className="text-xl font-semibold dark:text-white flex items-center gap-2">
+                <FolderOpen className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                Resources
+              </CardTitle>
+              <CardDescription className="dark:text-gray-400">
                 {resources.length} item{resources.length !== 1 ? 's' : ''} in this location
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-5">
               {resourcesLoading ? (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {[...Array(3)].map((_, i) => (
-                    <Skeleton key={i} className="h-12 w-full" />
+                    <Skeleton key={i} className="h-14 w-full dark:bg-gray-800" />
                   ))}
                 </div>
               ) : resources.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <FolderOpen className="w-10 h-10 mx-auto mb-2 opacity-50" />
-                  <p>No resources in this location</p>
+                <div className="text-center py-12 px-4 rounded-lg border-2 border-dashed dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50">
+                  <div className="w-14 h-14 rounded-full bg-blue-500/10 dark:bg-blue-500/20 flex items-center justify-center mx-auto mb-3">
+                    <FolderOpen className="w-7 h-7 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <p className="font-medium text-gray-600 dark:text-gray-300">No resources in this location</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Upload files or create folders to get started</p>
                 </div>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Size</TableHead>
-                      <TableHead>Added</TableHead>
-                      <TableHead className="w-[50px]"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {resources.map((resource) => (
-                      <TableRow
-                        key={resource.id}
-                        className={resource.type === 'folder' ? 'cursor-pointer hover:bg-muted/50' : ''}
-                        onClick={() => {
-                          if (resource.type === 'folder') {
-                            navigateToFolder(resource);
-                          }
-                        }}
-                      >
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            {getResourceIcon(resource)}
-                            <span className="font-medium">{resource.name}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="capitalize">
-                          {resource.type === 'link' ? 'External Link' : resource.type}
-                        </TableCell>
-                        <TableCell>{formatFileSize(resource.file_size)}</TableCell>
-                        <TableCell>
-                          {format(new Date(resource.created_at), 'MMM d, yyyy')}
-                        </TableCell>
-                        <TableCell onClick={(e) => e.stopPropagation()}>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon">
-                                <MoreVertical className="w-4 h-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              {resource.type === 'link' && resource.external_url && (
-                                <DropdownMenuItem asChild>
-                                  <a
-                                    href={resource.external_url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                  >
-                                    <ExternalLink className="w-4 h-4 mr-2" />
-                                    Open Link
-                                  </a>
-                                </DropdownMenuItem>
-                              )}
-                              <DropdownMenuItem
-                                onClick={() => handleDelete(resource)}
-                                className="text-destructive"
-                              >
-                                <Trash2 className="w-4 h-4 mr-2" />
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
+                <div className="rounded-lg border dark:border-gray-700 overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-b dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
+                        <TableHead className="font-semibold dark:text-gray-300">Name</TableHead>
+                        <TableHead className="font-semibold dark:text-gray-300">Type</TableHead>
+                        <TableHead className="font-semibold dark:text-gray-300">Size</TableHead>
+                        <TableHead className="font-semibold dark:text-gray-300">Added</TableHead>
+                        <TableHead className="w-[50px]"></TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {resources.map((resource) => (
+                        <TableRow
+                          key={resource.id}
+                          className={`border-b dark:border-gray-800 transition-colors ${
+                            resource.type === 'folder'
+                              ? 'cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-950/20'
+                              : 'hover:bg-gray-50 dark:hover:bg-gray-900/50'
+                          }`}
+                          onClick={() => {
+                            if (resource.type === 'folder') {
+                              navigateToFolder(resource);
+                            }
+                          }}
+                        >
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              {getResourceIcon(resource)}
+                              <span className="font-medium dark:text-white">{resource.name}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="capitalize dark:text-gray-300">
+                            {resource.type === 'link' ? 'External Link' : resource.type}
+                          </TableCell>
+                          <TableCell className="dark:text-gray-400">{formatFileSize(resource.file_size)}</TableCell>
+                          <TableCell className="dark:text-gray-400">
+                            {format(new Date(resource.created_at), 'MMM d, yyyy')}
+                          </TableCell>
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="dark:text-white dark:hover:bg-gray-800">
+                                  <MoreVertical className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="dark:bg-gray-900 dark:border-gray-700">
+                                {resource.type === 'link' && resource.external_url && (
+                                  <DropdownMenuItem asChild className="dark:text-white dark:focus:bg-gray-800">
+                                    <a
+                                      href={resource.external_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                    >
+                                      <ExternalLink className="w-4 h-4 mr-2" />
+                                      Open Link
+                                    </a>
+                                  </DropdownMenuItem>
+                                )}
+                                <DropdownMenuItem
+                                  onClick={() => handleDelete(resource)}
+                                  className="text-red-600 dark:text-red-400 dark:focus:bg-red-950/20"
+                                >
+                                  <Trash2 className="w-4 h-4 mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -536,32 +572,37 @@ export default function AdminResourcesPage() {
 
       {/* Create Folder Dialog */}
       <Dialog open={folderDialogOpen} onOpenChange={setFolderDialogOpen}>
-        <DialogContent>
+        <DialogContent className="dark:bg-gray-900 dark:border-gray-700">
           <DialogHeader>
-            <DialogTitle>Create Folder</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="dark:text-white">Create Folder</DialogTitle>
+            <DialogDescription className="dark:text-gray-400">
               Create a new folder to organize resources
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="folderName">Folder Name</Label>
+              <Label htmlFor="folderName" className="dark:text-gray-300">Folder Name</Label>
               <Input
                 id="folderName"
                 placeholder="Week 1 Materials"
                 value={folderName}
                 onChange={(e) => setFolderName(e.target.value)}
+                className="dark:bg-gray-950 dark:border-gray-700 dark:text-white"
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setFolderDialogOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setFolderDialogOpen(false)}
+              className="dark:border-gray-700 dark:text-white dark:hover:bg-gray-800"
+            >
               Cancel
             </Button>
             <Button
               onClick={handleCreateFolder}
               disabled={createLoading || !folderName.trim()}
-              className="gradient-bg"
+              className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white"
             >
               {createLoading ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -574,42 +615,48 @@ export default function AdminResourcesPage() {
 
       {/* Create Link Dialog */}
       <Dialog open={linkDialogOpen} onOpenChange={setLinkDialogOpen}>
-        <DialogContent>
+        <DialogContent className="dark:bg-gray-900 dark:border-gray-700">
           <DialogHeader>
-            <DialogTitle>Add External Link</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="dark:text-white">Add External Link</DialogTitle>
+            <DialogDescription className="dark:text-gray-400">
               Add a link to external content like YouTube videos or articles
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="linkName">Link Name</Label>
+              <Label htmlFor="linkName" className="dark:text-gray-300">Link Name</Label>
               <Input
                 id="linkName"
                 placeholder="Product Management Tutorial"
                 value={linkName}
                 onChange={(e) => setLinkName(e.target.value)}
+                className="dark:bg-gray-950 dark:border-gray-700 dark:text-white"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="linkUrl">URL</Label>
+              <Label htmlFor="linkUrl" className="dark:text-gray-300">URL</Label>
               <Input
                 id="linkUrl"
                 type="url"
                 placeholder="https://youtube.com/watch?v=..."
                 value={linkUrl}
                 onChange={(e) => setLinkUrl(e.target.value)}
+                className="dark:bg-gray-950 dark:border-gray-700 dark:text-white"
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setLinkDialogOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setLinkDialogOpen(false)}
+              className="dark:border-gray-700 dark:text-white dark:hover:bg-gray-800"
+            >
               Cancel
             </Button>
             <Button
               onClick={handleCreateLink}
               disabled={createLoading || !linkName.trim() || !linkUrl.trim()}
-              className="gradient-bg"
+              className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white"
             >
               {createLoading ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
