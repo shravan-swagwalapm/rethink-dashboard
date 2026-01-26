@@ -1,6 +1,6 @@
 'use client';
 
-import { Component, ReactNode, useEffect } from 'react';
+import { Component, ReactNode, useEffect, useState } from 'react';
 import { VideoPlayer, VideoPlayerProps } from './VideoPlayer';
 import { AlertCircle } from 'lucide-react';
 
@@ -46,13 +46,15 @@ interface VideoPlayerWrapperProps extends VideoPlayerProps {
 
 export function VideoPlayerWrapper(props: VideoPlayerWrapperProps) {
   const iframeUrl = `https://drive.google.com/file/d/${props.googleDriveId}/preview`;
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    // Ensure component is mounted before rendering VideoPlayer
+    setMounted(true);
+  }, []);
 
   const fallback = (
-    <div className="aspect-video bg-black rounded-lg overflow-hidden relative">
-      <div className="absolute top-4 left-4 right-4 z-10 bg-yellow-500/90 text-yellow-900 px-4 py-2 rounded-lg flex items-center gap-2 text-sm">
-        <AlertCircle className="w-4 h-4 flex-shrink-0" />
-        <span>Enhanced player unavailable. Using basic player.</span>
-      </div>
+    <div className="w-full h-full bg-black rounded-lg overflow-hidden relative flex items-center justify-center">
       <iframe
         src={iframeUrl}
         className="w-full h-full"
@@ -61,6 +63,18 @@ export function VideoPlayerWrapper(props: VideoPlayerWrapperProps) {
       />
     </div>
   );
+
+  // Don't render VideoPlayer until component is mounted
+  if (!mounted) {
+    return (
+      <div className="w-full h-full bg-muted rounded-lg flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-muted-foreground">Loading player...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <VideoPlayerErrorBoundary fallback={fallback}>

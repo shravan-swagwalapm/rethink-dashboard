@@ -134,7 +134,17 @@ export function VideoPlayer({
       return;
     }
 
-    console.log('[VideoPlayer] Initializing Video.js player...');
+    let initTimeout: NodeJS.Timeout;
+
+    // Add small delay to ensure DOM is fully ready
+    initTimeout = setTimeout(() => {
+      if (!videoRef.current) {
+        console.error('[VideoPlayer] Video element disappeared from DOM');
+        setError('Video player initialization failed. Please try refreshing.');
+        return;
+      }
+
+      console.log('[VideoPlayer] Initializing Video.js player...');
 
     try {
       const player = videojs(videoRef.current, {
@@ -230,32 +240,45 @@ export function VideoPlayer({
         console.error('Video.js error:', error);
 
         if (error) {
+          // If media loading fails (Google Drive blocking), throw error to trigger fallback
+          if (error.code === 4) {
+            console.error('[VideoPlayer] Media source not supported, falling back to iframe');
+            throw new Error('MEDIA_ERR_SRC_NOT_SUPPORTED');
+          }
           setError(`Failed to load video: ${error.message || 'Unknown error'}`);
         }
       });
 
-      // Cleanup
-      return () => {
-        if (progressIntervalRef.current) {
-          clearInterval(progressIntervalRef.current);
-        }
-
-        // Save one last time before cleanup
-        handleProgressSave();
-
-        if (playerRef.current) {
-          try {
-            playerRef.current.dispose();
-          } catch (error) {
-            console.error('Error disposing player:', error);
-          }
-          playerRef.current = null;
-        }
-      };
     } catch (err) {
       console.error('[VideoPlayer] Error initializing player:', err);
       setError('Failed to initialize video player');
     }
+    }, 100); // Small delay to ensure DOM is ready
+
+    // Cleanup function
+    return () => {
+      if (initTimeout) {
+        clearTimeout(initTimeout);
+      }
+
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+      }
+
+      // Save one last time before cleanup
+      if (playerRef.current) {
+        handleProgressSave();
+      }
+
+      if (playerRef.current) {
+        try {
+          playerRef.current.dispose();
+        } catch (error) {
+          console.error('Error disposing player:', error);
+        }
+        playerRef.current = null;
+      }
+    };
   }, [videoUrl, isVideoJsReady, videojs, progress, resourceId, thumbnail, autoplay, captions, handleProgressSave, markComplete, onComplete]);
 
   // Loading state
