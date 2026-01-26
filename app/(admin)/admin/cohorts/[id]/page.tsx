@@ -349,10 +349,10 @@ export default function CohortSettingsPage() {
         </div>
 
         {/* Info Banner */}
-        <Alert className="border-blue-200 bg-blue-50">
-          <InfoIcon className="h-4 w-4 text-blue-600" />
-          <AlertTitle className="text-blue-900">Resource Sharing Made Easy</AlertTitle>
-          <AlertDescription className="text-blue-800">
+        <Alert className="border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/50">
+          <InfoIcon className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+          <AlertTitle className="text-blue-900 dark:text-blue-100">Resource Sharing Made Easy</AlertTitle>
+          <AlertDescription className="text-blue-800 dark:text-blue-200">
             Share learning modules across cohorts without duplicating content. When you link modules,
             any updates to the original will automatically appear in all cohorts using it.
           </AlertDescription>
@@ -409,58 +409,58 @@ export default function CohortSettingsPage() {
             </Card>
 
             {/* Secondary Cards - 3 Column Grid */}
-            <Card className="hover:shadow-md transition-shadow border-blue-200 bg-blue-50/50">
+            <Card className="hover:shadow-md transition-shadow border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/50">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                  <CardTitle className="text-sm font-medium text-blue-700 dark:text-blue-300">
                     Own Modules
                   </CardTitle>
-                  <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                    <BookOpen className="w-5 h-5 text-blue-600" />
+                  <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center">
+                    <BookOpen className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                   </div>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-4xl font-bold text-blue-600">{stats.own_modules}</div>
-                <p className="text-xs text-muted-foreground mt-2">
+                <div className="text-4xl font-bold text-blue-600 dark:text-blue-400">{stats.own_modules}</div>
+                <p className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-2">
                   Created specifically for {cohort.name}
                 </p>
               </CardContent>
             </Card>
 
-            <Card className="hover:shadow-md transition-shadow border-green-200 bg-green-50/50">
+            <Card className="hover:shadow-md transition-shadow border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/50">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                  <CardTitle className="text-sm font-medium text-green-700 dark:text-green-300">
                     Linked Modules
                   </CardTitle>
-                  <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
-                    <Link2 className="w-5 h-5 text-green-600" />
+                  <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/50 flex items-center justify-center">
+                    <Link2 className="w-5 h-5 text-green-600 dark:text-green-400" />
                   </div>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-4xl font-bold text-green-600">{stats.linked_modules}</div>
-                <p className="text-xs text-muted-foreground mt-2">
+                <div className="text-4xl font-bold text-green-600 dark:text-green-400">{stats.linked_modules}</div>
+                <p className="text-xs text-green-600/70 dark:text-green-400/70 mt-2">
                   Shared from other cohorts
                 </p>
               </CardContent>
             </Card>
 
-            <Card className="hover:shadow-md transition-shadow border-purple-200 bg-purple-50/50">
+            <Card className="hover:shadow-md transition-shadow border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/50">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                  <CardTitle className="text-sm font-medium text-purple-700 dark:text-purple-300">
                     Global Modules
                   </CardTitle>
-                  <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
-                    <Globe className="w-5 h-5 text-purple-600" />
+                  <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900/50 flex items-center justify-center">
+                    <Globe className="w-5 h-5 text-purple-600 dark:text-purple-400" />
                   </div>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-4xl font-bold text-purple-600">{stats.global_modules}</div>
-                <p className="text-xs text-muted-foreground mt-2">
+                <div className="text-4xl font-bold text-purple-600 dark:text-purple-400">{stats.global_modules}</div>
+                <p className="text-xs text-purple-600/70 dark:text-purple-400/70 mt-2">
                   From global library
                 </p>
               </CardContent>
