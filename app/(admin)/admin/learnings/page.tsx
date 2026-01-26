@@ -57,6 +57,7 @@ import {
   Eye,
   EyeOff,
   Calendar,
+  Globe,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import type { Cohort, LearningModule, ModuleResource, LearningModuleWithResources, CaseStudy } from '@/types';
@@ -108,6 +109,9 @@ function getContentTypeLabel(type: string): string {
     default: return 'Links';
   }
 }
+
+// Global Library identifier
+const GLOBAL_LIBRARY_ID = '__global__';
 
 export default function LearningsPage() {
   const [modules, setModules] = useState<LearningModuleWithResources[]>([]);
@@ -193,7 +197,17 @@ export default function LearningsPage() {
     if (!selectedCohort) return;
 
     try {
-      const response = await fetch(`/api/admin/learnings?cohort_id=${selectedCohort}`);
+      // Check if Global Library is selected
+      let url;
+      if (selectedCohort === GLOBAL_LIBRARY_ID) {
+        // Fetch only global modules
+        url = '/api/admin/learnings?is_global=true';
+      } else {
+        // Fetch cohort-specific modules (existing behavior)
+        url = `/api/admin/learnings?cohort_id=${selectedCohort}`;
+      }
+
+      const response = await fetch(url);
       const data = await response.json();
       setModules(data.modules || []);
 
@@ -254,6 +268,8 @@ export default function LearningsPage() {
 
     setSaving(true);
     try {
+      const isGlobalLibrary = selectedCohort === GLOBAL_LIBRARY_ID;
+
       const response = await fetch('/api/admin/learnings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -263,13 +279,15 @@ export default function LearningsPage() {
           description: moduleFormData.description,
           week_number: parseInt(moduleFormData.week_number),
           order_index: moduleFormData.order_index,
-          cohort_id: selectedCohort,
+          // Set cohort_id to null and is_global to true for Global Library
+          cohort_id: isGlobalLibrary ? null : selectedCohort,
+          is_global: isGlobalLibrary,
         }),
       });
 
       if (!response.ok) throw new Error('Failed to create module');
 
-      toast.success('Week created');
+      toast.success(isGlobalLibrary ? 'Global module created' : 'Week created');
       setShowModuleForm(false);
       resetModuleForm();
       fetchModules();
@@ -655,17 +673,41 @@ export default function LearningsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Learning Content</h1>
+          <h1 className="text-2xl font-bold">
+            {selectedCohort === GLOBAL_LIBRARY_ID ? (
+              <span className="flex items-center gap-2">
+                <Globe className="w-6 h-6 text-purple-600" />
+                Global Library
+              </span>
+            ) : (
+              'Learning Content'
+            )}
+          </h1>
           <p className="text-muted-foreground">
-            Manage recordings, presentations, notes, and case studies
+            {selectedCohort === GLOBAL_LIBRARY_ID
+              ? 'Create modules accessible to all cohorts'
+              : 'Manage recordings, presentations, notes, and case studies'
+            }
           </p>
         </div>
         <div className="flex items-center gap-3">
           <Select value={selectedCohort} onValueChange={(value) => { setSelectedCohort(value); setSelectedWeek(''); }}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-[200px]">
               <SelectValue placeholder="Select cohort" />
             </SelectTrigger>
             <SelectContent>
+              {/* Global Library Option */}
+              <SelectItem value={GLOBAL_LIBRARY_ID}>
+                <div className="flex items-center gap-2">
+                  <Globe className="w-4 h-4 text-purple-600" />
+                  <span className="font-medium">Global Library</span>
+                </div>
+              </SelectItem>
+              {/* Separator */}
+              {cohorts.length > 0 && (
+                <div className="border-t my-1" />
+              )}
+              {/* Cohort Options */}
               {cohorts.map((cohort) => (
                 <SelectItem key={cohort.id} value={cohort.id}>
                   {cohort.name}

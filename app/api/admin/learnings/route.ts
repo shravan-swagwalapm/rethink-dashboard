@@ -82,6 +82,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const cohortId = searchParams.get('cohort_id');
     const moduleId = searchParams.get('module_id');
+    const isGlobalFilter = searchParams.get('is_global');
 
     const adminClient = await createAdminClient();
 
@@ -107,6 +108,36 @@ export async function GET(request: NextRequest) {
         module,
         resources: resources || [],
       });
+    }
+
+    // If is_global filter provided, fetch only global modules
+    if (isGlobalFilter === 'true') {
+      const { data: modules, error: modulesError } = await adminClient
+        .from('learning_modules')
+        .select('*')
+        .eq('is_global', true)
+        .order('week_number', { ascending: true })
+        .order('order_index', { ascending: true });
+
+      if (modulesError) {
+        return NextResponse.json({ error: modulesError.message }, { status: 400 });
+      }
+
+      // Fetch resources for global modules
+      const moduleIds = modules?.map(m => m.id) || [];
+      const { data: resources } = await adminClient
+        .from('module_resources')
+        .select('*')
+        .in('module_id', moduleIds)
+        .order('order_index', { ascending: true });
+
+      // Group resources by module
+      const modulesWithResources = modules?.map(module => ({
+        ...module,
+        resources: resources?.filter(r => r.module_id === module.id) || [],
+      }));
+
+      return NextResponse.json({ modules: modulesWithResources || [] });
     }
 
     // Fetch all modules for cohort (including global and linked modules)
@@ -189,6 +220,8 @@ export async function POST(request: NextRequest) {
 
     // Create a learning module
     if (body.type === 'module') {
+      const isGlobal = body.is_global === true;
+
       const { data: module, error } = await adminClient
         .from('learning_modules')
         .insert({
@@ -196,7 +229,8 @@ export async function POST(request: NextRequest) {
           description: body.description,
           week_number: body.week_number,
           order_index: body.order_index || 0,
-          cohort_id: body.cohort_id,
+          cohort_id: isGlobal ? null : body.cohort_id,
+          is_global: isGlobal,
         })
         .select()
         .single();
