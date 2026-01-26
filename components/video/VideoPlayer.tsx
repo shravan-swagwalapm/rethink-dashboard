@@ -7,21 +7,8 @@ import { Loader2, AlertCircle, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { CaptionTrack } from '@/types';
 
-// Dynamic import of Video.js to avoid SSR issues
-// Note: CSS is imported in root layout
-let videojs: any = null;
-let videojsLoadError: Error | null = null;
-
-if (typeof window !== 'undefined') {
-  import('video.js')
-    .then((module) => {
-      videojs = module.default;
-    })
-    .catch((err) => {
-      console.error('Failed to load Video.js:', err);
-      videojsLoadError = err;
-    });
-}
+// Video.js is loaded dynamically in useEffect to avoid SSR issues
+// CSS is imported in VideoPlayerWrapper component
 
 export interface VideoPlayerProps {
   googleDriveId: string;
@@ -54,6 +41,7 @@ export function VideoPlayer({
   const [error, setError] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [isVideoJsReady, setIsVideoJsReady] = useState(false);
+  const [videojs, setVideojs] = useState<any>(null);
 
   const {
     progress,
@@ -61,43 +49,39 @@ export function VideoPlayer({
     markComplete,
   } = useVideoProgress(resourceId);
 
-  // Load Video.js CSS dynamically
+  // Load Video.js dynamically
   useEffect(() => {
-    // Check if CSS is already loaded
-    const existingLink = document.getElementById('videojs-css');
-    if (!existingLink) {
-      const link = document.createElement('link');
-      link.id = 'videojs-css';
-      link.rel = 'stylesheet';
-      link.href = 'https://unpkg.com/video.js@8.23.4/dist/video-js.min.css';
-      document.head.appendChild(link);
-    }
-  }, []);
+    let mounted = true;
 
-  // Wait for Video.js to be loaded
-  useEffect(() => {
-    const checkVideoJs = setInterval(() => {
-      if (videojs) {
-        setIsVideoJsReady(true);
-        clearInterval(checkVideoJs);
-      } else if (videojsLoadError) {
-        setError('Failed to load video player library. Please refresh the page.');
-        setIsLoading(false);
-        clearInterval(checkVideoJs);
-      }
-    }, 100);
+    console.log('[VideoPlayer] Starting Video.js import...');
 
-    // Timeout after 10 seconds
+    import('video.js')
+      .then((module) => {
+        if (mounted) {
+          console.log('[VideoPlayer] Video.js loaded successfully');
+          setVideojs(module.default);
+          setIsVideoJsReady(true);
+        }
+      })
+      .catch((err) => {
+        console.error('[VideoPlayer] Failed to load Video.js:', err);
+        if (mounted) {
+          setError('Failed to load video player library. Please refresh the page.');
+          setIsLoading(false);
+        }
+      });
+
+    // Timeout after 15 seconds
     const timeout = setTimeout(() => {
-      if (!videojs && !videojsLoadError) {
+      if (mounted && !videojs) {
+        console.error('[VideoPlayer] Video.js load timeout');
         setError('Video player took too long to load. Please refresh the page.');
         setIsLoading(false);
       }
-      clearInterval(checkVideoJs);
-    }, 10000);
+    }, 15000);
 
     return () => {
-      clearInterval(checkVideoJs);
+      mounted = false;
       clearTimeout(timeout);
     };
   }, []);

@@ -1,8 +1,11 @@
 'use client';
 
-import { Component, ReactNode } from 'react';
+import { Component, ReactNode, useEffect } from 'react';
 import { VideoPlayer, VideoPlayerProps } from './VideoPlayer';
 import { AlertCircle } from 'lucide-react';
+
+// Import Video.js CSS - loads from local node_modules
+import 'video.js/dist/video-js.css';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
