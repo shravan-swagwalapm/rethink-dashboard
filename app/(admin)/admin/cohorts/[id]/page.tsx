@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -73,6 +74,11 @@ export default function CohortSettingsPage() {
   // Confirmation dialog state
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [moduleToUnlink, setModuleToUnlink] = useState<LearningModuleWithSharing | null>(null);
+
+  // Complete Untag dialog state
+  const [showUntagDialog, setShowUntagDialog] = useState(false);
+  const [isUntagging, setIsUntagging] = useState(false);
+  const [confirmText, setConfirmText] = useState('');
 
   useEffect(() => {
     fetchData();
@@ -230,6 +236,55 @@ export default function CohortSettingsPage() {
     } catch (error) {
       console.error('Error unlinking module:', error);
       toast.error('Failed to unlink module. Please try again.');
+    }
+  };
+
+  const handleCompleteUntag = async () => {
+    try {
+      setIsUntagging(true);
+
+      // Step 1: Unlink all linked modules
+      const unlinkResponse = await fetch(`/api/admin/cohorts/${cohortId}/link-modules`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ unlink_all: true }),
+      });
+
+      const unlinkResult = await unlinkResponse.json();
+
+      if (!unlinkResponse.ok) {
+        throw new Error(unlinkResult.error || 'Failed to unlink modules');
+      }
+
+      // Step 2: Convert own modules to global
+      const convertResponse = await fetch(`/api/admin/cohorts/${cohortId}/convert-to-global`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ make_global: true }),
+      });
+
+      const convertResult = await convertResponse.json();
+
+      if (!convertResponse.ok) {
+        throw new Error(convertResult.error || 'Failed to convert modules');
+      }
+
+      toast.success(
+        `Complete untag successful`,
+        {
+          description: `Unlinked ${unlinkResult.unlinked_count} modules, converted ${convertResult.converted_count} own modules to global`,
+          duration: 5000,
+        }
+      );
+
+      setShowUntagDialog(false);
+      setConfirmText('');
+      await fetchData();
+    } catch (error) {
+      console.error('Error during complete untag:', error);
+      toast.error('Failed to complete untag. Please try again.');
+    } finally {
+      setIsUntagging(false);
     }
   };
 
@@ -527,6 +582,51 @@ export default function CohortSettingsPage() {
           </CardContent>
         </Card>
 
+        {/* Complete Untag Section */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-start justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-amber-600" />
+                  Complete Untag
+                </CardTitle>
+                <CardDescription className="mt-1.5">
+                  Remove all linked modules and convert this cohort's own modules to global library.
+                  This makes the cohort a clean slate while preserving all content.
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Alert className="border-amber-200 bg-amber-50">
+              <AlertTriangle className="h-4 w-4 text-amber-600" />
+              <AlertTitle className="text-amber-900">Irreversible Action</AlertTitle>
+              <AlertDescription className="text-amber-800 space-y-2">
+                <p className="font-medium">This action will:</p>
+                <ul className="list-disc list-inside text-sm space-y-1">
+                  <li>Unlink all {stats?.linked_modules || 0} linked modules from other cohorts</li>
+                  <li>Convert {stats?.own_modules || 0} own modules to global library (accessible to all cohorts)</li>
+                  <li>Leave this cohort with 0 modules initially (you can re-link from global library)</li>
+                </ul>
+                <p className="text-sm mt-2">
+                  <strong>Note:</strong> No content will be deleted—modules will be moved to the global library.
+                </p>
+              </AlertDescription>
+            </Alert>
+
+            <Button
+              variant="destructive"
+              onClick={() => setShowUntagDialog(true)}
+              disabled={!stats || (stats.linked_modules === 0 && stats.own_modules === 0)}
+              className="w-full"
+            >
+              <AlertTriangle className="w-4 h-4 mr-2" />
+              Complete Untag {cohort?.name}
+            </Button>
+          </CardContent>
+        </Card>
+
         {/* Currently Linked Modules List */}
         <Card>
           <CardHeader>
@@ -723,6 +823,77 @@ export default function CohortSettingsPage() {
               >
                 <Trash2 className="w-4 h-4 mr-2" />
                 Unlink Module
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Complete Untag Confirmation Dialog */}
+        <Dialog open={showUntagDialog} onOpenChange={setShowUntagDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-amber-600" />
+                Confirm Complete Untag
+              </DialogTitle>
+              <DialogDescription className="space-y-3 pt-2">
+                <p>
+                  You are about to perform a <strong>Complete Untag</strong> on <strong>{cohort?.name}</strong>.
+                </p>
+
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3 space-y-2">
+                  <p className="text-sm font-medium text-red-900">What will happen:</p>
+                  <ol className="list-decimal list-inside text-sm text-red-800 space-y-1">
+                    <li><strong>{stats?.linked_modules || 0} linked modules</strong> will be unlinked from this cohort</li>
+                    <li><strong>{stats?.own_modules || 0} own modules</strong> will be converted to global library</li>
+                    <li>This cohort will have <strong>0 modules</strong> after this operation</li>
+                    <li>Students will temporarily lose access to all learning content</li>
+                  </ol>
+                </div>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p className="text-sm text-blue-900">
+                    <strong>Good news:</strong> No content will be deleted. All modules will be available in the global library,
+                    and you can re-link them to this cohort anytime.
+                  </p>
+                </div>
+
+                <p className="text-sm text-muted-foreground">
+                  Type <strong>UNTAG</strong> below to confirm:
+                </p>
+                <Input
+                  placeholder="Type UNTAG to confirm"
+                  value={confirmText}
+                  onChange={(e) => setConfirmText(e.target.value)}
+                />
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowUntagDialog(false);
+                  setConfirmText('');
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleCompleteUntag}
+                disabled={confirmText !== 'UNTAG' || isUntagging}
+              >
+                {isUntagging ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <AlertTriangle className="w-4 h-4 mr-2" />
+                    Complete Untag
+                  </>
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>
