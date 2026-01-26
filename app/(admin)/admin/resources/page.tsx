@@ -233,6 +233,7 @@ export default function AdminResourcesPage() {
     setUploading(true);
     let successCount = 0;
     let failCount = 0;
+    let errorMessage = '';
 
     for (const file of Array.from(files)) {
       try {
@@ -248,9 +249,16 @@ export default function AdminResourcesPage() {
           body: formData,
         });
 
-        if (!response.ok) throw new Error('Upload failed');
+        if (!response.ok) {
+          const errorData = await response.json();
+          errorMessage = errorData.error || 'Upload failed';
+          console.error('Upload error:', errorData);
+          throw new Error(errorMessage);
+        }
+
         successCount++;
       } catch (error) {
+        console.error('File upload error:', error);
         failCount++;
       }
     }
@@ -262,7 +270,7 @@ export default function AdminResourcesPage() {
       fetchResources();
     }
     if (failCount > 0) {
-      toast.error(`Failed to upload ${failCount} file${failCount > 1 ? 's' : ''}`);
+      toast.error(errorMessage || `Failed to upload ${failCount} file${failCount > 1 ? 's' : ''}`);
     }
   };
 

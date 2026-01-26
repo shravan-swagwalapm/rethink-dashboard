@@ -85,7 +85,21 @@ export async function POST(request: NextRequest) {
 
     if (uploadError) {
       console.error('Upload error:', uploadError);
-      return NextResponse.json({ error: 'Failed to upload file' }, { status: 500 });
+
+      // Provide specific error messages
+      let errorMessage = 'Failed to upload file';
+      if (uploadError.message?.includes('bucket')) {
+        errorMessage = 'Storage bucket not configured. Please contact administrator.';
+      } else if (uploadError.message?.includes('policy')) {
+        errorMessage = 'Storage permissions not configured. Please contact administrator.';
+      } else if (uploadError.message?.includes('size')) {
+        errorMessage = 'File size exceeds the limit (50MB max).';
+      }
+
+      return NextResponse.json({
+        error: errorMessage,
+        details: uploadError.message
+      }, { status: 500 });
     }
 
     // Create database record
