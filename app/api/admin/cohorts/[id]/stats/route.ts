@@ -1,6 +1,29 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
-import { NextResponse } from 'next/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { NextRequest, NextResponse } from 'next/server';
+
+async function verifyAdmin() {
+  const supabase = await createClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return { authorized: false, error: 'Unauthorized', status: 401 };
+  }
+
+  const adminClient = await createAdminClient();
+  const { data: profile } = await adminClient
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single();
+
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
+
+  if (!isAdmin) {
+    return { authorized: false, error: 'Forbidden', status: 403 };
+  }
+
+  return { authorized: true };
+}
 
 /**
  * GET /api/admin/cohorts/[id]/stats
@@ -13,35 +36,19 @@ import { NextResponse } from 'next/server';
  * - global_modules: Global library modules accessible to all
  */
 export async function GET(
-  req: Request,
+  req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const supabase = createRouteHandlerClient({ cookies });
-
-  // Verify authentication
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  // Verify admin role
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single();
-
-  if (profileError || !profile) {
-    return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
-  }
-
-  if (!['super_admin', 'admin'].includes(profile.role)) {
-    return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
+  const auth = await verifyAdmin();
+  if (!auth.authorized) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
   try {
+    const adminClient = await createAdminClient();
+
     // Get cohort's own modules
-    const { data: ownModules, error: ownError } = await supabase
+    const { data: ownModules, error: ownError } = await adminClient
       .from('learning_modules')
       .select('id')
       .eq('cohort_id', params.id);
@@ -52,7 +59,7 @@ export async function GET(
     }
 
     // Get linked modules (via cohort_module_links)
-    const { data: linkedModules, error: linkedError } = await supabase
+    const { data: linkedModules, error: linkedError } = await adminClient
       .from('cohort_module_links')
       .select(`
         module_id,

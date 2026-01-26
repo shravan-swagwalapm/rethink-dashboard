@@ -1,6 +1,29 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
-import { NextResponse } from 'next/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { NextRequest, NextResponse } from 'next/server';
+
+async function verifyAdmin() {
+  const supabase = await createClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return { authorized: false, error: 'Unauthorized', status: 401, userId: null };
+  }
+
+  const adminClient = await createAdminClient();
+  const { data: profile } = await adminClient
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single();
+
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
+
+  if (!isAdmin) {
+    return { authorized: false, error: 'Forbidden', status: 403, userId: null };
+  }
+
+  return { authorized: true, userId: user.id };
+}
 
 /**
  * POST /api/admin/cohorts/[id]/link-modules
@@ -11,30 +34,12 @@ import { NextResponse } from 'next/server';
  * - module_ids: Optional array of specific module IDs to link (null = link all)
  */
 export async function POST(
-  req: Request,
+  req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const supabase = createRouteHandlerClient({ cookies });
-
-  // Verify authentication
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  // Verify admin role
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single();
-
-  if (profileError || !profile) {
-    return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
-  }
-
-  if (!['super_admin', 'admin'].includes(profile.role)) {
-    return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
+  const auth = await verifyAdmin();
+  if (!auth.authorized) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
   try {
@@ -48,8 +53,10 @@ export async function POST(
       );
     }
 
+    const adminClient = await createAdminClient();
+
     // Fetch modules to link
-    let query = supabase
+    let query = adminClient
       .from('learning_modules')
       .select('id, title, cohort_id, is_global');
 
@@ -85,10 +92,10 @@ export async function POST(
       cohort_id: params.id,
       module_id: module.id,
       source_cohort_id: source_cohort_id === 'global' ? null : source_cohort_id,
-      linked_by: user.id,
+      linked_by: auth.userId,
     }));
 
-    const { data: createdLinks, error: linkError } = await supabase
+    const { data: createdLinks, error: linkError } = await adminClient
       .from('cohort_module_links')
       .insert(links)
       .select();
@@ -128,30 +135,12 @@ export async function POST(
  * - module_ids: Array of module IDs to unlink
  */
 export async function DELETE(
-  req: Request,
+  req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const supabase = createRouteHandlerClient({ cookies });
-
-  // Verify authentication
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  // Verify admin role
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single();
-
-  if (profileError || !profile) {
-    return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
-  }
-
-  if (!['super_admin', 'admin'].includes(profile.role)) {
-    return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
+  const auth = await verifyAdmin();
+  if (!auth.authorized) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
   try {
@@ -165,7 +154,9 @@ export async function DELETE(
       );
     }
 
-    const { error } = await supabase
+    const adminClient = await createAdminClient();
+
+    const { error } = await adminClient
       .from('cohort_module_links')
       .delete()
       .eq('cohort_id', params.id)
