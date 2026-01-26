@@ -8,12 +8,11 @@ import { Button } from '@/components/ui/button';
 import type { CaptionTrack } from '@/types';
 
 // Dynamic import of Video.js to avoid SSR issues
+// Note: CSS is imported in globals.css
 let videojs: any = null;
 if (typeof window !== 'undefined') {
   import('video.js').then((module) => {
     videojs = module.default;
-    // Import CSS
-    import('video.js/dist/video-js.css');
   });
 }
 

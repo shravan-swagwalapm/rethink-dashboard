@@ -183,7 +183,7 @@ class VideoProgressService {
       }
 
       const totalVideos = data?.length || 0;
-      const completedVideos = data?.filter((p) => p.completed).length || 0;
+      const completedVideos = data?.filter((p: VideoProgress) => p.completed).length || 0;
       const inProgressVideos = totalVideos - completedVideos;
       const completionRate = totalVideos > 0 ? (completedVideos / totalVideos) * 100 : 0;
 
