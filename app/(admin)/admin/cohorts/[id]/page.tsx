@@ -235,9 +235,15 @@ export default function CohortSettingsPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen gap-3">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        <p className="text-sm text-muted-foreground">Loading cohort settings...</p>
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <div className="relative">
+          <Loader2 className="w-12 h-12 animate-spin text-primary" />
+          <div className="absolute inset-0 w-12 h-12 rounded-full border-2 border-primary/20"></div>
+        </div>
+        <div className="text-center">
+          <p className="text-base font-medium text-foreground">Loading cohort settings...</p>
+          <p className="text-sm text-muted-foreground mt-1">Fetching modules and statistics</p>
+        </div>
       </div>
     );
   }
@@ -297,100 +303,109 @@ export default function CohortSettingsPage() {
           </AlertDescription>
         </Alert>
 
-        {/* Statistics Grid */}
+        {/* Statistics Grid - Hero + Secondary Layout */}
         {stats && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card className="hover:shadow-md transition-shadow">
-              <CardHeader className="pb-3">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Hero Card - Total Modules */}
+            <Card className="lg:col-span-3 hover:shadow-lg transition-all border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
+              <CardHeader className="pb-4">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    Total Modules
-                  </CardTitle>
+                  <div>
+                    <CardTitle className="text-lg font-medium text-muted-foreground">
+                      Total Modules Available
+                    </CardTitle>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      All learning content accessible to students in this cohort
+                    </p>
+                  </div>
                   <Tooltip>
                     <TooltipTrigger>
-                      <HelpCircle className="w-4 h-4 text-muted-foreground" />
+                      <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                        <BookOpen className="w-6 h-6 text-primary" />
+                      </div>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>All learning modules accessible to students in this cohort</p>
+                      <p>Sum of own, linked, and global modules</p>
                     </TooltipContent>
                   </Tooltip>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold">{stats.total_modules}</div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Accessible to students
-                </p>
+                <div className="flex items-end gap-4">
+                  <div className="text-5xl font-bold">{stats.total_modules}</div>
+                  <div className="flex items-center gap-3 mb-2 text-sm text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <BookOpen className="w-4 h-4 text-blue-600" />
+                      {stats.own_modules} own
+                    </span>
+                    <span>•</span>
+                    <span className="flex items-center gap-1">
+                      <Link2 className="w-4 h-4 text-green-600" />
+                      {stats.linked_modules} linked
+                    </span>
+                    <span>•</span>
+                    <span className="flex items-center gap-1">
+                      <Globe className="w-4 h-4 text-purple-600" />
+                      {stats.global_modules} global
+                    </span>
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
-            <Card className="hover:shadow-md transition-shadow border-blue-200">
+            {/* Secondary Cards - 3 Column Grid */}
+            <Card className="hover:shadow-md transition-shadow border-blue-200 bg-blue-50/50">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-sm font-medium text-muted-foreground">
                     Own Modules
                   </CardTitle>
-                  <Tooltip>
-                    <TooltipTrigger>
-                      <BookOpen className="w-4 h-4 text-blue-600" />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Modules created specifically for this cohort</p>
-                    </TooltipContent>
-                  </Tooltip>
+                  <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                    <BookOpen className="w-5 h-5 text-blue-600" />
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-blue-600">{stats.own_modules}</div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Created for {cohort.name}
+                <div className="text-4xl font-bold text-blue-600">{stats.own_modules}</div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Created specifically for {cohort.name}
                 </p>
               </CardContent>
             </Card>
 
-            <Card className="hover:shadow-md transition-shadow border-green-200">
+            <Card className="hover:shadow-md transition-shadow border-green-200 bg-green-50/50">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-sm font-medium text-muted-foreground">
                     Linked Modules
                   </CardTitle>
-                  <Tooltip>
-                    <TooltipTrigger>
-                      <Link2 className="w-4 h-4 text-green-600" />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Modules shared from other cohorts</p>
-                    </TooltipContent>
-                  </Tooltip>
+                  <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                    <Link2 className="w-5 h-5 text-green-600" />
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-green-600">{stats.linked_modules}</div>
-                <p className="text-xs text-muted-foreground mt-1">
+                <div className="text-4xl font-bold text-green-600">{stats.linked_modules}</div>
+                <p className="text-xs text-muted-foreground mt-2">
                   Shared from other cohorts
                 </p>
               </CardContent>
             </Card>
 
-            <Card className="hover:shadow-md transition-shadow border-purple-200">
+            <Card className="hover:shadow-md transition-shadow border-purple-200 bg-purple-50/50">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-sm font-medium text-muted-foreground">
                     Global Modules
                   </CardTitle>
-                  <Tooltip>
-                    <TooltipTrigger>
-                      <Globe className="w-4 h-4 text-purple-600" />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Modules from the global library, accessible to all cohorts</p>
-                    </TooltipContent>
-                  </Tooltip>
+                  <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
+                    <Globe className="w-5 h-5 text-purple-600" />
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-purple-600">{stats.global_modules}</div>
-                <p className="text-xs text-muted-foreground mt-1">
+                <div className="text-4xl font-bold text-purple-600">{stats.global_modules}</div>
+                <p className="text-xs text-muted-foreground mt-2">
                   From global library
                 </p>
               </CardContent>
@@ -398,14 +413,14 @@ export default function CohortSettingsPage() {
           </div>
         )}
 
-        {/* Copy Resources Section */}
+        {/* Link Resources Section */}
         <Card>
           <CardHeader>
             <div className="flex items-start justify-between">
               <div>
                 <CardTitle className="flex items-center gap-2">
-                  <Copy className="w-5 h-5" />
-                  Copy Resources from Another Cohort
+                  <Link2 className="w-5 h-5" />
+                  Link Resources from Another Cohort
                 </CardTitle>
                 <CardDescription className="mt-1.5">
                   Link existing modules to this cohort instead of recreating them. Resources are shared,
@@ -419,20 +434,20 @@ export default function CohortSettingsPage() {
               <label className="text-sm font-medium">
                 Select Source
                 <span className="text-muted-foreground font-normal ml-2">
-                  (Choose where to copy modules from)
+                  (Choose where to link modules from)
                 </span>
               </label>
 
               <Select value={sourceCohortId} onValueChange={setSourceCohortId}>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="🔍 Choose a cohort or the global library..." />
+                  <SelectValue placeholder="Choose a source..." />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="global">
                     <div className="flex items-center gap-2">
                       <Globe className="w-4 h-4 text-purple-600" />
                       <span className="font-medium">Global Library</span>
-                      <span className="text-muted-foreground text-xs">(Available to all)</span>
+                      <span className="text-muted-foreground text-xs">Shared across all cohorts</span>
                     </div>
                   </SelectItem>
                   {otherCohorts.length > 0 && (
@@ -503,7 +518,7 @@ export default function CohortSettingsPage() {
                 </>
               ) : (
                 <>
-                  <Copy className="w-5 h-5 mr-2" />
+                  <Link2 className="w-5 h-5 mr-2" />
                   Link {sourceModulesCount > 0 ? `${sourceModulesCount} Module${sourceModulesCount !== 1 ? 's' : ''}` : 'Modules'}
                   to {cohort.name}
                 </>
@@ -530,23 +545,23 @@ export default function CohortSettingsPage() {
           </CardHeader>
           <CardContent>
             {linkedModules.length > 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {linkedModules.map((module) => (
                   <div
                     key={module.id}
-                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors group"
+                    className="flex items-center justify-between p-5 border rounded-lg hover:bg-gray-50 transition-colors group"
                   >
-                    <div className="flex items-center gap-4 flex-1 min-w-0">
+                    <div className="flex items-center gap-5 flex-1 min-w-0">
                       {module.is_global ? (
                         <div className="flex-shrink-0">
-                          <Badge variant="secondary" className="gap-1.5 bg-purple-100 text-purple-700 border-purple-200">
+                          <Badge className="gap-1.5 bg-purple-600 text-white hover:bg-purple-700">
                             <Globe className="w-3 h-3" />
                             Global
                           </Badge>
                         </div>
                       ) : (
                         <div className="flex-shrink-0">
-                          <Badge variant="outline" className="gap-1.5 border-green-200 text-green-700">
+                          <Badge className="gap-1.5 bg-green-600 text-white hover:bg-green-700">
                             <Link2 className="w-3 h-3" />
                             Linked
                           </Badge>
@@ -565,14 +580,29 @@ export default function CohortSettingsPage() {
                           )}
                         </div>
 
-                        {/* Resource preview badges */}
+                        {/* Resource preview badges with color coding */}
                         {module.resources && module.resources.length > 0 && (
-                          <div className="flex flex-wrap gap-1.5 mt-2">
+                          <div className="flex flex-wrap gap-2 mt-3">
                             {module.resources.slice(0, 3).map(resource => (
-                              <Badge key={resource.id} variant="secondary" className="text-xs font-normal">
-                                {resource.content_type === 'video' && <Video className="w-3 h-3 mr-1" />}
-                                {resource.content_type === 'slides' && <FileText className="w-3 h-3 mr-1" />}
-                                {resource.content_type === 'document' && <FileText className="w-3 h-3 mr-1" />}
+                              <Badge
+                                key={resource.id}
+                                className="text-xs font-normal py-1 px-2.5"
+                                style={{
+                                  backgroundColor:
+                                    resource.content_type === 'video' ? '#f3e8ff' : // purple-100
+                                    resource.content_type === 'slides' ? '#fed7aa' : // orange-100
+                                    resource.content_type === 'document' ? '#dbeafe' : // blue-100
+                                    '#f3f4f6', // gray-100
+                                  color:
+                                    resource.content_type === 'video' ? '#7c3aed' : // purple-600
+                                    resource.content_type === 'slides' ? '#ea580c' : // orange-600
+                                    resource.content_type === 'document' ? '#2563eb' : // blue-600
+                                    '#6b7280', // gray-600
+                                }}
+                              >
+                                {resource.content_type === 'video' && <Video className="w-3 h-3 mr-1.5" />}
+                                {resource.content_type === 'slides' && <FileText className="w-3 h-3 mr-1.5" />}
+                                {resource.content_type === 'document' && <FileText className="w-3 h-3 mr-1.5" />}
                                 {resource.title.length > 25
                                   ? resource.title.substring(0, 25) + '...'
                                   : resource.title}
@@ -607,24 +637,45 @@ export default function CohortSettingsPage() {
                 ))}
               </div>
             ) : stats && stats.total_modules > 0 ? (
-              <Alert>
-                <CheckCircle className="h-4 w-4 text-green-600" />
-                <AlertTitle>All Modules Owned by This Cohort</AlertTitle>
-                <AlertDescription>
-                  This cohort has <strong>{stats.own_modules} module{stats.own_modules !== 1 ? 's' : ''}</strong> that {stats.own_modules === 1 ? 'was' : 'were'} created specifically for it.
-                  Use the form above to link modules from other cohorts.
+              <Alert className="border-blue-200 bg-blue-50">
+                <CheckCircle className="h-5 w-5 text-blue-600" />
+                <AlertTitle className="text-blue-900 text-base font-semibold">All Modules Owned by This Cohort</AlertTitle>
+                <AlertDescription className="text-blue-800">
+                  <p className="mb-3">
+                    This cohort has <strong className="font-bold">{stats.own_modules} module{stats.own_modules !== 1 ? 's' : ''}</strong> that {stats.own_modules === 1 ? 'was' : 'were'} created specifically for it.
+                  </p>
+                  <div className="bg-white rounded-md p-3 border border-blue-200">
+                    <p className="text-sm font-medium text-blue-900 mb-2">Want to add more content?</p>
+                    <ul className="list-disc list-inside space-y-1 text-sm">
+                      <li>Link modules from another cohort using the form above</li>
+                      <li>Access global library modules automatically</li>
+                      <li>Create new modules in the <strong>Learnings</strong> section</li>
+                    </ul>
+                  </div>
                 </AlertDescription>
               </Alert>
             ) : (
-              <Alert>
-                <InfoIcon className="h-4 w-4" />
-                <AlertTitle>No Modules Yet</AlertTitle>
-                <AlertDescription className="space-y-2">
-                  <p>This cohort doesn't have any learning modules yet. You can:</p>
-                  <ul className="list-disc list-inside space-y-1 mt-2">
-                    <li>Copy modules from another cohort using the form above</li>
-                    <li>Create new modules in the <strong>Learnings</strong> section</li>
-                  </ul>
+              <Alert className="border-amber-200 bg-amber-50">
+                <InfoIcon className="h-5 w-5 text-amber-600" />
+                <AlertTitle className="text-amber-900 text-base font-semibold">No Modules Yet</AlertTitle>
+                <AlertDescription className="text-amber-800 space-y-3">
+                  <p>This cohort doesn't have any learning modules yet. Get started by:</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                    <div className="bg-white rounded-md p-3 border border-amber-200">
+                      <p className="font-medium text-amber-900 mb-1 flex items-center gap-2">
+                        <Link2 className="w-4 h-4" />
+                        Link from Other Cohorts
+                      </p>
+                      <p className="text-sm">Link modules from another cohort using the form above</p>
+                    </div>
+                    <div className="bg-white rounded-md p-3 border border-amber-200">
+                      <p className="font-medium text-amber-900 mb-1 flex items-center gap-2">
+                        <BookOpen className="w-4 h-4" />
+                        Create New Modules
+                      </p>
+                      <p className="text-sm">Go to the <strong>Learnings</strong> section to create custom content</p>
+                    </div>
+                  </div>
                 </AlertDescription>
               </Alert>
             )}
