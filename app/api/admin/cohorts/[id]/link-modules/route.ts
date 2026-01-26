@@ -35,8 +35,10 @@ async function verifyAdmin() {
  */
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id: cohortId } = await params;
+
   const auth = await verifyAdmin();
   if (!auth.authorized) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
@@ -89,7 +91,7 @@ export async function POST(
 
     // Create cohort_module_links
     const links = modules.map(module => ({
-      cohort_id: params.id,
+      cohort_id: cohortId,
       module_id: module.id,
       source_cohort_id: source_cohort_id === 'global' ? null : source_cohort_id,
       linked_by: auth.userId,
@@ -136,8 +138,10 @@ export async function POST(
  */
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id: cohortId } = await params;
+
   const auth = await verifyAdmin();
   if (!auth.authorized) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
@@ -159,7 +163,7 @@ export async function DELETE(
     const { error } = await adminClient
       .from('cohort_module_links')
       .delete()
-      .eq('cohort_id', params.id)
+      .eq('cohort_id', cohortId)
       .in('module_id', module_ids);
 
     if (error) {

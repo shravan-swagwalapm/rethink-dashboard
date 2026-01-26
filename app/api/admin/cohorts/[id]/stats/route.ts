@@ -37,8 +37,10 @@ async function verifyAdmin() {
  */
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id: cohortId } = await params;
+
   const auth = await verifyAdmin();
   if (!auth.authorized) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
@@ -51,7 +53,7 @@ export async function GET(
     const { data: ownModules, error: ownError } = await adminClient
       .from('learning_modules')
       .select('id')
-      .eq('cohort_id', params.id);
+      .eq('cohort_id', cohortId);
 
     if (ownError) {
       console.error('Error fetching own modules:', ownError);
@@ -68,7 +70,7 @@ export async function GET(
           is_global
         )
       `)
-      .eq('cohort_id', params.id);
+      .eq('cohort_id', cohortId);
 
     if (linkedError) {
       console.error('Error fetching linked modules:', linkedError);
