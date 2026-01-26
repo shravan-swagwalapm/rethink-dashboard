@@ -140,8 +140,19 @@ export interface LearningModule {
   description: string | null;
   week_number: number | null;
   order_index: number | null;
-  cohort_id: string | null;
+  cohort_id: string | null;  // Nullable for global modules
+  is_global: boolean;  // True for global library modules
   created_at: string;
+}
+
+// Cohort-Module link for cross-cohort resource sharing
+export interface CohortModuleLink {
+  id: string;
+  cohort_id: string;
+  module_id: string;
+  source_cohort_id: string | null;  // Original cohort this was copied from
+  linked_at: string;
+  linked_by: string | null;
 }
 
 export interface Recording {
@@ -280,6 +291,25 @@ export interface ResourceWithChildren extends Resource {
 export interface LearningModuleWithResources extends LearningModule {
   resources: ModuleResource[];
   recordings?: Recording[];
+}
+
+// Extended module interface with sharing metadata
+export interface LearningModuleWithSharing extends LearningModule {
+  resources: ModuleResource[];
+  recordings?: Recording[];
+  shared_cohorts?: Cohort[];  // Cohorts this module is shared with
+  is_shared_from?: string;  // Source cohort ID if this is a linked module
+  source_cohort_name?: string;  // Source cohort name for display
+}
+
+// Admin API response for cohort resource statistics
+export interface CohortResourceSharingInfo {
+  cohort_id: string;
+  cohort_name: string;
+  total_modules: number;
+  own_modules: number;  // Directly owned (cohort_id match)
+  linked_modules: number;  // Shared from other cohorts
+  global_modules: number;  // From global library
 }
 
 export interface AttendanceWithSegments extends Attendance {

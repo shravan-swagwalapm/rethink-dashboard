@@ -47,7 +47,9 @@ import {
   Trash2,
   Loader2,
   RefreshCw,
+  Settings,
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import type { Cohort } from '@/types';
 
@@ -57,6 +59,7 @@ interface CohortWithStats extends Cohort {
 }
 
 export default function CohortsPage() {
+  const router = useRouter();
   const [cohorts, setCohorts] = useState<CohortWithStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -345,6 +348,10 @@ export default function CohortsPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => router.push(`/admin/cohorts/${cohort.id}`)}>
+                              <Settings className="w-4 h-4 mr-2" />
+                              Settings
+                            </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleOpenForm(cohort)}>
                               <Pencil className="w-4 h-4 mr-2" />
                               Edit

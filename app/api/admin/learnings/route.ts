@@ -109,18 +109,47 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Fetch all modules for cohort
-    let modulesQuery = adminClient
-      .from('learning_modules')
-      .select('*')
-      .order('week_number', { ascending: true })
-      .order('order_index', { ascending: true });
+    // Fetch all modules for cohort (including global and linked modules)
+    let modules;
+    let modulesError;
 
     if (cohortId) {
-      modulesQuery = modulesQuery.eq('cohort_id', cohortId);
-    }
+      // For a specific cohort, fetch:
+      // 1. Modules directly owned by this cohort
+      // 2. Global modules (is_global = true)
+      // 3. Modules linked via cohort_module_links
 
-    const { data: modules, error: modulesError } = await modulesQuery;
+      // First, get linked module IDs
+      const { data: linkedModuleIds } = await adminClient
+        .from('cohort_module_links')
+        .select('module_id')
+        .eq('cohort_id', cohortId);
+
+      const linkedIds = linkedModuleIds?.map(link => link.module_id) || [];
+
+      // Build the query with OR conditions
+      let modulesQuery = adminClient
+        .from('learning_modules')
+        .select('*')
+        .or(`cohort_id.eq.${cohortId},is_global.eq.true${linkedIds.length > 0 ? `,id.in.(${linkedIds.join(',')})` : ''}`)
+        .order('week_number', { ascending: true })
+        .order('order_index', { ascending: true });
+
+      const result = await modulesQuery;
+      modules = result.data;
+      modulesError = result.error;
+    } else {
+      // No cohort filter - fetch all modules
+      const modulesQuery = adminClient
+        .from('learning_modules')
+        .select('*')
+        .order('week_number', { ascending: true })
+        .order('order_index', { ascending: true });
+
+      const result = await modulesQuery;
+      modules = result.data;
+      modulesError = result.error;
+    }
 
     if (modulesError) {
       return NextResponse.json({ error: modulesError.message }, { status: 400 });
