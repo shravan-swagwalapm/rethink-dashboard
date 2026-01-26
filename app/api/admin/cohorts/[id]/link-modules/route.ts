@@ -134,7 +134,8 @@ export async function POST(
  * Unlink modules from this cohort
  *
  * Request body:
- * - module_ids: Array of module IDs to unlink
+ * - module_ids: Array of module IDs to unlink (optional if unlink_all is true)
+ * - unlink_all: Boolean flag to unlink all linked modules (optional)
  */
 export async function DELETE(
   req: NextRequest,
@@ -149,16 +150,36 @@ export async function DELETE(
 
   try {
     const body = await req.json();
-    const { module_ids } = body;
+    const { module_ids, unlink_all } = body;
 
+    const adminClient = await createAdminClient();
+
+    // Handle bulk unlink - delete ALL links for this cohort
+    if (unlink_all === true) {
+      const { data: deletedLinks, error } = await adminClient
+        .from('cohort_module_links')
+        .delete()
+        .eq('cohort_id', cohortId)
+        .select();
+
+      if (error) {
+        console.error('Error unlinking all modules:', error);
+        throw error;
+      }
+
+      return NextResponse.json({
+        message: `Successfully unlinked all modules`,
+        unlinked_count: deletedLinks?.length || 0,
+      });
+    }
+
+    // Handle specific module unlink
     if (!module_ids || !Array.isArray(module_ids) || module_ids.length === 0) {
       return NextResponse.json(
-        { error: 'module_ids array is required' },
+        { error: 'module_ids array or unlink_all flag required' },
         { status: 400 }
       );
     }
-
-    const adminClient = await createAdminClient();
 
     const { error } = await adminClient
       .from('cohort_module_links')
@@ -173,6 +194,7 @@ export async function DELETE(
 
     return NextResponse.json({
       message: `Successfully unlinked ${module_ids.length} modules`,
+      unlinked_count: module_ids.length,
     });
 
   } catch (error) {
