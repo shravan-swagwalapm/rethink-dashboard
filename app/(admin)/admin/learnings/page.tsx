@@ -1196,80 +1196,100 @@ export default function LearningsPage() {
 
       {/* Resource Form Dialog */}
       <Dialog open={showResourceForm} onOpenChange={setShowResourceForm}>
-        <DialogContent>
+        <DialogContent className="dark:bg-gray-900 dark:border-gray-700 sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>{editingResource ? 'Edit Resource' : `Add ${getContentTypeLabel(resourceFormData.content_type).slice(0, -1)}`}</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="dark:text-white text-xl">
+              {editingResource ? 'Edit Resource' : `Add ${getContentTypeLabel(resourceFormData.content_type).slice(0, -1)}`}
+            </DialogTitle>
+            <DialogDescription className="dark:text-gray-400">
               Add content from Google Drive
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="resource-title">Title *</Label>
+          <div className="space-y-5 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="resource-title" className="dark:text-gray-300 font-medium">
+                Title <span className="text-red-500">*</span>
+              </Label>
               <Input
                 id="resource-title"
                 placeholder="e.g., Session 1 Recording"
                 value={resourceFormData.title}
                 onChange={(e) => setResourceFormData({ ...resourceFormData, title: e.target.value })}
+                className="dark:bg-gray-950 dark:border-gray-700 dark:text-white h-11"
               />
             </div>
-            <div>
-              <Label htmlFor="resource-url">Google Drive URL *</Label>
+            <div className="space-y-2">
+              <Label htmlFor="resource-url" className="dark:text-gray-300 font-medium">
+                Google Drive URL <span className="text-red-500">*</span>
+              </Label>
               <Input
                 id="resource-url"
                 placeholder="https://drive.google.com/file/d/..."
                 value={resourceFormData.url}
                 onChange={(e) => handleUrlChange(e.target.value)}
+                className="dark:bg-gray-950 dark:border-gray-700 dark:text-white h-11"
               />
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
                 Paste the sharing link from Google Drive, Slides, or Docs
               </p>
             </div>
             <div className="grid grid-cols-3 gap-4">
-              <div>
-                <Label htmlFor="resource-type">Content Type</Label>
+              <div className="space-y-2">
+                <Label htmlFor="resource-type" className="dark:text-gray-300 font-medium">Content Type</Label>
                 <Select
                   value={resourceFormData.content_type}
                   onValueChange={(value: 'video' | 'slides' | 'document' | 'link') =>
                     setResourceFormData({ ...resourceFormData, content_type: value })
                   }
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="dark:bg-gray-950 dark:border-gray-700 dark:text-white h-11">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="video">Recording</SelectItem>
-                    <SelectItem value="slides">PPT</SelectItem>
-                    <SelectItem value="document">Notes</SelectItem>
-                    <SelectItem value="link">Link</SelectItem>
+                  <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
+                    <SelectItem value="video" className="dark:text-white dark:focus:bg-gray-800">Recording</SelectItem>
+                    <SelectItem value="slides" className="dark:text-white dark:focus:bg-gray-800">PPT</SelectItem>
+                    <SelectItem value="document" className="dark:text-white dark:focus:bg-gray-800">Notes</SelectItem>
+                    <SelectItem value="link" className="dark:text-white dark:focus:bg-gray-800">Link</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <Label htmlFor="resource-session">Session #</Label>
+              <div className="space-y-2">
+                <Label htmlFor="resource-session" className="dark:text-gray-300 font-medium">Session #</Label>
                 <Input
                   id="resource-session"
                   type="number"
                   placeholder="1"
                   value={resourceFormData.session_number}
                   onChange={(e) => setResourceFormData({ ...resourceFormData, session_number: e.target.value })}
+                  className="dark:bg-gray-950 dark:border-gray-700 dark:text-white h-11"
                 />
               </div>
-              <div>
-                <Label htmlFor="resource-duration">Duration (sec)</Label>
+              <div className="space-y-2">
+                <Label htmlFor="resource-duration" className="dark:text-gray-300 font-medium">Duration (sec)</Label>
                 <Input
                   id="resource-duration"
                   type="number"
                   placeholder="3600"
                   value={resourceFormData.duration_seconds}
                   onChange={(e) => setResourceFormData({ ...resourceFormData, duration_seconds: e.target.value })}
+                  className="dark:bg-gray-950 dark:border-gray-700 dark:text-white h-11"
                 />
               </div>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowResourceForm(false)}>Cancel</Button>
-            <Button onClick={editingResource ? handleUpdateResource : handleCreateResource} disabled={saving}>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowResourceForm(false)}
+              className="dark:border-gray-700 dark:text-white dark:hover:bg-gray-800"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={editingResource ? handleUpdateResource : handleCreateResource}
+              disabled={saving || !resourceFormData.title.trim() || !resourceFormData.url.trim()}
+              className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white"
+            >
               {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               {editingResource ? 'Update' : 'Add'}
             </Button>
