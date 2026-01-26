@@ -1135,60 +1135,89 @@ export default function LearningsPage() {
 
       {/* Module/Week Form Dialog */}
       <Dialog open={showModuleForm} onOpenChange={setShowModuleForm}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editingModule ? 'Edit Week' : 'Create Week'}</DialogTitle>
-            <DialogDescription>
-              Create a week to organize your learning content
+        <DialogContent className="dark:bg-gray-900 dark:border-gray-700 sm:max-w-[550px]">
+          <DialogHeader className="pb-2">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                <BookOpen className="w-5 h-5 text-white" />
+              </div>
+              <DialogTitle className="dark:text-white text-2xl">
+                {editingModule ? 'Edit Week' : 'Create New Week'}
+              </DialogTitle>
+            </div>
+            <DialogDescription className="dark:text-gray-400 text-base">
+              {editingModule ? 'Update week details and content structure' : 'Create a new week to organize your learning content'}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="module-week">Week Number *</Label>
+          <div className="space-y-6 py-4">
+            <div className="grid grid-cols-2 gap-5">
+              <div className="space-y-2">
+                <Label htmlFor="module-week" className="dark:text-gray-300 font-medium flex items-center gap-1">
+                  Week Number <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   id="module-week"
                   type="number"
                   placeholder="1"
                   value={moduleFormData.week_number}
                   onChange={(e) => setModuleFormData({ ...moduleFormData, week_number: e.target.value })}
+                  className="dark:bg-gray-950 dark:border-gray-700 dark:text-white h-11 text-base"
                 />
+                <p className="text-xs text-muted-foreground dark:text-gray-500">Displayed in tabs</p>
               </div>
-              <div>
-                <Label htmlFor="module-order">Order Index</Label>
+              <div className="space-y-2">
+                <Label htmlFor="module-order" className="dark:text-gray-300 font-medium">Order Index</Label>
                 <Input
                   id="module-order"
                   type="number"
                   placeholder="0"
                   value={moduleFormData.order_index}
                   onChange={(e) => setModuleFormData({ ...moduleFormData, order_index: parseInt(e.target.value) || 0 })}
+                  className="dark:bg-gray-950 dark:border-gray-700 dark:text-white h-11 text-base"
                 />
+                <p className="text-xs text-muted-foreground dark:text-gray-500">Sort order (0 = first)</p>
               </div>
             </div>
-            <div>
-              <Label htmlFor="module-title">Title *</Label>
+            <div className="space-y-2">
+              <Label htmlFor="module-title" className="dark:text-gray-300 font-medium flex items-center gap-1">
+                Title <span className="text-red-500">*</span>
+              </Label>
               <Input
                 id="module-title"
                 placeholder="e.g., Week 1: Introduction to Product Management"
                 value={moduleFormData.title}
                 onChange={(e) => setModuleFormData({ ...moduleFormData, title: e.target.value })}
+                className="dark:bg-gray-950 dark:border-gray-700 dark:text-white h-11 text-base"
               />
+              <p className="text-xs text-muted-foreground dark:text-gray-500">Descriptive title for the week</p>
             </div>
-            <div>
-              <Label htmlFor="module-description">Description</Label>
+            <div className="space-y-2">
+              <Label htmlFor="module-description" className="dark:text-gray-300 font-medium">Description</Label>
               <Textarea
                 id="module-description"
                 placeholder="Brief description of what this week covers..."
                 value={moduleFormData.description}
                 onChange={(e) => setModuleFormData({ ...moduleFormData, description: e.target.value })}
+                className="dark:bg-gray-950 dark:border-gray-700 dark:text-white min-h-[100px] text-base resize-none"
               />
+              <p className="text-xs text-muted-foreground dark:text-gray-500">Optional summary of week content</p>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowModuleForm(false)}>Cancel</Button>
-            <Button onClick={editingModule ? handleUpdateModule : handleCreateModule} disabled={saving}>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowModuleForm(false)}
+              className="dark:border-gray-700 dark:text-white dark:hover:bg-gray-800 h-11"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={editingModule ? handleUpdateModule : handleCreateModule}
+              disabled={saving || !moduleFormData.week_number || !moduleFormData.title.trim()}
+              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white h-11 px-6 shadow-md"
+            >
               {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              {editingModule ? 'Update' : 'Create'}
+              {editingModule ? 'Update Week' : 'Create Week'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1299,75 +1328,113 @@ export default function LearningsPage() {
 
       {/* Case Study Form Dialog */}
       <Dialog open={showCaseStudyForm} onOpenChange={setShowCaseStudyForm}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editingCaseStudy ? 'Edit Case Study' : 'Add Case Study'}</DialogTitle>
-            <DialogDescription>
-              Add a case study with problem statement and solution
+        <DialogContent className="dark:bg-gray-900 dark:border-gray-700 sm:max-w-[600px]">
+          <DialogHeader className="pb-2">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center">
+                <FileText className="w-5 h-5 text-white" />
+              </div>
+              <DialogTitle className="dark:text-white text-2xl">
+                {editingCaseStudy ? 'Edit Case Study' : 'Add New Case Study'}
+              </DialogTitle>
+            </div>
+            <DialogDescription className="dark:text-gray-400 text-base">
+              {editingCaseStudy ? 'Update case study details and resources' : 'Add a case study with problem statement and solution documents'}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="cs-title">Title *</Label>
+          <div className="space-y-5 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="cs-title" className="dark:text-gray-300 font-medium flex items-center gap-1">
+                Title <span className="text-red-500">*</span>
+              </Label>
               <Input
                 id="cs-title"
                 placeholder="e.g., Case Study 1: Culture Compass"
                 value={caseStudyFormData.title}
                 onChange={(e) => setCaseStudyFormData({ ...caseStudyFormData, title: e.target.value })}
+                className="dark:bg-gray-950 dark:border-gray-700 dark:text-white h-11 text-base"
               />
             </div>
-            <div>
-              <Label htmlFor="cs-description">Description</Label>
+            <div className="space-y-2">
+              <Label htmlFor="cs-description" className="dark:text-gray-300 font-medium">Description</Label>
               <Textarea
                 id="cs-description"
-                placeholder="Brief description..."
+                placeholder="Brief description of the case study and learning objectives..."
                 value={caseStudyFormData.description}
                 onChange={(e) => setCaseStudyFormData({ ...caseStudyFormData, description: e.target.value })}
+                className="dark:bg-gray-950 dark:border-gray-700 dark:text-white min-h-[80px] text-base resize-none"
               />
             </div>
-            <div>
-              <Label htmlFor="cs-problem">Problem Document URL</Label>
+            <div className="space-y-2">
+              <Label htmlFor="cs-problem" className="dark:text-gray-300 font-medium flex items-center gap-2">
+                <FileText className="w-4 h-4 text-orange-500" />
+                Problem Document URL
+              </Label>
               <Input
                 id="cs-problem"
                 placeholder="https://docs.google.com/document/d/..."
                 value={caseStudyFormData.problem_doc_url}
                 onChange={(e) => setCaseStudyFormData({ ...caseStudyFormData, problem_doc_url: e.target.value })}
+                className="dark:bg-gray-950 dark:border-gray-700 dark:text-white h-11 text-base"
               />
+              <p className="text-xs text-muted-foreground dark:text-gray-500">Google Docs URL for the problem statement</p>
             </div>
-            <div>
-              <Label htmlFor="cs-solution">Solution Document URL</Label>
+            <div className="space-y-2">
+              <Label htmlFor="cs-solution" className="dark:text-gray-300 font-medium flex items-center gap-2">
+                <FileText className="w-4 h-4 text-green-500" />
+                Solution Document URL
+              </Label>
               <Input
                 id="cs-solution"
                 placeholder="https://docs.google.com/document/d/..."
                 value={caseStudyFormData.solution_doc_url}
                 onChange={(e) => setCaseStudyFormData({ ...caseStudyFormData, solution_doc_url: e.target.value })}
+                className="dark:bg-gray-950 dark:border-gray-700 dark:text-white h-11 text-base"
               />
+              <p className="text-xs text-muted-foreground dark:text-gray-500">Google Docs URL for the solution</p>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="cs-due">Due Date</Label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <div className="space-y-2">
+                <Label htmlFor="cs-due" className="dark:text-gray-300 font-medium">Due Date</Label>
                 <Input
                   id="cs-due"
                   type="date"
                   value={caseStudyFormData.due_date}
                   onChange={(e) => setCaseStudyFormData({ ...caseStudyFormData, due_date: e.target.value })}
+                  className="dark:bg-gray-950 dark:border-gray-700 dark:text-white h-11 text-base"
                 />
+                <p className="text-xs text-muted-foreground dark:text-gray-500">Optional submission deadline</p>
               </div>
-              <div className="flex items-center gap-2 pt-6">
-                <Switch
-                  id="cs-visible"
-                  checked={caseStudyFormData.solution_visible}
-                  onCheckedChange={(checked) => setCaseStudyFormData({ ...caseStudyFormData, solution_visible: checked })}
-                />
-                <Label htmlFor="cs-visible">Solution Visible to Students</Label>
+              <div className="space-y-2">
+                <Label className="dark:text-gray-300 font-medium">Solution Visibility</Label>
+                <div className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-950/50 h-11">
+                  <Switch
+                    id="cs-visible"
+                    checked={caseStudyFormData.solution_visible}
+                    onCheckedChange={(checked) => setCaseStudyFormData({ ...caseStudyFormData, solution_visible: checked })}
+                  />
+                  <Label htmlFor="cs-visible" className="text-sm cursor-pointer dark:text-gray-300">
+                    Visible to Students
+                  </Label>
+                </div>
               </div>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCaseStudyForm(false)}>Cancel</Button>
-            <Button onClick={editingCaseStudy ? handleUpdateCaseStudy : handleCreateCaseStudy} disabled={saving}>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowCaseStudyForm(false)}
+              className="dark:border-gray-700 dark:text-white dark:hover:bg-gray-800 h-11"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={editingCaseStudy ? handleUpdateCaseStudy : handleCreateCaseStudy}
+              disabled={saving || !caseStudyFormData.title.trim()}
+              className="bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white h-11 px-6 shadow-md"
+            >
               {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              {editingCaseStudy ? 'Update' : 'Create'}
+              {editingCaseStudy ? 'Update Case Study' : 'Create Case Study'}
             </Button>
           </DialogFooter>
         </DialogContent>
