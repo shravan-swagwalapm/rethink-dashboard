@@ -61,6 +61,19 @@ export function VideoPlayer({
     markComplete,
   } = useVideoProgress(resourceId);
 
+  // Load Video.js CSS dynamically
+  useEffect(() => {
+    // Check if CSS is already loaded
+    const existingLink = document.getElementById('videojs-css');
+    if (!existingLink) {
+      const link = document.createElement('link');
+      link.id = 'videojs-css';
+      link.rel = 'stylesheet';
+      link.href = 'https://unpkg.com/video.js@8.23.4/dist/video-js.min.css';
+      document.head.appendChild(link);
+    }
+  }, []);
+
   // Wait for Video.js to be loaded
   useEffect(() => {
     const checkVideoJs = setInterval(() => {

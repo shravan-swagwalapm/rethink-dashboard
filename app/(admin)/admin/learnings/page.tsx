@@ -60,7 +60,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import type { Cohort, LearningModule, ModuleResource, LearningModuleWithResources, CaseStudy } from '@/types';
-import { VideoPlayer } from '@/components/video/VideoPlayer';
+import { VideoPlayerWrapper } from '@/components/video/VideoPlayerWrapper';
 
 // Helper to detect content type from URL
 function detectContentType(url: string): 'video' | 'slides' | 'document' | 'link' {
@@ -1213,7 +1213,7 @@ export default function LearningsPage() {
 
           {/* Video Player for video content */}
           {previewResource?.content_type === 'video' && previewResource.google_drive_id ? (
-            <VideoPlayer
+            <VideoPlayerWrapper
               googleDriveId={previewResource.google_drive_id}
               resourceId={previewResource.id}
               title={previewResource.title}

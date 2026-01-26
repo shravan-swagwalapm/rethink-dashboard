@@ -32,7 +32,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { LearningModule, ModuleResource, ModuleResourceType, CaseStudy } from '@/types';
-import { VideoPlayer } from '@/components/video/VideoPlayer';
+import { VideoPlayerWrapper } from '@/components/video/VideoPlayerWrapper';
 
 interface ModuleWithResources extends LearningModule {
   resources: ModuleResource[];
@@ -539,7 +539,7 @@ export default function LearningsPage() {
 
           {/* Video Player for video content */}
           {selectedResource?.content_type === 'video' && selectedResource.google_drive_id ? (
-            <VideoPlayer
+            <VideoPlayerWrapper
               googleDriveId={selectedResource.google_drive_id}
               resourceId={selectedResource.id}
               title={selectedResource.title}
