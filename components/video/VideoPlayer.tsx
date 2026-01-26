@@ -7,9 +7,6 @@ import { Loader2, AlertCircle, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { CaptionTrack } from '@/types';
 
-// Video.js is loaded dynamically in useEffect to avoid SSR issues
-// CSS is imported in VideoPlayerWrapper component
-
 export interface VideoPlayerProps {
   googleDriveId: string;
   resourceId: string;
@@ -36,12 +33,12 @@ export function VideoPlayer({
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerRef = useRef<any>(null);
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [videojs, setVideojs] = useState<any>(null);
 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [isVideoJsReady, setIsVideoJsReady] = useState(false);
-  const [videojs, setVideojs] = useState<any>(null);
 
   const {
     progress,
@@ -49,40 +46,34 @@ export function VideoPlayer({
     markComplete,
   } = useVideoProgress(resourceId);
 
-  // Load Video.js dynamically
+  // Load Video.js
   useEffect(() => {
     let mounted = true;
 
     console.log('[VideoPlayer] Starting Video.js import...');
 
-    import('video.js')
-      .then((module) => {
+    // Use require instead of dynamic import for better reliability
+    const loadVideoJs = async () => {
+      try {
+        const videojsModule = await import('video.js');
         if (mounted) {
           console.log('[VideoPlayer] Video.js loaded successfully');
-          setVideojs(module.default);
+          setVideojs(() => videojsModule.default);
           setIsVideoJsReady(true);
         }
-      })
-      .catch((err) => {
+      } catch (err) {
         console.error('[VideoPlayer] Failed to load Video.js:', err);
         if (mounted) {
-          setError('Failed to load video player library. Please refresh the page.');
+          setError('Failed to load video player. Please refresh the page.');
           setIsLoading(false);
         }
-      });
-
-    // Timeout after 15 seconds
-    const timeout = setTimeout(() => {
-      if (mounted && !videojs) {
-        console.error('[VideoPlayer] Video.js load timeout');
-        setError('Video player took too long to load. Please refresh the page.');
-        setIsLoading(false);
       }
-    }, 15000);
+    };
+
+    loadVideoJs();
 
     return () => {
       mounted = false;
-      clearTimeout(timeout);
     };
   }, []);
 
@@ -92,6 +83,7 @@ export function VideoPlayer({
       try {
         setIsLoading(true);
         const result = getGoogleDriveVideoUrl(googleDriveId, true);
+        console.log('[VideoPlayer] Video URL generated:', result);
         setVideoUrl(result.url);
         setError(null);
       } catch (err) {
@@ -132,125 +124,144 @@ export function VideoPlayer({
 
   // Initialize Video.js player
   useEffect(() => {
-    if (!videoRef.current || !videoUrl || !isVideoJsReady || !videojs) return;
+    if (!videoRef.current || !videoUrl || !isVideoJsReady || !videojs) {
+      console.log('[VideoPlayer] Waiting for player initialization...', {
+        hasVideoRef: !!videoRef.current,
+        hasVideoUrl: !!videoUrl,
+        isVideoJsReady,
+        hasVideojs: !!videojs
+      });
+      return;
+    }
 
-    const player = videojs(videoRef.current, {
-      controls: true,
-      responsive: true,
-      fluid: true,
-      playbackRates: [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2],
-      poster: thumbnail,
-      autoplay,
-      preload: 'metadata',
-      sources: [{
-        src: videoUrl,
-        type: 'video/mp4',
-      }],
-      controlBar: {
-        children: [
-          'playToggle',
-          'volumePanel',
-          'currentTimeDisplay',
-          'timeDivider',
-          'durationDisplay',
-          'progressControl',
-          'playbackRateMenuButton',
-          'chaptersButton',
-          'descriptionsButton',
-          'subsCapsButton',
-          'audioTrackButton',
-          'pictureInPictureToggle',
-          'fullscreenToggle',
-        ],
-      },
-    });
+    console.log('[VideoPlayer] Initializing Video.js player...');
 
-    playerRef.current = player;
+    try {
+      const player = videojs(videoRef.current, {
+        controls: true,
+        responsive: true,
+        fluid: true,
+        playbackRates: [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2],
+        poster: thumbnail,
+        autoplay,
+        preload: 'metadata',
+        sources: [{
+          src: videoUrl,
+          type: 'video/mp4',
+        }],
+        controlBar: {
+          children: [
+            'playToggle',
+            'volumePanel',
+            'currentTimeDisplay',
+            'timeDivider',
+            'durationDisplay',
+            'progressControl',
+            'playbackRateMenuButton',
+            'chaptersButton',
+            'descriptionsButton',
+            'subsCapsButton',
+            'audioTrackButton',
+            'pictureInPictureToggle',
+            'fullscreenToggle',
+          ],
+        },
+      });
 
-    // Resume from last position
-    player.ready(() => {
-      if (progress && progress.last_position_seconds > 5) {
-        player.currentTime(progress.last_position_seconds);
-      }
+      playerRef.current = player;
 
-      // Add captions if provided
-      if (captions && captions.length > 0) {
-        captions.forEach((caption) => {
-          player.addRemoteTextTrack({
-            kind: 'subtitles',
-            src: caption.src,
-            srclang: caption.srclang,
-            label: caption.label,
-            default: caption.default || false,
-          }, false);
-        });
-      }
-    });
+      console.log('[VideoPlayer] Player initialized successfully');
 
-    // Progress tracking (save every 5 seconds)
-    player.on('play', () => {
-      if (progressIntervalRef.current) {
-        clearInterval(progressIntervalRef.current);
-      }
-
-      progressIntervalRef.current = setInterval(() => {
-        handleProgressSave();
-      }, 5000);
-    });
-
-    player.on('pause', () => {
-      if (progressIntervalRef.current) {
-        clearInterval(progressIntervalRef.current);
-        progressIntervalRef.current = null;
-      }
-      // Save immediately on pause
-      handleProgressSave();
-    });
-
-    player.on('ended', () => {
-      if (progressIntervalRef.current) {
-        clearInterval(progressIntervalRef.current);
-        progressIntervalRef.current = null;
-      }
-      // Mark as complete
-      markComplete();
-      onComplete?.();
-    });
-
-    // Error handling
-    player.on('error', (e: any) => {
-      const error = player.error();
-      console.error('Video.js error:', error);
-
-      if (error) {
-        setError(`Failed to load video: ${error.message || 'Unknown error'}`);
-      }
-    });
-
-    // Cleanup
-    return () => {
-      if (progressIntervalRef.current) {
-        clearInterval(progressIntervalRef.current);
-      }
-
-      // Save one last time before cleanup
-      handleProgressSave();
-
-      if (playerRef.current) {
-        try {
-          playerRef.current.dispose();
-        } catch (error) {
-          console.error('Error disposing player:', error);
+      // Resume from last position
+      player.ready(() => {
+        console.log('[VideoPlayer] Player ready');
+        if (progress && progress.last_position_seconds > 5) {
+          console.log('[VideoPlayer] Resuming from', progress.last_position_seconds);
+          player.currentTime(progress.last_position_seconds);
         }
-        playerRef.current = null;
-      }
-    };
-  }, [videoUrl, isVideoJsReady, progress, resourceId, thumbnail, autoplay, captions, handleProgressSave, markComplete, onComplete]);
+
+        // Add captions if provided
+        if (captions && captions.length > 0) {
+          captions.forEach((caption) => {
+            player.addRemoteTextTrack({
+              kind: 'subtitles',
+              src: caption.src,
+              srclang: caption.srclang,
+              label: caption.label,
+              default: caption.default || false,
+            }, false);
+          });
+        }
+      });
+
+      // Progress tracking (save every 5 seconds)
+      player.on('play', () => {
+        if (progressIntervalRef.current) {
+          clearInterval(progressIntervalRef.current);
+        }
+
+        progressIntervalRef.current = setInterval(() => {
+          handleProgressSave();
+        }, 5000);
+      });
+
+      player.on('pause', () => {
+        if (progressIntervalRef.current) {
+          clearInterval(progressIntervalRef.current);
+          progressIntervalRef.current = null;
+        }
+        // Save immediately on pause
+        handleProgressSave();
+      });
+
+      player.on('ended', () => {
+        if (progressIntervalRef.current) {
+          clearInterval(progressIntervalRef.current);
+          progressIntervalRef.current = null;
+        }
+        // Mark as complete
+        markComplete();
+        onComplete?.();
+      });
+
+      // Error handling
+      player.on('error', (e: any) => {
+        const error = player.error();
+        console.error('Video.js error:', error);
+
+        if (error) {
+          setError(`Failed to load video: ${error.message || 'Unknown error'}`);
+        }
+      });
+
+      // Cleanup
+      return () => {
+        if (progressIntervalRef.current) {
+          clearInterval(progressIntervalRef.current);
+        }
+
+        // Save one last time before cleanup
+        handleProgressSave();
+
+        if (playerRef.current) {
+          try {
+            playerRef.current.dispose();
+          } catch (error) {
+            console.error('Error disposing player:', error);
+          }
+          playerRef.current = null;
+        }
+      };
+    } catch (err) {
+      console.error('[VideoPlayer] Error initializing player:', err);
+      setError('Failed to initialize video player');
+    }
+  }, [videoUrl, isVideoJsReady, videojs, progress, resourceId, thumbnail, autoplay, captions, handleProgressSave, markComplete, onComplete]);
 
   // Loading state
   if (isLoading || !isVideoJsReady) {
     return (
-      <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
+      <div className="w-full h-full bg-muted rounded-lg flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="w-12 h-12 animate-spin text-muted-foreground" />
           <p className="text-sm text-muted-foreground">Loading video player...</p>
@@ -262,7 +273,7 @@ export function VideoPlayer({
   // Error state
   if (error) {
     return (
-      <div className="aspect-video bg-destructive/10 rounded-lg border border-destructive/50 flex flex-col items-center justify-center p-6">
+      <div className="w-full h-full bg-destructive/10 rounded-lg border border-destructive/50 flex flex-col items-center justify-center p-6">
         <AlertCircle className="w-12 h-12 text-destructive mb-4" />
         <h3 className="text-lg font-semibold mb-2">Failed to load video</h3>
         <p className="text-sm text-muted-foreground text-center mb-4">{error}</p>
@@ -275,11 +286,11 @@ export function VideoPlayer({
 
   // Main video player
   return (
-    <div className="video-player-container space-y-3">
-      <div data-vjs-player className="rounded-lg overflow-hidden">
+    <div className="video-player-container space-y-3 w-full h-full">
+      <div data-vjs-player className="rounded-lg overflow-hidden w-full h-full">
         <video
           ref={videoRef}
-          className="video-js vjs-big-play-centered vjs-theme-rethink"
+          className="video-js vjs-big-play-centered vjs-theme-rethink w-full h-full"
         />
       </div>
 
