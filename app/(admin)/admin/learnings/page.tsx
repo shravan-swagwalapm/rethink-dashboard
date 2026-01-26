@@ -1203,7 +1203,7 @@ export default function LearningsPage() {
 
       {/* Resource Preview Modal */}
       <Dialog open={!!previewResource} onOpenChange={() => setPreviewResource(null)}>
-        <DialogContent className="max-w-[95vw] w-[95vw] max-h-[95vh] h-[95vh]">
+        <DialogContent className="max-w-[95vw] w-[95vw] max-h-[95vh] h-[95vh] sm:max-w-[95vw] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {previewResource && getContentIcon(previewResource.content_type)}

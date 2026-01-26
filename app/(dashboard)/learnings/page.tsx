@@ -522,7 +522,7 @@ export default function LearningsPage() {
 
       {/* Resource Viewer Modal */}
       <Dialog open={!!selectedResource} onOpenChange={() => setSelectedResource(null)}>
-        <DialogContent className="max-w-[95vw] w-[95vw] max-h-[95vh] h-[95vh]">
+        <DialogContent className="max-w-[95vw] w-[95vw] max-h-[95vh] h-[95vh] sm:max-w-[95vw] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 pr-8">
               {selectedResource && getContentIcon(selectedResource.content_type)}
