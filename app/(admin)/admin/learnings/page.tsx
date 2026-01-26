@@ -60,7 +60,6 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import type { Cohort, LearningModule, ModuleResource, LearningModuleWithResources, CaseStudy } from '@/types';
-import { VideoPlayerWrapper } from '@/components/video/VideoPlayerWrapper';
 import { cn } from '@/lib/utils';
 
 // Helper to detect content type from URL
@@ -1204,54 +1203,27 @@ export default function LearningsPage() {
 
       {/* Resource Preview Modal */}
       <Dialog open={!!previewResource} onOpenChange={() => setPreviewResource(null)}>
-        <DialogContent className={cn(
-          "max-w-[95vw] w-[95vw] max-h-[95vh]",
-          previewResource?.content_type === 'video' ? "p-0 gap-0" : ""
-        )}>
-          {previewResource?.content_type !== 'video' && (
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                {previewResource && getContentIcon(previewResource.content_type)}
-                {previewResource?.title}
-              </DialogTitle>
-            </DialogHeader>
-          )}
+        <DialogContent className="max-w-[95vw] w-[95vw] max-h-[95vh] h-[95vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {previewResource && getContentIcon(previewResource.content_type)}
+              {previewResource?.title}
+            </DialogTitle>
+          </DialogHeader>
 
-          {/* Video Player for video content */}
-          {previewResource?.content_type === 'video' && previewResource.google_drive_id ? (
-            <div className="relative w-full h-full flex flex-col">
-              {/* Video Header */}
-              <div className="px-6 pt-6 pb-3 border-b">
-                <div className="flex items-center gap-2 pr-8">
-                  {getContentIcon('video')}
-                  <h2 className="text-lg font-semibold">{previewResource?.title}</h2>
-                </div>
-              </div>
-
-              {/* Video Container */}
-              <div className="flex-1 p-6 flex items-center justify-center bg-black">
-                <div className="w-full aspect-video">
-                  <VideoPlayerWrapper
-                    googleDriveId={previewResource.google_drive_id}
-                    resourceId={previewResource.id}
-                    title={previewResource.title}
-                    duration={previewResource.duration_seconds || undefined}
-                    thumbnail={previewResource.thumbnail_url || undefined}
-                  />
-                </div>
-              </div>
-            </div>
-          ) : (
-            /* Iframe for slides, documents, and videos without Drive ID */
-            <div className="aspect-video bg-black rounded-lg overflow-hidden">
-              {previewResource && (
-                <iframe
-                  src={getEmbedUrl(previewResource)}
-                  className="w-full h-full"
-                  allow="autoplay; encrypted-media"
-                  allowFullScreen
-                />
-              )}
+          {/* Content Display */}
+          {previewResource && (
+            <div className="w-full flex-1 min-h-0">
+              <iframe
+                src={previewResource.google_drive_id
+                  ? `https://drive.google.com/file/d/${previewResource.google_drive_id}/preview`
+                  : getEmbedUrl(previewResource)
+                }
+                className="w-full h-full rounded-lg"
+                allow="autoplay; encrypted-media; fullscreen"
+                allowFullScreen
+                title={previewResource.title}
+              />
             </div>
           )}
         </DialogContent>

@@ -32,7 +32,6 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { LearningModule, ModuleResource, ModuleResourceType, CaseStudy } from '@/types';
-import { VideoPlayerWrapper } from '@/components/video/VideoPlayerWrapper';
 
 interface ModuleWithResources extends LearningModule {
   resources: ModuleResource[];
@@ -523,72 +522,33 @@ export default function LearningsPage() {
 
       {/* Resource Viewer Modal */}
       <Dialog open={!!selectedResource} onOpenChange={() => setSelectedResource(null)}>
-        <DialogContent className={cn(
-          "max-w-[95vw] w-[95vw] max-h-[95vh]",
-          selectedResource?.content_type === 'video' ? "p-0 gap-0" : ""
-        )}>
-          {selectedResource?.content_type !== 'video' && (
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 pr-8">
-                {selectedResource && getContentIcon(selectedResource.content_type)}
-                {selectedResource?.title}
-              </DialogTitle>
-              {selectedResource?.duration_seconds && (
-                <p className="text-sm text-muted-foreground flex items-center gap-1">
-                  <Clock className="w-3 h-3" />
-                  {formatDuration(selectedResource.duration_seconds)}
-                </p>
-              )}
-            </DialogHeader>
-          )}
+        <DialogContent className="max-w-[95vw] w-[95vw] max-h-[95vh] h-[95vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 pr-8">
+              {selectedResource && getContentIcon(selectedResource.content_type)}
+              {selectedResource?.title}
+            </DialogTitle>
+            {selectedResource?.duration_seconds && (
+              <p className="text-sm text-muted-foreground flex items-center gap-1">
+                <Clock className="w-3 h-3" />
+                {formatDuration(selectedResource.duration_seconds)}
+              </p>
+            )}
+          </DialogHeader>
 
-          {/* Video Player for video content */}
-          {selectedResource?.content_type === 'video' && selectedResource.google_drive_id ? (
-            <div className="relative w-full h-full flex flex-col">
-              {/* Video Header */}
-              <div className="px-6 pt-6 pb-3 border-b">
-                <div className="flex items-center gap-2 pr-8">
-                  {getContentIcon('video')}
-                  <h2 className="text-lg font-semibold">{selectedResource?.title}</h2>
-                </div>
-                {selectedResource?.duration_seconds && (
-                  <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
-                    <Clock className="w-3 h-3" />
-                    {formatDuration(selectedResource.duration_seconds)}
-                  </p>
-                )}
-              </div>
-
-              {/* Video Container */}
-              <div className="flex-1 p-6 flex items-center justify-center bg-black">
-                <div className="w-full aspect-video">
-                  <VideoPlayerWrapper
-                    googleDriveId={selectedResource.google_drive_id}
-                    resourceId={selectedResource.id}
-                    title={selectedResource.title}
-                    duration={selectedResource.duration_seconds || undefined}
-                    thumbnail={selectedResource.thumbnail_url || undefined}
-                    onProgress={(seconds, percentage) => {
-                      console.log('Video progress:', { seconds, percentage });
-                    }}
-                    onComplete={() => {
-                      console.log('Video completed!');
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-          ) : (
-            /* Iframe for slides, documents, and videos without Drive ID */
-            <div className="aspect-video bg-black rounded-lg overflow-hidden">
-              {selectedResource && (
-                <iframe
-                  src={getEmbedUrl(selectedResource)}
-                  className="w-full h-full"
-                  allow="autoplay; encrypted-media; fullscreen"
-                  allowFullScreen
-                />
-              )}
+          {/* Content Display */}
+          {selectedResource && (
+            <div className="w-full flex-1 min-h-0">
+              <iframe
+                src={selectedResource.google_drive_id
+                  ? `https://drive.google.com/file/d/${selectedResource.google_drive_id}/preview`
+                  : getEmbedUrl(selectedResource)
+                }
+                className="w-full h-full rounded-lg"
+                allow="autoplay; encrypted-media; fullscreen"
+                allowFullScreen
+                title={selectedResource.title}
+              />
             </div>
           )}
 
