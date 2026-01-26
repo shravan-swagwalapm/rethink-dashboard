@@ -669,21 +669,23 @@ export default function LearningsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 max-w-7xl mx-auto p-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 pb-6 border-b border-border">
         <div>
-          <h1 className="text-2xl font-bold">
+          <h1 className="text-3xl font-bold tracking-tight">
             {selectedCohort === GLOBAL_LIBRARY_ID ? (
-              <span className="flex items-center gap-2">
-                <Globe className="w-6 h-6 text-purple-600" />
-                Global Library
+              <span className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-purple-500/10 dark:bg-purple-500/20 flex items-center justify-center">
+                  <Globe className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                </div>
+                <span className="dark:text-white">Global Library</span>
               </span>
             ) : (
-              'Learning Content'
+              <span className="dark:text-white">Learning Content</span>
             )}
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-base text-gray-600 dark:text-gray-300 mt-2">
             {selectedCohort === GLOBAL_LIBRARY_ID
               ? 'Create modules accessible to all cohorts'
               : 'Manage recordings, presentations, notes, and case studies'
@@ -692,24 +694,24 @@ export default function LearningsPage() {
         </div>
         <div className="flex items-center gap-3">
           <Select value={selectedCohort} onValueChange={(value) => { setSelectedCohort(value); setSelectedWeek(''); }}>
-            <SelectTrigger className="w-[200px]">
+            <SelectTrigger className="w-[220px] h-11 font-medium border-2 dark:border-gray-700 dark:bg-gray-900 dark:text-white">
               <SelectValue placeholder="Select cohort" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
               {/* Global Library Option */}
-              <SelectItem value={GLOBAL_LIBRARY_ID}>
+              <SelectItem value={GLOBAL_LIBRARY_ID} className="dark:text-white dark:focus:bg-gray-800">
                 <div className="flex items-center gap-2">
-                  <Globe className="w-4 h-4 text-purple-600" />
+                  <Globe className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                   <span className="font-medium">Global Library</span>
                 </div>
               </SelectItem>
               {/* Separator */}
               {cohorts.length > 0 && (
-                <div className="border-t my-1" />
+                <div className="border-t my-1 dark:border-gray-700" />
               )}
               {/* Cohort Options */}
               {cohorts.map((cohort) => (
-                <SelectItem key={cohort.id} value={cohort.id}>
+                <SelectItem key={cohort.id} value={cohort.id} className="dark:text-white dark:focus:bg-gray-800">
                   {cohort.name}
                 </SelectItem>
               ))}
@@ -719,23 +721,37 @@ export default function LearningsPage() {
       </div>
 
       {/* Week Tabs */}
-      <Card>
-        <CardHeader className="pb-3">
+      <Card className="border-2 dark:border-gray-800 dark:bg-gray-950/50 shadow-sm">
+        <CardHeader className="pb-4 border-b dark:border-gray-800">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">Weeks</CardTitle>
-            <Button size="sm" onClick={openAddWeek}>
-              <Plus className="w-4 h-4 mr-1" />
+            <CardTitle className="text-xl font-semibold dark:text-white flex items-center gap-2">
+              <BookOpen className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              Weeks
+            </CardTitle>
+            <Button
+              size="sm"
+              onClick={openAddWeek}
+              className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white shadow-sm transition-all hover:shadow-md"
+            >
+              <Plus className="w-4 h-4 mr-1.5" />
               Add Week
             </Button>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-5">
           {weeks.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <BookOpen className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p className="text-lg font-medium">No weeks created yet</p>
-              <p className="text-sm mb-4">Create your first week to start adding content</p>
-              <Button onClick={openAddWeek}>
+            <div className="text-center py-12 px-4 rounded-lg border-2 border-dashed dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50">
+              <div className="w-16 h-16 rounded-full bg-blue-500/10 dark:bg-blue-500/20 flex items-center justify-center mx-auto mb-4">
+                <BookOpen className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+              </div>
+              <p className="text-lg font-semibold dark:text-white mb-2">No weeks created yet</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
+                Create your first week to start adding content
+              </p>
+              <Button
+                onClick={openAddWeek}
+                className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white shadow-sm transition-all hover:shadow-md"
+              >
                 <Plus className="w-4 h-4 mr-2" />
                 Create Week 1
               </Button>
@@ -743,12 +759,12 @@ export default function LearningsPage() {
           ) : (
             <Tabs value={selectedWeek} onValueChange={setSelectedWeek}>
               <ScrollArea className="w-full">
-                <TabsList className="inline-flex h-10 items-center justify-start rounded-lg bg-muted p-1 w-auto">
+                <TabsList className="inline-flex h-12 items-center justify-start rounded-lg bg-gray-100 dark:bg-gray-900 p-1.5 w-auto border dark:border-gray-800">
                   {weeks.map((week) => (
                     <TabsTrigger
                       key={week}
                       value={week?.toString() || ''}
-                      className="px-4"
+                      className="px-5 h-9 font-medium dark:text-gray-300 dark:data-[state=active]:bg-blue-600 dark:data-[state=active]:text-white data-[state=active]:shadow-sm transition-all"
                     >
                       Week {week}
                     </TabsTrigger>
@@ -762,51 +778,82 @@ export default function LearningsPage() {
 
       {/* Week Content */}
       {selectedWeek && currentWeekModule && (
-        <div className="space-y-4">
+        <div className="space-y-6">
           {/* Week Header */}
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between p-6 rounded-lg border-2 dark:border-gray-800 bg-gradient-to-r from-blue-50/50 to-purple-50/50 dark:from-blue-950/20 dark:to-purple-950/20">
             <div>
-              <h2 className="text-xl font-semibold">{currentWeekModule.title}</h2>
+              <h2 className="text-2xl font-bold dark:text-white">{currentWeekModule.title}</h2>
               {currentWeekModule.description && (
-                <p className="text-muted-foreground text-sm">{currentWeekModule.description}</p>
+                <p className="text-gray-600 dark:text-gray-300 text-sm mt-1.5">{currentWeekModule.description}</p>
               )}
             </div>
             <div className="flex items-center gap-2">
-              <Button size="sm" variant="outline" onClick={() => openEditModule(currentWeekModule)}>
-                <Pencil className="w-4 h-4 mr-1" />
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => openEditModule(currentWeekModule)}
+                className="border-2 dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:hover:bg-gray-800 transition-all hover:shadow-sm"
+              >
+                <Pencil className="w-4 h-4 mr-1.5" />
                 Edit Week
               </Button>
-              <Button size="sm" variant="ghost" className="text-destructive" onClick={() => handleDeleteModule(currentWeekModule.id)}>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 transition-all"
+                onClick={() => handleDeleteModule(currentWeekModule.id)}
+              >
                 <Trash2 className="w-4 h-4" />
               </Button>
             </div>
           </div>
 
           {/* Recordings Section */}
-          <Card>
+          <Card className="border-2 dark:border-gray-800 dark:bg-gray-950/50 shadow-sm overflow-hidden">
             <Collapsible open={expandedSections.recordings} onOpenChange={() => toggleSection('recordings')}>
               <CollapsibleTrigger asChild>
-                <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+                <CardHeader className="cursor-pointer hover:bg-purple-50/50 dark:hover:bg-purple-950/10 transition-all border-b dark:border-gray-800 group">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      {expandedSections.recordings ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
-                      <Video className="w-5 h-5 text-purple-500" />
-                      <CardTitle className="text-base">Recordings</CardTitle>
-                      <Badge variant="secondary">{recordings.length}</Badge>
+                      <div className="transition-transform group-hover:scale-110">
+                        {expandedSections.recordings ? (
+                          <ChevronDown className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+                        ) : (
+                          <ChevronRight className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+                        )}
+                      </div>
+                      <div className="w-9 h-9 rounded-lg bg-purple-500/10 dark:bg-purple-500/20 flex items-center justify-center">
+                        <Video className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                      </div>
+                      <CardTitle className="text-lg font-semibold dark:text-white">Recordings</CardTitle>
+                      <Badge variant="secondary" className="bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-0 font-semibold">
+                        {recordings.length}
+                      </Badge>
                     </div>
-                    <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); openAddResource('video'); }}>
-                      <Plus className="w-4 h-4 mr-1" />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={(e) => { e.stopPropagation(); openAddResource('video'); }}
+                      className="border-2 dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:hover:bg-gray-800 transition-all hover:shadow-sm"
+                    >
+                      <Plus className="w-4 h-4 mr-1.5" />
                       Add
                     </Button>
                   </div>
                 </CardHeader>
               </CollapsibleTrigger>
               <CollapsibleContent>
-                <CardContent className="pt-0">
+                <CardContent className="pt-5 pb-5">
                   {recordings.length === 0 ? (
-                    <p className="text-sm text-muted-foreground py-4 text-center">No recordings added yet</p>
+                    <div className="text-center py-8 px-4 rounded-lg border-2 border-dashed dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50">
+                      <div className="w-12 h-12 rounded-full bg-purple-500/10 dark:bg-purple-500/20 flex items-center justify-center mx-auto mb-3">
+                        <Video className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                      </div>
+                      <p className="text-sm font-medium text-gray-600 dark:text-gray-300">No recordings added yet</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Click "Add" to upload your first recording</p>
+                    </div>
                   ) : (
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       {recordings.map((resource) => (
                         <ResourceItem
                           key={resource.id}
@@ -825,30 +872,51 @@ export default function LearningsPage() {
           </Card>
 
           {/* PPTs Section */}
-          <Card>
+          <Card className="border-2 dark:border-gray-800 dark:bg-gray-950/50 shadow-sm overflow-hidden">
             <Collapsible open={expandedSections.slides} onOpenChange={() => toggleSection('slides')}>
               <CollapsibleTrigger asChild>
-                <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+                <CardHeader className="cursor-pointer hover:bg-orange-50/50 dark:hover:bg-orange-950/10 transition-all border-b dark:border-gray-800 group">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      {expandedSections.slides ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
-                      <Presentation className="w-5 h-5 text-orange-500" />
-                      <CardTitle className="text-base">PPTs</CardTitle>
-                      <Badge variant="secondary">{slides.length}</Badge>
+                      <div className="transition-transform group-hover:scale-110">
+                        {expandedSections.slides ? (
+                          <ChevronDown className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+                        ) : (
+                          <ChevronRight className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+                        )}
+                      </div>
+                      <div className="w-9 h-9 rounded-lg bg-orange-500/10 dark:bg-orange-500/20 flex items-center justify-center">
+                        <Presentation className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                      </div>
+                      <CardTitle className="text-lg font-semibold dark:text-white">PPTs</CardTitle>
+                      <Badge variant="secondary" className="bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-0 font-semibold">
+                        {slides.length}
+                      </Badge>
                     </div>
-                    <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); openAddResource('slides'); }}>
-                      <Plus className="w-4 h-4 mr-1" />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={(e) => { e.stopPropagation(); openAddResource('slides'); }}
+                      className="border-2 dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:hover:bg-gray-800 transition-all hover:shadow-sm"
+                    >
+                      <Plus className="w-4 h-4 mr-1.5" />
                       Add
                     </Button>
                   </div>
                 </CardHeader>
               </CollapsibleTrigger>
               <CollapsibleContent>
-                <CardContent className="pt-0">
+                <CardContent className="pt-5 pb-5">
                   {slides.length === 0 ? (
-                    <p className="text-sm text-muted-foreground py-4 text-center">No presentations added yet</p>
+                    <div className="text-center py-8 px-4 rounded-lg border-2 border-dashed dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50">
+                      <div className="w-12 h-12 rounded-full bg-orange-500/10 dark:bg-orange-500/20 flex items-center justify-center mx-auto mb-3">
+                        <Presentation className="w-6 h-6 text-orange-600 dark:text-orange-400" />
+                      </div>
+                      <p className="text-sm font-medium text-gray-600 dark:text-gray-300">No presentations added yet</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Click "Add" to upload your first presentation</p>
+                    </div>
                   ) : (
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       {slides.map((resource) => (
                         <ResourceItem
                           key={resource.id}
@@ -867,30 +935,51 @@ export default function LearningsPage() {
           </Card>
 
           {/* Session Notes Section */}
-          <Card>
+          <Card className="border-2 dark:border-gray-800 dark:bg-gray-950/50 shadow-sm overflow-hidden">
             <Collapsible open={expandedSections.documents} onOpenChange={() => toggleSection('documents')}>
               <CollapsibleTrigger asChild>
-                <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+                <CardHeader className="cursor-pointer hover:bg-blue-50/50 dark:hover:bg-blue-950/10 transition-all border-b dark:border-gray-800 group">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      {expandedSections.documents ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
-                      <FileText className="w-5 h-5 text-blue-500" />
-                      <CardTitle className="text-base">Session Notes</CardTitle>
-                      <Badge variant="secondary">{documents.length}</Badge>
+                      <div className="transition-transform group-hover:scale-110">
+                        {expandedSections.documents ? (
+                          <ChevronDown className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+                        ) : (
+                          <ChevronRight className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+                        )}
+                      </div>
+                      <div className="w-9 h-9 rounded-lg bg-blue-500/10 dark:bg-blue-500/20 flex items-center justify-center">
+                        <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <CardTitle className="text-lg font-semibold dark:text-white">Session Notes</CardTitle>
+                      <Badge variant="secondary" className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-0 font-semibold">
+                        {documents.length}
+                      </Badge>
                     </div>
-                    <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); openAddResource('document'); }}>
-                      <Plus className="w-4 h-4 mr-1" />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={(e) => { e.stopPropagation(); openAddResource('document'); }}
+                      className="border-2 dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:hover:bg-gray-800 transition-all hover:shadow-sm"
+                    >
+                      <Plus className="w-4 h-4 mr-1.5" />
                       Add
                     </Button>
                   </div>
                 </CardHeader>
               </CollapsibleTrigger>
               <CollapsibleContent>
-                <CardContent className="pt-0">
+                <CardContent className="pt-5 pb-5">
                   {documents.length === 0 ? (
-                    <p className="text-sm text-muted-foreground py-4 text-center">No session notes added yet</p>
+                    <div className="text-center py-8 px-4 rounded-lg border-2 border-dashed dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50">
+                      <div className="w-12 h-12 rounded-full bg-blue-500/10 dark:bg-blue-500/20 flex items-center justify-center mx-auto mb-3">
+                        <FileText className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <p className="text-sm font-medium text-gray-600 dark:text-gray-300">No session notes added yet</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Click "Add" to upload your first session note</p>
+                    </div>
                   ) : (
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       {documents.map((resource) => (
                         <ResourceItem
                           key={resource.id}
@@ -909,78 +998,99 @@ export default function LearningsPage() {
           </Card>
 
           {/* Case Studies Section */}
-          <Card>
+          <Card className="border-2 dark:border-gray-800 dark:bg-gray-950/50 shadow-sm overflow-hidden">
             <Collapsible open={expandedSections.caseStudies} onOpenChange={() => toggleSection('caseStudies')}>
               <CollapsibleTrigger asChild>
-                <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+                <CardHeader className="cursor-pointer hover:bg-green-50/50 dark:hover:bg-green-950/10 transition-all border-b dark:border-gray-800 group">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      {expandedSections.caseStudies ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
-                      <ClipboardList className="w-5 h-5 text-green-500" />
-                      <CardTitle className="text-base">Case Studies</CardTitle>
-                      <Badge variant="secondary">{weekCaseStudies.length}</Badge>
+                      <div className="transition-transform group-hover:scale-110">
+                        {expandedSections.caseStudies ? (
+                          <ChevronDown className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+                        ) : (
+                          <ChevronRight className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+                        )}
+                      </div>
+                      <div className="w-9 h-9 rounded-lg bg-green-500/10 dark:bg-green-500/20 flex items-center justify-center">
+                        <ClipboardList className="w-5 h-5 text-green-600 dark:text-green-400" />
+                      </div>
+                      <CardTitle className="text-lg font-semibold dark:text-white">Case Studies</CardTitle>
+                      <Badge variant="secondary" className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-0 font-semibold">
+                        {weekCaseStudies.length}
+                      </Badge>
                     </div>
-                    <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); openAddCaseStudy(); }}>
-                      <Plus className="w-4 h-4 mr-1" />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={(e) => { e.stopPropagation(); openAddCaseStudy(); }}
+                      className="border-2 dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:hover:bg-gray-800 transition-all hover:shadow-sm"
+                    >
+                      <Plus className="w-4 h-4 mr-1.5" />
                       Add
                     </Button>
                   </div>
                 </CardHeader>
               </CollapsibleTrigger>
               <CollapsibleContent>
-                <CardContent className="pt-0">
+                <CardContent className="pt-5 pb-5">
                   {weekCaseStudies.length === 0 ? (
-                    <p className="text-sm text-muted-foreground py-4 text-center">No case studies added yet</p>
+                    <div className="text-center py-8 px-4 rounded-lg border-2 border-dashed dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50">
+                      <div className="w-12 h-12 rounded-full bg-green-500/10 dark:bg-green-500/20 flex items-center justify-center mx-auto mb-3">
+                        <ClipboardList className="w-6 h-6 text-green-600 dark:text-green-400" />
+                      </div>
+                      <p className="text-sm font-medium text-gray-600 dark:text-gray-300">No case studies added yet</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Click "Add" to create your first case study</p>
+                    </div>
                   ) : (
                     <div className="space-y-3">
                       {weekCaseStudies.map((caseStudy) => (
                         <div
                           key={caseStudy.id}
-                          className="flex items-start gap-3 p-4 rounded-lg border bg-card"
+                          className="flex items-start gap-4 p-5 rounded-lg border-2 dark:border-gray-700 bg-white dark:bg-gray-900 hover:border-green-500/50 dark:hover:border-green-500/50 transition-all shadow-sm hover:shadow-md"
                         >
-                          <div className="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center flex-shrink-0">
-                            <ClipboardList className="w-5 h-5 text-green-500" />
+                          <div className="w-12 h-12 rounded-lg bg-green-500/10 dark:bg-green-500/20 flex items-center justify-center flex-shrink-0">
+                            <ClipboardList className="w-6 h-6 text-green-600 dark:text-green-400" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <p className="font-medium">{caseStudy.title}</p>
+                            <div className="flex items-center gap-2 mb-2">
+                              <p className="font-semibold text-base dark:text-white">{caseStudy.title}</p>
                               {caseStudy.solution_visible ? (
-                                <Badge variant="secondary" className="text-xs">
+                                <Badge variant="secondary" className="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-0">
                                   <Eye className="w-3 h-3 mr-1" />
                                   Solution Visible
                                 </Badge>
                               ) : (
-                                <Badge variant="outline" className="text-xs">
+                                <Badge variant="outline" className="text-xs border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400">
                                   <EyeOff className="w-3 h-3 mr-1" />
                                   Solution Hidden
                                 </Badge>
                               )}
                             </div>
                             {caseStudy.description && (
-                              <p className="text-sm text-muted-foreground mb-2">{caseStudy.description}</p>
+                              <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">{caseStudy.description}</p>
                             )}
                             <div className="flex items-center gap-4 text-sm">
                               {caseStudy.problem_doc_url && (
                                 <button
                                   onClick={() => setPreviewCaseStudy({ url: caseStudy.problem_doc_url!, title: 'Problem Statement' })}
-                                  className="text-blue-600 hover:underline flex items-center gap-1"
+                                  className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium flex items-center gap-1.5 transition-colors"
                                 >
-                                  <FileText className="w-3 h-3" />
+                                  <FileText className="w-4 h-4" />
                                   Problem
                                 </button>
                               )}
                               {caseStudy.solution_doc_url && (
                                 <button
                                   onClick={() => setPreviewCaseStudy({ url: caseStudy.solution_doc_url!, title: 'Solution' })}
-                                  className="text-green-600 hover:underline flex items-center gap-1"
+                                  className="text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 font-medium flex items-center gap-1.5 transition-colors"
                                 >
-                                  <FileText className="w-3 h-3" />
+                                  <FileText className="w-4 h-4" />
                                   Solution
                                 </button>
                               )}
                               {caseStudy.due_date && (
-                                <span className="text-muted-foreground flex items-center gap-1">
-                                  <Calendar className="w-3 h-3" />
+                                <span className="text-gray-600 dark:text-gray-400 flex items-center gap-1.5">
+                                  <Calendar className="w-4 h-4" />
                                   Due: {format(new Date(caseStudy.due_date), 'MMM d, yyyy')}
                                 </span>
                               )}
@@ -1306,53 +1416,80 @@ function ResourceItem({
   onDelete: () => void;
   formatDuration: (seconds: number | null) => string;
 }) {
+  const colorMap = {
+    video: 'purple',
+    slides: 'orange',
+    document: 'blue',
+    link: 'gray',
+  };
+  const color = colorMap[resource.content_type as keyof typeof colorMap] || 'gray';
+
   return (
-    <div className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors">
-      <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center">
-        {resource.content_type === 'video' && <Video className="w-4 h-4 text-purple-500" />}
-        {resource.content_type === 'slides' && <Presentation className="w-4 h-4 text-orange-500" />}
-        {resource.content_type === 'document' && <FileText className="w-4 h-4 text-blue-500" />}
-        {resource.content_type === 'link' && <Link2 className="w-4 h-4 text-gray-500" />}
+    <div className={cn(
+      "flex items-center gap-4 p-4 rounded-lg border-2 transition-all group",
+      "dark:border-gray-700 bg-white dark:bg-gray-900",
+      "hover:border-${color}-500/50 dark:hover:border-${color}-500/50",
+      "shadow-sm hover:shadow-md"
+    )}>
+      <div className={cn(
+        "w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0",
+        resource.content_type === 'video' && "bg-purple-500/10 dark:bg-purple-500/20",
+        resource.content_type === 'slides' && "bg-orange-500/10 dark:bg-orange-500/20",
+        resource.content_type === 'document' && "bg-blue-500/10 dark:bg-blue-500/20",
+        resource.content_type === 'link' && "bg-gray-500/10 dark:bg-gray-500/20"
+      )}>
+        {resource.content_type === 'video' && <Video className="w-5 h-5 text-purple-600 dark:text-purple-400" />}
+        {resource.content_type === 'slides' && <Presentation className="w-5 h-5 text-orange-600 dark:text-orange-400" />}
+        {resource.content_type === 'document' && <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400" />}
+        {resource.content_type === 'link' && <Link2 className="w-5 h-5 text-gray-600 dark:text-gray-400" />}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="font-medium text-sm truncate">{resource.title}</p>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          {resource.session_number && <span>Session {resource.session_number}</span>}
+        <p className="font-semibold text-sm truncate dark:text-white">{resource.title}</p>
+        <div className="flex items-center gap-2.5 text-xs text-gray-600 dark:text-gray-400 mt-1">
+          {resource.session_number && (
+            <span className="font-medium">Session {resource.session_number}</span>
+          )}
           {resource.duration_seconds && (
             <>
-              {resource.session_number && <span>•</span>}
-              <span>{formatDuration(resource.duration_seconds)}</span>
+              {resource.session_number && <span className="text-gray-400">•</span>}
+              <span className="font-medium">{formatDuration(resource.duration_seconds)}</span>
             </>
           )}
         </div>
       </div>
-      <Button size="sm" variant="ghost" onClick={onPreview}>
-        <Play className="w-4 h-4" />
+      <Button
+        size="sm"
+        variant="ghost"
+        onClick={onPreview}
+        className="opacity-0 group-hover:opacity-100 transition-opacity dark:text-white dark:hover:bg-gray-800"
+      >
+        <Play className="w-4 h-4 mr-1.5" />
+        Play
       </Button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button size="sm" variant="ghost">
+          <Button size="sm" variant="ghost" className="dark:text-white dark:hover:bg-gray-800">
             <MoreVertical className="w-4 h-4" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={onPreview}>
+        <DropdownMenuContent align="end" className="dark:bg-gray-900 dark:border-gray-700">
+          <DropdownMenuItem onClick={onPreview} className="dark:text-white dark:focus:bg-gray-800">
             <Play className="w-4 h-4 mr-2" />
             Preview
           </DropdownMenuItem>
           {resource.external_url && (
-            <DropdownMenuItem asChild>
+            <DropdownMenuItem asChild className="dark:text-white dark:focus:bg-gray-800">
               <a href={resource.external_url} target="_blank" rel="noopener noreferrer">
                 <ExternalLink className="w-4 h-4 mr-2" />
                 Open Original
               </a>
             </DropdownMenuItem>
           )}
-          <DropdownMenuItem onClick={onEdit}>
+          <DropdownMenuItem onClick={onEdit} className="dark:text-white dark:focus:bg-gray-800">
             <Pencil className="w-4 h-4 mr-2" />
             Edit
           </DropdownMenuItem>
-          <DropdownMenuItem className="text-destructive" onClick={onDelete}>
+          <DropdownMenuItem className="text-red-600 dark:text-red-400 dark:focus:bg-red-950/20" onClick={onDelete}>
             <Trash2 className="w-4 h-4 mr-2" />
             Delete
           </DropdownMenuItem>
