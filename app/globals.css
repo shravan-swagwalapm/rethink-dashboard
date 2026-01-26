@@ -1,6 +1,5 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "video.js/dist/video-js.css";
 
 @custom-variant dark (&:is(.dark *));
 

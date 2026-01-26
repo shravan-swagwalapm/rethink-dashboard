@@ -8,12 +8,19 @@ import { Button } from '@/components/ui/button';
 import type { CaptionTrack } from '@/types';
 
 // Dynamic import of Video.js to avoid SSR issues
-// Note: CSS is imported in globals.css
+// Note: CSS is imported in root layout
 let videojs: any = null;
+let videojsLoadError: Error | null = null;
+
 if (typeof window !== 'undefined') {
-  import('video.js').then((module) => {
-    videojs = module.default;
-  });
+  import('video.js')
+    .then((module) => {
+      videojs = module.default;
+    })
+    .catch((err) => {
+      console.error('Failed to load Video.js:', err);
+      videojsLoadError = err;
+    });
 }
 
 export interface VideoPlayerProps {
@@ -60,10 +67,26 @@ export function VideoPlayer({
       if (videojs) {
         setIsVideoJsReady(true);
         clearInterval(checkVideoJs);
+      } else if (videojsLoadError) {
+        setError('Failed to load video player library. Please refresh the page.');
+        setIsLoading(false);
+        clearInterval(checkVideoJs);
       }
     }, 100);
 
-    return () => clearInterval(checkVideoJs);
+    // Timeout after 10 seconds
+    const timeout = setTimeout(() => {
+      if (!videojs && !videojsLoadError) {
+        setError('Video player took too long to load. Please refresh the page.');
+        setIsLoading(false);
+      }
+      clearInterval(checkVideoJs);
+    }, 10000);
+
+    return () => {
+      clearInterval(checkVideoJs);
+      clearTimeout(timeout);
+    };
   }, []);
 
   // Fetch Google Drive video URL
