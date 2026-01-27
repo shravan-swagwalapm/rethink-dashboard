@@ -142,6 +142,9 @@ export function IntegrationSettings() {
       ...(editedConfigs[channel] || {}),
     };
 
+    // Extract provider from config or use existing
+    const provider = config.provider || integration?.provider || getDefaultProvider(channel);
+
     try {
       setSaving(channel);
       const response = await fetch('/api/admin/notifications/integrations', {
@@ -149,18 +152,22 @@ export function IntegrationSettings() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           channel,
+          provider,
           config,
           is_active: integration?.is_active,
         }),
       });
 
-      if (!response.ok) throw new Error('Failed to save');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to save');
+      }
 
       toast.success(`${channelLabels[channel as keyof typeof channelLabels]} settings saved`);
       fetchIntegrations();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving integration:', error);
-      toast.error('Failed to save settings');
+      toast.error(error.message || 'Failed to save settings');
     } finally {
       setSaving(null);
     }

@@ -66,7 +66,7 @@ export async function PATCH(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { channel, provider, is_active, config, test_mode } = body;
+    let { channel, provider, is_active, config, test_mode } = body;
 
     if (!channel) {
       return NextResponse.json(
@@ -77,10 +77,10 @@ export async function PATCH(request: NextRequest) {
 
     const adminClient = await createAdminClient();
 
-    // First, get existing config to preserve sensitive data
-    const { data: existing } = await adminClient
+    // First, get existing record to preserve data
+    const { data: existing, error: existingError } = await adminClient
       .from('notification_integrations')
-      .select('config')
+      .select('*')
       .eq('channel', channel)
       .single();
 
@@ -92,17 +92,43 @@ export async function PATCH(request: NextRequest) {
         ...config,
       };
 
-      // If api_key is masked (ends with ***), keep the original
+      // If api_key is masked (contains ***), keep the original
       if (finalConfig.api_key && finalConfig.api_key.includes('***')) {
         finalConfig.api_key = existing.config.api_key;
       }
+      // Same for auth_token
+      if (finalConfig.auth_token && finalConfig.auth_token.includes('***')) {
+        finalConfig.auth_token = existing.config.auth_token;
+      }
+      // Same for account_sid
+      if (finalConfig.account_sid && finalConfig.account_sid.includes('***')) {
+        finalConfig.account_sid = existing.config.account_sid;
+      }
+    }
+
+    // Extract provider from config if not provided at top level
+    if (!provider && finalConfig.provider) {
+      provider = finalConfig.provider;
+    }
+    // Fall back to existing provider or default
+    if (!provider && existing?.provider) {
+      provider = existing.provider;
+    }
+    // Ultimate fallback to channel defaults
+    if (!provider) {
+      const defaults: Record<string, string> = {
+        email: 'resend',
+        sms: 'twilio',
+        whatsapp: 'interakt',
+      };
+      provider = defaults[channel] || 'unknown';
     }
 
     const updateData: any = {
       updated_at: new Date().toISOString(),
+      provider, // Always include provider
     };
 
-    if (provider !== undefined) updateData.provider = provider;
     if (is_active !== undefined) updateData.is_active = is_active;
     if (config !== undefined) updateData.config = finalConfig;
     if (test_mode !== undefined) updateData.test_mode = test_mode;
