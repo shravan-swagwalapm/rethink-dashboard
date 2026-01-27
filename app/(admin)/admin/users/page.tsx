@@ -60,6 +60,12 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import * as XLSX from 'xlsx';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import type { Profile, Cohort, UserRoleAssignment } from '@/types';
 
 interface UserWithCohort extends Profile {
@@ -347,6 +353,34 @@ export default function UsersPage() {
     setEditRoleAssignments(updated);
   };
 
+  // Download bulk upload template
+  const downloadTemplate = () => {
+    // Create sample data with headers and example rows
+    const templateData = [
+      { 'Email': 'john.doe@example.com', 'Full Name': 'John Doe', 'Cohort Tag': 'BATCH2025' },
+      { 'Email': 'jane.smith@example.com', 'Full Name': 'Jane Smith', 'Cohort Tag': 'BATCH2025' },
+      { 'Email': 'user@company.com', 'Full Name': 'User Name', 'Cohort Tag': 'BATCH2025' },
+    ];
+
+    // Create workbook and worksheet
+    const ws = XLSX.utils.json_to_sheet(templateData);
+
+    // Set column widths for better readability
+    ws['!cols'] = [
+      { wch: 30 }, // Email
+      { wch: 25 }, // Full Name
+      { wch: 15 }, // Cohort Tag
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Users');
+
+    // Download the file
+    XLSX.writeFile(wb, 'bulk_users_template.xlsx');
+
+    toast.success('Template downloaded! Fill in your user data and upload.');
+  };
+
   // Handle file upload for bulk import
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -470,6 +504,24 @@ export default function UsersPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          {/* Download Template */}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={downloadTemplate}
+                >
+                  <FileSpreadsheet className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Download bulk upload template</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
           {/* Bulk Upload */}
           <input
             ref={fileInputRef}
