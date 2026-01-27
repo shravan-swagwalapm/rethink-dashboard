@@ -239,15 +239,22 @@ export function IntegrationSettings() {
           <CardContent className="pt-6">
             <div className="flex gap-3">
               <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-              <div className="text-sm text-blue-800 dark:text-blue-200">
-                <p className="font-medium mb-1">Environment Variables</p>
+              <div className="text-sm text-blue-800 dark:text-blue-200 space-y-2">
+                <p className="font-medium">How API Keys Work</p>
                 <p className="text-blue-700 dark:text-blue-300">
-                  For security, API keys can also be set via environment variables:
-                  <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded mx-1">RESEND_API_KEY</code>,
-                  <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded mx-1">INTERAKT_API_KEY</code>,
-                  <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded mx-1">TWILIO_ACCOUNT_SID</code>,
-                  <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded mx-1">TWILIO_AUTH_TOKEN</code>
+                  You can enter custom API keys above, or leave them empty to use the default system keys
+                  configured in environment variables. Custom keys take priority when provided.
                 </p>
+                <div className="text-xs text-blue-600 dark:text-blue-400 space-y-1 pt-1">
+                  <p><strong>Default environment variables:</strong></p>
+                  <div className="flex flex-wrap gap-2">
+                    <code className="bg-blue-100 dark:bg-blue-900 px-1.5 py-0.5 rounded">RESEND_API_KEY</code>
+                    <code className="bg-blue-100 dark:bg-blue-900 px-1.5 py-0.5 rounded">INTERAKT_API_KEY</code>
+                    <code className="bg-blue-100 dark:bg-blue-900 px-1.5 py-0.5 rounded">TWILIO_ACCOUNT_SID</code>
+                    <code className="bg-blue-100 dark:bg-blue-900 px-1.5 py-0.5 rounded">TWILIO_AUTH_TOKEN</code>
+                    <code className="bg-blue-100 dark:bg-blue-900 px-1.5 py-0.5 rounded">TWILIO_PHONE_NUMBER</code>
+                  </div>
+                </div>
               </div>
             </div>
           </CardContent>
@@ -344,6 +351,46 @@ export function IntegrationSettings() {
           {/* Channel-specific configuration */}
           {channel === 'email' && (
             <div className="space-y-4">
+              {/* API Key Section */}
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  Resend API Key
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <AlertCircle className="w-3.5 h-3.5 text-muted-foreground" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      Get your API key from the Resend dashboard. Leave empty to use default system key.
+                    </TooltipContent>
+                  </Tooltip>
+                </Label>
+                <div className="relative">
+                  <Input
+                    type={showSecrets['email_api'] ? 'text' : 'password'}
+                    placeholder="re_XXXXXXXXX... (optional - uses default if empty)"
+                    value={config.api_key || ''}
+                    onChange={(e) => updateConfig(channel, 'api_key', e.target.value)}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                    onClick={() => toggleShowSecret('email_api')}
+                  >
+                    {showSecrets['email_api'] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </Button>
+                </div>
+                {!config.api_key && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                    <Info className="w-3 h-3" />
+                    Using default system API key (RESEND_API_KEY)
+                  </p>
+                )}
+              </div>
+
+              <Separator className="my-2" />
+
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>From Email</Label>
@@ -382,34 +429,38 @@ export function IntegrationSettings() {
                     <TooltipTrigger>
                       <AlertCircle className="w-3.5 h-3.5 text-muted-foreground" />
                     </TooltipTrigger>
-                    <TooltipContent>
-                      Get your API key from Interakt dashboard under Settings &gt; Developer Settings
+                    <TooltipContent className="max-w-xs">
+                      Get your API key from Interakt dashboard under Settings &gt; Developer Settings. Leave empty to use default system key.
                     </TooltipContent>
                   </Tooltip>
                 </Label>
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <Input
-                      type={showSecrets['whatsapp_api'] ? 'text' : 'password'}
-                      placeholder="Enter API key"
-                      value={config.api_key || ''}
-                      onChange={(e) => updateConfig(channel, 'api_key', e.target.value)}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
-                      onClick={() => toggleShowSecret('whatsapp_api')}
-                    >
-                      {showSecrets['whatsapp_api'] ? (
-                        <EyeOff className="w-4 h-4" />
-                      ) : (
-                        <Eye className="w-4 h-4" />
-                      )}
-                    </Button>
-                  </div>
+                <div className="relative">
+                  <Input
+                    type={showSecrets['whatsapp_api'] ? 'text' : 'password'}
+                    placeholder="Enter API key (optional - uses default if empty)"
+                    value={config.api_key || ''}
+                    onChange={(e) => updateConfig(channel, 'api_key', e.target.value)}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                    onClick={() => toggleShowSecret('whatsapp_api')}
+                  >
+                    {showSecrets['whatsapp_api'] ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
+                  </Button>
                 </div>
+                {!config.api_key && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                    <Info className="w-3 h-3" />
+                    Using default system API key (INTERAKT_API_KEY)
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label>Default Country Code</Label>
@@ -427,11 +478,21 @@ export function IntegrationSettings() {
             <div className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>Twilio Account SID</Label>
+                  <Label className="flex items-center gap-2">
+                    Twilio Account SID
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <AlertCircle className="w-3.5 h-3.5 text-muted-foreground" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        Leave empty to use default system credentials (TWILIO_ACCOUNT_SID)
+                      </TooltipContent>
+                    </Tooltip>
+                  </Label>
                   <div className="relative">
                     <Input
                       type={showSecrets['twilio_sid'] ? 'text' : 'password'}
-                      placeholder="ACXXXXXXXX..."
+                      placeholder="ACXXXXXXXX... (optional)"
                       value={config.account_sid || ''}
                       onChange={(e) => updateConfig(channel, 'account_sid', e.target.value)}
                     />
@@ -447,11 +508,21 @@ export function IntegrationSettings() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label>Twilio Auth Token</Label>
+                  <Label className="flex items-center gap-2">
+                    Twilio Auth Token
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <AlertCircle className="w-3.5 h-3.5 text-muted-foreground" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        Leave empty to use default system credentials (TWILIO_AUTH_TOKEN)
+                      </TooltipContent>
+                    </Tooltip>
+                  </Label>
                   <div className="relative">
                     <Input
                       type={showSecrets['twilio_token'] ? 'text' : 'password'}
-                      placeholder="Enter auth token"
+                      placeholder="Enter auth token (optional)"
                       value={config.auth_token || ''}
                       onChange={(e) => updateConfig(channel, 'auth_token', e.target.value)}
                     />
@@ -467,13 +538,24 @@ export function IntegrationSettings() {
                   </div>
                 </div>
               </div>
+              {!config.account_sid && !config.auth_token && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                  <Info className="w-3 h-3" />
+                  Using default system credentials (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+                </p>
+              )}
               <div className="space-y-2">
                 <Label>Twilio Phone Number</Label>
                 <Input
-                  placeholder="+1234567890"
+                  placeholder="+1234567890 (optional - uses default if empty)"
                   value={config.phone_number || ''}
                   onChange={(e) => updateConfig(channel, 'phone_number', e.target.value)}
                 />
+                {!config.phone_number && (
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    Uses TWILIO_PHONE_NUMBER from environment if not set
+                  </p>
+                )}
               </div>
             </div>
           )}

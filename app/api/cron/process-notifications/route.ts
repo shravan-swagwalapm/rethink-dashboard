@@ -5,13 +5,18 @@ import { interakt } from '@/lib/integrations/interakt';
 import { sms } from '@/lib/integrations/sms';
 
 // Initialize Resend lazily to avoid build-time errors
-let resend: Resend | null = null;
+let defaultResend: Resend | null = null;
 
-function getResendClient() {
-  if (!resend && process.env.RESEND_API_KEY) {
-    resend = new Resend(process.env.RESEND_API_KEY);
+function getResendClient(customApiKey?: string) {
+  // Use custom API key if provided
+  if (customApiKey) {
+    return new Resend(customApiKey);
   }
-  return resend;
+  // Fall back to default client with env API key
+  if (!defaultResend && process.env.RESEND_API_KEY) {
+    defaultResend = new Resend(process.env.RESEND_API_KEY);
+  }
+  return defaultResend;
 }
 
 // Cache for integration settings
@@ -199,16 +204,19 @@ async function sendNotification(job: any, log: any, supabase: any) {
 
     // Get email integration settings
     const integration = await getIntegrationSettings(supabase, 'email');
+    const config = integration?.config || {};
 
-    const resendClient = getResendClient();
+    // Use custom API key from config, or fall back to env variable
+    const customApiKey = config.api_key || undefined;
+    const resendClient = getResendClient(customApiKey);
     if (!resendClient) {
-      throw new Error('Resend API key not configured');
+      throw new Error('Resend API key not configured - set it in Settings or RESEND_API_KEY env var');
     }
 
     // Use integration config or env vars
-    const fromEmail = integration?.config?.from_email || process.env.RESEND_FROM_EMAIL || 'notifications@rethink.com';
-    const fromName = integration?.config?.from_name || 'Rethink Systems';
-    const replyTo = integration?.config?.reply_to || process.env.RESEND_REPLY_TO_EMAIL;
+    const fromEmail = config.from_email || process.env.RESEND_FROM_EMAIL || 'notifications@rethink.com';
+    const fromName = config.from_name || 'Rethink Systems';
+    const replyTo = config.reply_to || process.env.RESEND_REPLY_TO_EMAIL;
 
     // Choose body based on body_type
     const emailBody = job.metadata?.body_type === 'html' && job.metadata?.html_body
