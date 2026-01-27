@@ -136,7 +136,11 @@ export function IntegrationSettings() {
 
   const handleSave = async (channel: string) => {
     const integration = integrations.find(i => i.channel === channel);
-    const config = editedConfigs[channel] || {};
+    // Merge existing config with edited config
+    const config = {
+      ...(integration?.config || {}),
+      ...(editedConfigs[channel] || {}),
+    };
 
     try {
       setSaving(channel);
@@ -294,7 +298,11 @@ export function IntegrationSettings() {
   function renderIntegrationCard(channel: 'email' | 'sms' | 'whatsapp') {
     const integration = integrations.find(i => i.channel === channel);
     const Icon = channelIcons[channel];
-    const config = editedConfigs[channel] || {};
+    // Merge existing integration config with any edits made in this session
+    const config = {
+      ...(integration?.config || {}),
+      ...(editedConfigs[channel] || {}),
+    };
     const providers = getProviders(channel);
     const defaultProviderId = getDefaultProvider(channel);
     const selectedProvider = config.provider || defaultProviderId;
