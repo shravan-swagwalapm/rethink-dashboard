@@ -157,7 +157,8 @@ async function removeCalendarInvitesFromOldCohort(
 }
 
 // GET - Fetch users and cohorts
-export async function GET() {
+// Supports ?search= query param for RecipientSelector component
+export async function GET(request: NextRequest) {
   const auth = await verifyAdmin();
   if (!auth.authorized) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
@@ -165,6 +166,33 @@ export async function GET() {
 
   try {
     const adminClient = await createAdminClient();
+
+    // Check for search parameter (used by RecipientSelector in notifications)
+    const { searchParams } = new URL(request.url);
+    const search = searchParams.get('search');
+
+    // If search parameter exists, return filtered users in { data: [...] } format
+    if (search !== null) {
+      let query = adminClient
+        .from('profiles')
+        .select('id, email, full_name, phone')
+        .order('full_name', { ascending: true });
+
+      if (search.length >= 2) {
+        query = query.or(`full_name.ilike.%${search}%,email.ilike.%${search}%`);
+      }
+
+      const { data, error } = await query.limit(50);
+
+      if (error) {
+        console.error('Error searching users:', error);
+        return NextResponse.json({ error: 'Failed to search users' }, { status: 500 });
+      }
+
+      return NextResponse.json({ data: data || [] });
+    }
+
+    // Full user list for admin user management page
 
     const [{ data: users }, { data: cohorts }, { data: roleAssignments }] = await Promise.all([
       adminClient

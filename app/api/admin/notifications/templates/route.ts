@@ -84,12 +84,22 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, description, subject, body: templateBody, variables, channel } = body;
+    const {
+      name,
+      description,
+      subject,
+      body: templateBody,
+      html_body,
+      body_type = 'text',
+      variables,
+      channel
+    } = body;
 
     // Validation
-    if (!name || !templateBody || !channel) {
+    const hasBody = templateBody || (body_type === 'html' && html_body);
+    if (!name || !hasBody || !channel) {
       return NextResponse.json(
-        { error: 'Name, body, and channel are required' },
+        { error: 'Name, body (or html_body for HTML type), and channel are required' },
         { status: 400 }
       );
     }
@@ -101,6 +111,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (body_type && !['text', 'html'].includes(body_type)) {
+      return NextResponse.json(
+        { error: 'Invalid body_type. Must be text or html' },
+        { status: 400 }
+      );
+    }
+
     // Insert template
     const { data, error } = await supabase
       .from('notification_templates')
@@ -108,7 +125,9 @@ export async function POST(request: NextRequest) {
         name,
         description: description || null,
         subject: subject || null,
-        body: templateBody,
+        body: templateBody || '',
+        html_body: html_body || null,
+        body_type: body_type || 'text',
         variables: variables || [],
         channel,
         created_by: user.id,

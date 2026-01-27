@@ -1,6 +1,8 @@
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
+import { interakt } from '@/lib/integrations/interakt';
+import { sms } from '@/lib/integrations/sms';
 
 // Initialize Resend lazily to avoid build-time errors
 let resend: Resend | null = null;
@@ -10,6 +12,30 @@ function getResendClient() {
     resend = new Resend(process.env.RESEND_API_KEY);
   }
   return resend;
+}
+
+// Cache for integration settings
+let integrationCache: Record<string, any> = {};
+let cacheTimestamp = 0;
+const CACHE_TTL = 60000; // 1 minute
+
+async function getIntegrationSettings(supabase: any, channel: string) {
+  const now = Date.now();
+
+  // Refresh cache if expired
+  if (now - cacheTimestamp > CACHE_TTL) {
+    const { data } = await supabase
+      .from('notification_integrations')
+      .select('*');
+
+    integrationCache = {};
+    (data || []).forEach((i: any) => {
+      integrationCache[i.channel] = i;
+    });
+    cacheTimestamp = now;
+  }
+
+  return integrationCache[channel] || null;
 }
 
 // GET - Process pending notification jobs (called by Vercel Cron every 5 minutes)
@@ -101,7 +127,7 @@ async function processJob(supabase: any, job: any) {
 
   for (const log of logs) {
     try {
-      await sendNotification(job, log);
+      await sendNotification(job, log, supabase);
 
       // Update log as delivered
       await supabase
@@ -165,40 +191,138 @@ async function processJob(supabase: any, job: any) {
   }
 }
 
-async function sendNotification(job: any, log: any) {
+async function sendNotification(job: any, log: any, supabase: any) {
   if (job.channel === 'email') {
     if (!log.recipient_email) {
       throw new Error('No email address provided');
     }
+
+    // Get email integration settings
+    const integration = await getIntegrationSettings(supabase, 'email');
 
     const resendClient = getResendClient();
     if (!resendClient) {
       throw new Error('Resend API key not configured');
     }
 
+    // Use integration config or env vars
+    const fromEmail = integration?.config?.from_email || process.env.RESEND_FROM_EMAIL || 'notifications@rethink.com';
+    const fromName = integration?.config?.from_name || 'Rethink Systems';
+    const replyTo = integration?.config?.reply_to || process.env.RESEND_REPLY_TO_EMAIL;
+
+    // Choose body based on body_type
+    const emailBody = job.metadata?.body_type === 'html' && job.metadata?.html_body
+      ? job.metadata.html_body
+      : job.body;
+
     const result = await resendClient.emails.send({
-      from: process.env.RESEND_FROM_EMAIL || 'notifications@rethink.com',
+      from: `${fromName} <${fromEmail}>`,
       to: log.recipient_email,
       subject: job.subject || 'Notification',
-      html: job.body,
-      replyTo: process.env.RESEND_REPLY_TO_EMAIL,
+      html: emailBody,
+      ...(replyTo && { replyTo }),
     });
 
     if (!result.data) {
       throw new Error(result.error?.message || 'Failed to send email');
     }
 
-    return result.data;
+    return { messageId: result.data.id };
+
   } else if (job.channel === 'sms') {
-    // SMS implementation would go here
-    // For now, just log
-    console.log(`SMS would be sent to ${log.recipient_phone}: ${job.body}`);
-    throw new Error('SMS sending not yet implemented');
+    if (!log.recipient_phone) {
+      throw new Error('No phone number provided');
+    }
+
+    // Get SMS integration settings
+    const integration = await getIntegrationSettings(supabase, 'sms');
+
+    if (!integration || !integration.is_active) {
+      throw new Error('SMS integration not configured or disabled');
+    }
+
+    const provider = integration.provider || 'twilio';
+    const config = integration.config || {};
+
+    const result = await sms.send({
+      to: log.recipient_phone,
+      message: job.body,
+      config: {
+        provider,
+        twilio: provider === 'twilio' ? {
+          accountSid: config.account_sid || process.env.TWILIO_ACCOUNT_SID || '',
+          authToken: config.auth_token || process.env.TWILIO_AUTH_TOKEN || '',
+          phoneNumber: config.phone_number || process.env.TWILIO_PHONE_NUMBER || '',
+        } : undefined,
+        msg91: provider === 'msg91' ? {
+          authKey: config.auth_key || process.env.MSG91_AUTH_KEY || '',
+          senderId: config.sender_id || process.env.MSG91_SENDER_ID || '',
+        } : undefined,
+      },
+    });
+
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to send SMS');
+    }
+
+    return { messageId: result.messageId };
+
   } else if (job.channel === 'whatsapp') {
-    // WhatsApp implementation would go here
-    // For now, just log
-    console.log(`WhatsApp would be sent to ${log.recipient_phone}: ${job.body}`);
-    throw new Error('WhatsApp sending not yet implemented');
+    if (!log.recipient_phone) {
+      throw new Error('No phone number provided');
+    }
+
+    // Get WhatsApp integration settings
+    const integration = await getIntegrationSettings(supabase, 'whatsapp');
+
+    if (!integration || !integration.is_active) {
+      throw new Error('WhatsApp integration not configured or disabled');
+    }
+
+    const config = integration.config || {};
+    const apiKey = config.api_key || process.env.INTERAKT_API_KEY;
+
+    if (!apiKey) {
+      throw new Error('Interakt API key not configured');
+    }
+
+    // Check if using template or text message
+    const templateName = job.metadata?.whatsapp_template_name;
+
+    if (templateName) {
+      // Send template message
+      const result = await interakt.sendTemplate({
+        phoneNumber: log.recipient_phone,
+        templateName,
+        variables: job.metadata?.variable_values || {},
+        config: {
+          apiKey,
+          countryCode: config.country_code || '+91',
+        },
+      });
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to send WhatsApp template');
+      }
+
+      return { messageId: result.messageId };
+    } else {
+      // Send text message (only works within 24-hour session window)
+      const result = await interakt.sendText({
+        phoneNumber: log.recipient_phone,
+        message: job.body,
+        config: {
+          apiKey,
+          countryCode: config.country_code || '+91',
+        },
+      });
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to send WhatsApp message');
+      }
+
+      return { messageId: result.messageId };
+    }
   }
 
   throw new Error(`Unknown channel: ${job.channel}`);

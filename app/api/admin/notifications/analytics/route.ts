@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
     // Get stats by template
     const { data: jobs } = await supabase
       .from('notification_jobs')
-      .select('template_id, notification_templates(name)')
+      .select('id, template_id, notification_templates(name)')
       .gte('created_at', from)
       .lte('created_at', to);
 
@@ -76,7 +76,8 @@ export async function GET(request: NextRequest) {
 
     if (jobs) {
       for (const job of jobs) {
-        const jobLogs = logs?.filter(l => l.job_id === job.template_id) || [];
+        // Fix: Filter logs by job.id, not job.template_id
+        const jobLogs = logs?.filter(l => l.job_id === job.id) || [];
         const templateName = (job as any).notification_templates?.name || 'Unknown';
 
         if (!templateStats[job.template_id]) {
