@@ -133,21 +133,40 @@ export async function PATCH(request: NextRequest) {
     if (config !== undefined) updateData.config = finalConfig;
     if (test_mode !== undefined) updateData.test_mode = test_mode;
 
-    // Upsert the integration
-    const { data: integration, error } = await adminClient
-      .from('notification_integrations')
-      .upsert(
-        {
+    let integration;
+    let error;
+
+    if (existing) {
+      // UPDATE existing record
+      const result = await adminClient
+        .from('notification_integrations')
+        .update(updateData)
+        .eq('channel', channel)
+        .select()
+        .single();
+
+      integration = result.data;
+      error = result.error;
+    } else {
+      // INSERT new record
+      const result = await adminClient
+        .from('notification_integrations')
+        .insert({
           channel,
           ...updateData,
           created_by: auth.userId,
-        },
-        { onConflict: 'channel' }
-      )
-      .select()
-      .single();
+        })
+        .select()
+        .single();
 
-    if (error) throw error;
+      integration = result.data;
+      error = result.error;
+    }
+
+    if (error) {
+      console.error('Database error:', error);
+      throw new Error(error.message || 'Database operation failed');
+    }
 
     return NextResponse.json({
       data: {
