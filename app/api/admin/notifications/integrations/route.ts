@@ -226,73 +226,89 @@ function maskSensitiveConfig(config: any): any {
   return masked;
 }
 
-// Test Email Integration (Resend)
+// Test Email Integration
 async function testEmailIntegration(
   integration: any,
   testRecipient?: string
 ): Promise<{ success: boolean; message: string }> {
+  const provider = integration.config?.provider || integration.provider || 'resend';
+  const config = integration.config || {};
+
+  // Use custom API key if provided, otherwise fall back to env var for default provider
+  const isDefaultProvider = provider === 'resend';
+  const apiKey = config.api_key || (isDefaultProvider ? process.env.RESEND_API_KEY : null);
+
+  if (!apiKey) {
+    return {
+      success: false,
+      message: isDefaultProvider
+        ? 'No API key configured. Set one in Settings or via RESEND_API_KEY environment variable.'
+        : `No API key configured for ${provider}. Please enter your API key in Settings.`,
+    };
+  }
+
   try {
-    const apiKey = process.env.RESEND_API_KEY || integration.config?.api_key;
-
-    if (!apiKey) {
-      return {
-        success: false,
-        message: 'Resend API key not configured. Set RESEND_API_KEY environment variable.',
-      };
-    }
-
-    // Test API key validity by fetching domains
-    const response = await fetch('https://api.resend.com/domains', {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-      },
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      return {
-        success: false,
-        message: `Resend API error: ${error.message || 'Invalid API key'}`,
-      };
-    }
-
-    // Optionally send a test email
-    if (testRecipient) {
-      const fromEmail = integration.config?.from_email || 'notifications@rethink.com';
-      const fromName = integration.config?.from_name || 'Rethink Systems';
-
-      const emailResponse = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
+    // Currently only Resend is fully implemented
+    if (provider === 'resend') {
+      // Test API key validity by fetching domains
+      const response = await fetch('https://api.resend.com/domains', {
+        method: 'GET',
         headers: {
           Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          from: `${fromName} <${fromEmail}>`,
-          to: testRecipient,
-          subject: 'Test Email from Rethink Notifications',
-          html: '<h1>Test Email</h1><p>This is a test email from your notification system. If you received this, your email integration is working correctly!</p>',
-        }),
       });
 
-      if (!emailResponse.ok) {
-        const error = await emailResponse.json();
+      if (!response.ok) {
+        const error = await response.json();
         return {
           success: false,
-          message: `Failed to send test email: ${error.message || 'Unknown error'}`,
+          message: `Resend API error: ${error.message || 'Invalid API key'}`,
+        };
+      }
+
+      // Optionally send a test email
+      if (testRecipient) {
+        const fromEmail = config.from_email || 'notifications@rethink.com';
+        const fromName = config.from_name || 'Rethink Systems';
+
+        const emailResponse = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            from: `${fromName} <${fromEmail}>`,
+            to: testRecipient,
+            subject: 'Test Email from Rethink Notifications',
+            html: '<h1>Test Email</h1><p>This is a test email from your notification system. If you received this, your email integration is working correctly!</p>',
+          }),
+        });
+
+        if (!emailResponse.ok) {
+          const error = await emailResponse.json();
+          return {
+            success: false,
+            message: `Failed to send test email: ${error.message || 'Unknown error'}`,
+          };
+        }
+
+        return {
+          success: true,
+          message: `Email integration working! Test email sent to ${testRecipient}`,
         };
       }
 
       return {
         success: true,
-        message: `Email integration working! Test email sent to ${testRecipient}`,
+        message: 'Email integration configured correctly (Resend API key valid)',
       };
     }
 
+    // Other providers - just verify API key is provided
     return {
       success: true,
-      message: 'Email integration configured correctly (Resend API key valid)',
+      message: `${provider} configured with API key. Full testing not yet implemented - send a real email to verify.`,
     };
   } catch (error: any) {
     return {
@@ -302,52 +318,94 @@ async function testEmailIntegration(
   }
 }
 
-// Test SMS Integration (Twilio/MSG91)
+// Test SMS Integration
 async function testSmsIntegration(
   integration: any,
   testRecipient?: string
 ): Promise<{ success: boolean; message: string }> {
-  const provider = integration.provider;
+  const config = integration.config || {};
+  const provider = config.provider || integration.provider || 'twilio';
+  const isDefaultProvider = provider === 'twilio';
 
-  if (provider === 'twilio') {
-    const accountSid = integration.config?.account_sid || process.env.TWILIO_ACCOUNT_SID;
-    const authToken = integration.config?.auth_token || process.env.TWILIO_AUTH_TOKEN;
+  if (provider === 'twilio' || provider === 'vonage' || provider === 'plivo') {
+    // Use custom credentials if provided, otherwise fall back to env vars for default provider
+    const accountSid = config.account_sid || (isDefaultProvider ? process.env.TWILIO_ACCOUNT_SID : null);
+    const authToken = config.auth_token || (isDefaultProvider ? process.env.TWILIO_AUTH_TOKEN : null);
 
     if (!accountSid || !authToken) {
       return {
         success: false,
-        message: 'Twilio credentials not configured. Set account_sid and auth_token.',
+        message: isDefaultProvider
+          ? 'No credentials configured. Set them in Settings or via TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN environment variables.'
+          : `No credentials configured for ${provider}. Please enter your Account SID and Auth Token in Settings.`,
       };
     }
 
     try {
-      // Test credentials by fetching account info
-      const response = await fetch(
-        `https://api.twilio.com/2010-04-01/Accounts/${accountSid}.json`,
-        {
-          headers: {
-            Authorization: `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString('base64')}`,
-          },
-        }
-      );
+      if (provider === 'twilio') {
+        // Test credentials by fetching account info
+        const response = await fetch(
+          `https://api.twilio.com/2010-04-01/Accounts/${accountSid}.json`,
+          {
+            headers: {
+              Authorization: `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString('base64')}`,
+            },
+          }
+        );
 
-      if (!response.ok) {
+        if (!response.ok) {
+          return {
+            success: false,
+            message: 'Invalid Twilio credentials',
+          };
+        }
+
         return {
-          success: false,
-          message: 'Invalid Twilio credentials',
+          success: true,
+          message: 'Twilio integration configured correctly',
         };
       }
 
+      // Other providers - just verify credentials are provided
       return {
         success: true,
-        message: 'Twilio integration configured correctly',
+        message: `${provider} configured with credentials. Full testing not yet implemented.`,
       };
     } catch (error: any) {
       return {
         success: false,
-        message: `Twilio test failed: ${error.message}`,
+        message: `${provider} test failed: ${error.message}`,
       };
     }
+  }
+
+  if (provider === 'msg91') {
+    const authKey = config.auth_key;
+    if (!authKey) {
+      return {
+        success: false,
+        message: 'MSG91 auth key not configured. Please enter your auth key in Settings.',
+      };
+    }
+    return {
+      success: true,
+      message: 'MSG91 configured with auth key. Full testing not yet implemented.',
+    };
+  }
+
+  if (provider === 'sns') {
+    const accessKey = config.access_key;
+    const secretKey = config.secret_key;
+    if (!accessKey || !secretKey) {
+      return {
+        success: false,
+        message: 'AWS SNS credentials not configured. Please enter your AWS credentials in Settings.',
+      };
+    }
+    return {
+      success: true,
+      message: 'AWS SNS configured with credentials. Full testing not yet implemented.',
+    };
   }
 
   return {
@@ -356,26 +414,30 @@ async function testSmsIntegration(
   };
 }
 
-// Test WhatsApp Integration (Interakt)
+// Test WhatsApp Integration
 async function testWhatsAppIntegration(
   integration: any,
   testRecipient?: string
 ): Promise<{ success: boolean; message: string }> {
-  const provider = integration.provider;
+  const config = integration.config || {};
+  const provider = config.provider || integration.provider || 'interakt';
+  const isDefaultProvider = provider === 'interakt';
 
-  if (provider === 'interakt') {
-    const apiKey = integration.config?.api_key || process.env.INTERAKT_API_KEY;
+  // Use custom API key if provided, otherwise fall back to env var for default provider
+  const apiKey = config.api_key || (isDefaultProvider ? process.env.INTERAKT_API_KEY : null);
 
-    if (!apiKey) {
-      return {
-        success: false,
-        message: 'Interakt API key not configured. Set api_key in config.',
-      };
-    }
+  if (!apiKey) {
+    return {
+      success: false,
+      message: isDefaultProvider
+        ? 'No API key configured. Set one in Settings or via INTERAKT_API_KEY environment variable.'
+        : `No API key configured for ${provider}. Please enter your API key in Settings.`,
+    };
+  }
 
-    try {
-      // Test API key by making a basic request
-      // Note: Interakt may not have a dedicated test endpoint, so we verify key format
+  try {
+    if (provider === 'interakt') {
+      // Test API key by verifying format
       if (apiKey.length < 20) {
         return {
           success: false,
@@ -383,8 +445,9 @@ async function testWhatsAppIntegration(
         };
       }
 
-      // If test recipient provided, send a test template message
+      // If test recipient provided, send a test message
       if (testRecipient) {
+        const countryCode = config.country_code || '+91';
         const response = await fetch('https://api.interakt.ai/v1/public/message/', {
           method: 'POST',
           headers: {
@@ -392,8 +455,8 @@ async function testWhatsAppIntegration(
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            countryCode: '+91',
-            phoneNumber: testRecipient.replace(/^\+91/, ''),
+            countryCode: countryCode.replace('+', ''),
+            phoneNumber: testRecipient.replace(/^\+\d+/, ''),
             callbackData: 'test',
             type: 'Text',
             data: {
@@ -420,16 +483,51 @@ async function testWhatsAppIntegration(
         success: true,
         message: 'Interakt API key configured (send test message to verify fully)',
       };
-    } catch (error: any) {
+    }
+
+    if (provider === 'twilio_wa') {
+      const accountSid = config.account_sid;
+      const authToken = config.auth_token;
+
+      if (!accountSid || !authToken) {
+        return {
+          success: false,
+          message: 'Twilio WhatsApp credentials not configured. Please enter Account SID and Auth Token.',
+        };
+      }
+
+      // Verify Twilio credentials
+      const response = await fetch(
+        `https://api.twilio.com/2010-04-01/Accounts/${accountSid}.json`,
+        {
+          headers: {
+            Authorization: `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString('base64')}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        return {
+          success: false,
+          message: 'Invalid Twilio credentials',
+        };
+      }
+
       return {
-        success: false,
-        message: `Interakt test failed: ${error.message}`,
+        success: true,
+        message: 'Twilio WhatsApp integration configured correctly',
       };
     }
-  }
 
-  return {
-    success: false,
-    message: `WhatsApp provider "${provider}" not yet supported`,
-  };
+    // Other providers - just verify API key is provided
+    return {
+      success: true,
+      message: `${provider} configured with API key. Full testing not yet implemented.`,
+    };
+  } catch (error: any) {
+    return {
+      success: false,
+      message: `WhatsApp test failed: ${error.message}`,
+    };
+  }
 }

@@ -205,8 +205,20 @@ async function sendNotification(job: any, log: any, supabase: any) {
     // Get email integration settings
     const integration = await getIntegrationSettings(supabase, 'email');
     const config = integration?.config || {};
+    const provider = config.provider || integration?.provider || 'resend';
 
-    // Use custom API key from config, or fall back to env variable
+    // Currently only Resend is fully implemented
+    // For other providers, you would add their implementation here
+    if (provider !== 'resend') {
+      // For non-default providers, require API key in config
+      if (!config.api_key) {
+        throw new Error(`Email provider ${provider} requires an API key. Configure it in Settings.`);
+      }
+      // TODO: Implement other email providers (SendGrid, Mailgun, etc.)
+      throw new Error(`Email provider ${provider} not yet implemented. Please use Resend for now.`);
+    }
+
+    // Use custom API key from config, or fall back to env variable for default provider
     const customApiKey = config.api_key || undefined;
     const resendClient = getResendClient(customApiKey);
     if (!resendClient) {
@@ -249,18 +261,26 @@ async function sendNotification(job: any, log: any, supabase: any) {
       throw new Error('SMS integration not configured or disabled');
     }
 
-    const provider = integration.provider || 'twilio';
     const config = integration.config || {};
+    // Provider can be stored in config.provider (from UI) or integration.provider
+    const provider = config.provider || integration.provider || 'twilio';
+    const isDefaultProvider = provider === 'twilio';
+
+    // For non-default providers, require credentials in config
+    if (!isDefaultProvider && provider !== 'msg91') {
+      throw new Error(`SMS provider ${provider} not yet implemented. Please use Twilio or MSG91 for now.`);
+    }
 
     const result = await sms.send({
       to: log.recipient_phone,
       message: job.body,
       config: {
-        provider,
-        twilio: provider === 'twilio' ? {
-          accountSid: config.account_sid || process.env.TWILIO_ACCOUNT_SID || '',
-          authToken: config.auth_token || process.env.TWILIO_AUTH_TOKEN || '',
-          phoneNumber: config.phone_number || process.env.TWILIO_PHONE_NUMBER || '',
+        provider: provider === 'msg91' ? 'msg91' : 'twilio',
+        twilio: (provider === 'twilio' || provider === 'vonage' || provider === 'plivo') ? {
+          // Only fall back to env vars for default provider (twilio)
+          accountSid: config.account_sid || (isDefaultProvider ? process.env.TWILIO_ACCOUNT_SID : '') || '',
+          authToken: config.auth_token || (isDefaultProvider ? process.env.TWILIO_AUTH_TOKEN : '') || '',
+          phoneNumber: config.phone_number || (isDefaultProvider ? process.env.TWILIO_PHONE_NUMBER : '') || '',
         } : undefined,
         msg91: provider === 'msg91' ? {
           authKey: config.auth_key || process.env.MSG91_AUTH_KEY || '',
@@ -288,10 +308,24 @@ async function sendNotification(job: any, log: any, supabase: any) {
     }
 
     const config = integration.config || {};
+    // Provider can be stored in config.provider (from UI) or integration.provider
+    const provider = config.provider || integration.provider || 'interakt';
+    const isDefaultProvider = provider === 'interakt';
+
+    // For non-default providers, require API key in config
+    if (!isDefaultProvider) {
+      if (!config.api_key) {
+        throw new Error(`WhatsApp provider ${provider} requires an API key. Configure it in Settings.`);
+      }
+      // TODO: Implement other WhatsApp providers (Twilio WhatsApp, etc.)
+      throw new Error(`WhatsApp provider ${provider} not yet implemented. Please use Interakt for now.`);
+    }
+
+    // Use custom API key or fall back to env var for default provider
     const apiKey = config.api_key || process.env.INTERAKT_API_KEY;
 
     if (!apiKey) {
-      throw new Error('Interakt API key not configured');
+      throw new Error('Interakt API key not configured - set it in Settings or INTERAKT_API_KEY env var');
     }
 
     // Check if using template or text message

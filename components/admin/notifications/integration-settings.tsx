@@ -29,6 +29,13 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Integration {
   id: string;
@@ -53,22 +60,43 @@ const channelLabels = {
   whatsapp: 'WhatsApp',
 };
 
-const providerInfo: Record<string, { name: string; description: string; docsUrl: string }> = {
-  resend: {
-    name: 'Resend',
-    description: 'Modern email API for developers. Reliable delivery, detailed analytics.',
-    docsUrl: 'https://resend.com/docs',
-  },
-  twilio: {
-    name: 'Twilio',
-    description: 'Industry-leading SMS API. Global reach, programmable messaging.',
-    docsUrl: 'https://www.twilio.com/docs/sms',
-  },
-  interakt: {
-    name: 'Interakt',
-    description: 'Official WhatsApp Business API partner for India. Template-based messaging.',
-    docsUrl: 'https://docs.interakt.ai/',
-  },
+// Provider options for each channel
+const emailProviders = [
+  { id: 'resend', name: 'Resend', description: 'Modern email API for developers. Reliable delivery.', docsUrl: 'https://resend.com/docs', isDefault: true },
+  { id: 'sendgrid', name: 'SendGrid', description: 'Trusted email delivery by Twilio.', docsUrl: 'https://docs.sendgrid.com/' },
+  { id: 'mailgun', name: 'Mailgun', description: 'Powerful transactional email API.', docsUrl: 'https://documentation.mailgun.com/' },
+  { id: 'ses', name: 'AWS SES', description: 'Amazon Simple Email Service.', docsUrl: 'https://docs.aws.amazon.com/ses/' },
+  { id: 'postmark', name: 'Postmark', description: 'Fast, reliable email delivery.', docsUrl: 'https://postmarkapp.com/developer' },
+  { id: 'custom', name: 'Custom SMTP', description: 'Use your own SMTP server.', docsUrl: '' },
+];
+
+const whatsappProviders = [
+  { id: 'interakt', name: 'Interakt', description: 'Official WhatsApp Business API partner for India.', docsUrl: 'https://docs.interakt.ai/', isDefault: true },
+  { id: 'twilio_wa', name: 'Twilio WhatsApp', description: 'WhatsApp Business API via Twilio.', docsUrl: 'https://www.twilio.com/docs/whatsapp' },
+  { id: 'messagebird', name: 'MessageBird', description: 'Omnichannel messaging platform.', docsUrl: 'https://developers.messagebird.com/' },
+  { id: 'gupshup', name: 'Gupshup', description: 'Conversational messaging platform.', docsUrl: 'https://www.gupshup.io/developer' },
+];
+
+const smsProviders = [
+  { id: 'twilio', name: 'Twilio', description: 'Industry-leading SMS API. Global reach.', docsUrl: 'https://www.twilio.com/docs/sms', isDefault: true },
+  { id: 'msg91', name: 'MSG91', description: 'SMS gateway for India.', docsUrl: 'https://docs.msg91.com/' },
+  { id: 'vonage', name: 'Vonage (Nexmo)', description: 'Global SMS and voice APIs.', docsUrl: 'https://developer.vonage.com/' },
+  { id: 'plivo', name: 'Plivo', description: 'Cloud communications platform.', docsUrl: 'https://www.plivo.com/docs/' },
+  { id: 'sns', name: 'AWS SNS', description: 'Amazon Simple Notification Service.', docsUrl: 'https://docs.aws.amazon.com/sns/' },
+];
+
+const getProviders = (channel: string) => {
+  switch (channel) {
+    case 'email': return emailProviders;
+    case 'whatsapp': return whatsappProviders;
+    case 'sms': return smsProviders;
+    default: return [];
+  }
+};
+
+const getDefaultProvider = (channel: string) => {
+  const providers = getProviders(channel);
+  return providers.find(p => p.isDefault)?.id || providers[0]?.id;
 };
 
 export function IntegrationSettings() {
@@ -266,9 +294,22 @@ export function IntegrationSettings() {
   function renderIntegrationCard(channel: 'email' | 'sms' | 'whatsapp') {
     const integration = integrations.find(i => i.channel === channel);
     const Icon = channelIcons[channel];
-    const provider = integration?.provider || (channel === 'email' ? 'resend' : channel === 'whatsapp' ? 'interakt' : 'twilio');
-    const info = providerInfo[provider];
     const config = editedConfigs[channel] || {};
+    const providers = getProviders(channel);
+    const defaultProviderId = getDefaultProvider(channel);
+    const selectedProvider = config.provider || defaultProviderId;
+    const providerInfo = providers.find(p => p.id === selectedProvider);
+    const isDefaultProvider = selectedProvider === defaultProviderId;
+
+    const handleProviderChange = (newProvider: string) => {
+      updateConfig(channel, 'provider', newProvider);
+      // Clear provider-specific config when changing providers
+      if (newProvider !== config.provider) {
+        updateConfig(channel, 'api_key', '');
+        updateConfig(channel, 'account_sid', '');
+        updateConfig(channel, 'auth_token', '');
+      }
+    };
 
     return (
       <Card key={channel} className="dark:bg-gray-900/50">
@@ -295,19 +336,6 @@ export function IntegrationSettings() {
                     </Badge>
                   )}
                 </CardTitle>
-                <CardDescription className="flex items-center gap-2">
-                  Provider: <span className="font-medium">{info?.name || provider}</span>
-                  {info?.docsUrl && (
-                    <a
-                      href={info.docsUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:text-blue-700 dark:text-blue-400"
-                    >
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
-                  )}
-                </CardDescription>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -340,225 +368,379 @@ export function IntegrationSettings() {
         </CardHeader>
 
         <CardContent className="space-y-4">
-          {info?.description && (
-            <p className="text-sm text-muted-foreground dark:text-gray-400">
-              {info.description}
-            </p>
-          )}
+          {/* Provider Selection */}
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              Provider
+              {isDefaultProvider && (
+                <Badge variant="outline" className="text-xs bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800">
+                  Default
+                </Badge>
+              )}
+            </Label>
+            <Select value={selectedProvider} onValueChange={handleProviderChange}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {providers.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    <div className="flex items-center gap-2">
+                      {p.name}
+                      {p.isDefault && (
+                        <span className="text-xs text-muted-foreground">(Default)</span>
+                      )}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {providerInfo?.description && (
+              <p className="text-xs text-muted-foreground flex items-center gap-2">
+                {providerInfo.description}
+                {providerInfo.docsUrl && (
+                  <a
+                    href={providerInfo.docsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:text-blue-700 dark:text-blue-400 inline-flex items-center gap-1"
+                  >
+                    Docs <ExternalLink className="w-3 h-3" />
+                  </a>
+                )}
+              </p>
+            )}
+          </div>
 
           <Separator />
 
-          {/* Channel-specific configuration */}
-          {channel === 'email' && (
-            <div className="space-y-4">
-              {/* API Key Section */}
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  Resend API Key
-                  <Tooltip>
-                    <TooltipTrigger>
-                      <AlertCircle className="w-3.5 h-3.5 text-muted-foreground" />
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-xs">
-                      Get your API key from the Resend dashboard. Leave empty to use default system key.
-                    </TooltipContent>
-                  </Tooltip>
-                </Label>
-                <div className="relative">
-                  <Input
-                    type={showSecrets['email_api'] ? 'text' : 'password'}
-                    placeholder="re_XXXXXXXXX... (optional - uses default if empty)"
-                    value={config.api_key || ''}
-                    onChange={(e) => updateConfig(channel, 'api_key', e.target.value)}
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
-                    onClick={() => toggleShowSecret('email_api')}
-                  >
-                    {showSecrets['email_api'] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </Button>
-                </div>
-                {!config.api_key && (
-                  <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                    <Info className="w-3 h-3" />
-                    Using default system API key (RESEND_API_KEY)
-                  </p>
-                )}
-              </div>
-
-              <Separator className="my-2" />
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>From Email</Label>
-                  <Input
-                    placeholder="notifications@yourcompany.com"
-                    value={config.from_email || ''}
-                    onChange={(e) => updateConfig(channel, 'from_email', e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>From Name</Label>
-                  <Input
-                    placeholder="Rethink Systems"
-                    value={config.from_name || ''}
-                    onChange={(e) => updateConfig(channel, 'from_name', e.target.value)}
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Reply-To Email (optional)</Label>
-                <Input
-                  placeholder="support@yourcompany.com"
-                  value={config.reply_to || ''}
-                  onChange={(e) => updateConfig(channel, 'reply_to', e.target.value)}
-                />
-              </div>
-            </div>
-          )}
-
-          {channel === 'whatsapp' && (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  Interakt API Key
-                  <Tooltip>
-                    <TooltipTrigger>
-                      <AlertCircle className="w-3.5 h-3.5 text-muted-foreground" />
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-xs">
-                      Get your API key from Interakt dashboard under Settings &gt; Developer Settings. Leave empty to use default system key.
-                    </TooltipContent>
-                  </Tooltip>
-                </Label>
-                <div className="relative">
-                  <Input
-                    type={showSecrets['whatsapp_api'] ? 'text' : 'password'}
-                    placeholder="Enter API key (optional - uses default if empty)"
-                    value={config.api_key || ''}
-                    onChange={(e) => updateConfig(channel, 'api_key', e.target.value)}
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
-                    onClick={() => toggleShowSecret('whatsapp_api')}
-                  >
-                    {showSecrets['whatsapp_api'] ? (
-                      <EyeOff className="w-4 h-4" />
-                    ) : (
-                      <Eye className="w-4 h-4" />
-                    )}
-                  </Button>
-                </div>
-                {!config.api_key && (
-                  <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                    <Info className="w-3 h-3" />
-                    Using default system API key (INTERAKT_API_KEY)
-                  </p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label>Default Country Code</Label>
-                <Input
-                  placeholder="+91"
-                  value={config.country_code || '+91'}
-                  onChange={(e) => updateConfig(channel, 'country_code', e.target.value)}
-                  className="w-24"
-                />
-              </div>
-            </div>
-          )}
-
-          {channel === 'sms' && (
-            <div className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
-                    Twilio Account SID
-                    <Tooltip>
-                      <TooltipTrigger>
-                        <AlertCircle className="w-3.5 h-3.5 text-muted-foreground" />
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs">
-                        Leave empty to use default system credentials (TWILIO_ACCOUNT_SID)
-                      </TooltipContent>
-                    </Tooltip>
-                  </Label>
-                  <div className="relative">
-                    <Input
-                      type={showSecrets['twilio_sid'] ? 'text' : 'password'}
-                      placeholder="ACXXXXXXXX... (optional)"
-                      value={config.account_sid || ''}
-                      onChange={(e) => updateConfig(channel, 'account_sid', e.target.value)}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
-                      onClick={() => toggleShowSecret('twilio_sid')}
-                    >
-                      {showSecrets['twilio_sid'] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </Button>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
-                    Twilio Auth Token
-                    <Tooltip>
-                      <TooltipTrigger>
-                        <AlertCircle className="w-3.5 h-3.5 text-muted-foreground" />
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs">
-                        Leave empty to use default system credentials (TWILIO_AUTH_TOKEN)
-                      </TooltipContent>
-                    </Tooltip>
-                  </Label>
-                  <div className="relative">
-                    <Input
-                      type={showSecrets['twilio_token'] ? 'text' : 'password'}
-                      placeholder="Enter auth token (optional)"
-                      value={config.auth_token || ''}
-                      onChange={(e) => updateConfig(channel, 'auth_token', e.target.value)}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
-                      onClick={() => toggleShowSecret('twilio_token')}
-                    >
-                      {showSecrets['twilio_token'] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-              {!config.account_sid && !config.auth_token && (
-                <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                  <Info className="w-3 h-3" />
-                  Using default system credentials (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+          {/* Default Provider - Using System Keys */}
+          {isDefaultProvider && !config.api_key && !config.account_sid && (
+            <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+              <Info className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+              <div className="text-sm text-blue-800 dark:text-blue-200">
+                <p className="font-medium">Using System Default</p>
+                <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                  {channel === 'email' && 'Connected via RESEND_API_KEY environment variable'}
+                  {channel === 'whatsapp' && 'Connected via INTERAKT_API_KEY environment variable'}
+                  {channel === 'sms' && 'Connected via TWILIO_* environment variables'}
                 </p>
-              )}
-              <div className="space-y-2">
-                <Label>Twilio Phone Number</Label>
-                <Input
-                  placeholder="+1234567890 (optional - uses default if empty)"
-                  value={config.phone_number || ''}
-                  onChange={(e) => updateConfig(channel, 'phone_number', e.target.value)}
-                />
-                {!config.phone_number && (
-                  <p className="text-xs text-muted-foreground flex items-center gap-1">
-                    Uses TWILIO_PHONE_NUMBER from environment if not set
-                  </p>
-                )}
               </div>
             </div>
           )}
+
+          {/* API Key / Credentials Section */}
+          <div className="space-y-4">
+            {/* Email Providers */}
+            {channel === 'email' && (
+              <>
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    API Key
+                    {isDefaultProvider && (
+                      <span className="text-xs text-muted-foreground">(optional for default provider)</span>
+                    )}
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      type={showSecrets['email_api'] ? 'text' : 'password'}
+                      placeholder={isDefaultProvider ? "Leave empty to use system default" : "Enter your API key (required)"}
+                      value={config.api_key || ''}
+                      onChange={(e) => updateConfig(channel, 'api_key', e.target.value)}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                      onClick={() => toggleShowSecret('email_api')}
+                    >
+                      {showSecrets['email_api'] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </Button>
+                  </div>
+                </div>
+
+                <Separator className="my-2" />
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>From Email</Label>
+                    <Input
+                      placeholder="notifications@yourcompany.com"
+                      value={config.from_email || ''}
+                      onChange={(e) => updateConfig(channel, 'from_email', e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>From Name</Label>
+                    <Input
+                      placeholder="Your Company"
+                      value={config.from_name || ''}
+                      onChange={(e) => updateConfig(channel, 'from_name', e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Reply-To Email (optional)</Label>
+                  <Input
+                    placeholder="support@yourcompany.com"
+                    value={config.reply_to || ''}
+                    onChange={(e) => updateConfig(channel, 'reply_to', e.target.value)}
+                  />
+                </div>
+              </>
+            )}
+
+            {/* WhatsApp Providers */}
+            {channel === 'whatsapp' && (
+              <>
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    API Key
+                    {isDefaultProvider && (
+                      <span className="text-xs text-muted-foreground">(optional for default provider)</span>
+                    )}
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      type={showSecrets['whatsapp_api'] ? 'text' : 'password'}
+                      placeholder={isDefaultProvider ? "Leave empty to use system default" : "Enter your API key (required)"}
+                      value={config.api_key || ''}
+                      onChange={(e) => updateConfig(channel, 'api_key', e.target.value)}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                      onClick={() => toggleShowSecret('whatsapp_api')}
+                    >
+                      {showSecrets['whatsapp_api'] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Twilio WhatsApp requires Account SID and Auth Token */}
+                {selectedProvider === 'twilio_wa' && (
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Account SID</Label>
+                      <div className="relative">
+                        <Input
+                          type={showSecrets['wa_sid'] ? 'text' : 'password'}
+                          placeholder="ACXXXXXXXX..."
+                          value={config.account_sid || ''}
+                          onChange={(e) => updateConfig(channel, 'account_sid', e.target.value)}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                          onClick={() => toggleShowSecret('wa_sid')}
+                        >
+                          {showSecrets['wa_sid'] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Auth Token</Label>
+                      <div className="relative">
+                        <Input
+                          type={showSecrets['wa_token'] ? 'text' : 'password'}
+                          placeholder="Enter auth token"
+                          value={config.auth_token || ''}
+                          onChange={(e) => updateConfig(channel, 'auth_token', e.target.value)}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                          onClick={() => toggleShowSecret('wa_token')}
+                        >
+                          {showSecrets['wa_token'] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label>Default Country Code</Label>
+                  <Input
+                    placeholder="+91"
+                    value={config.country_code || '+91'}
+                    onChange={(e) => updateConfig(channel, 'country_code', e.target.value)}
+                    className="w-24"
+                  />
+                </div>
+              </>
+            )}
+
+            {/* SMS Providers */}
+            {channel === 'sms' && (
+              <>
+                {/* Twilio and similar providers need Account SID + Auth Token */}
+                {(selectedProvider === 'twilio' || selectedProvider === 'vonage' || selectedProvider === 'plivo') && (
+                  <>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-2">
+                          Account SID / API Key
+                          {isDefaultProvider && (
+                            <span className="text-xs text-muted-foreground">(optional)</span>
+                          )}
+                        </Label>
+                        <div className="relative">
+                          <Input
+                            type={showSecrets['sms_sid'] ? 'text' : 'password'}
+                            placeholder={isDefaultProvider ? "Leave empty for default" : "ACXXXXXXXX..."}
+                            value={config.account_sid || ''}
+                            onChange={(e) => updateConfig(channel, 'account_sid', e.target.value)}
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                            onClick={() => toggleShowSecret('sms_sid')}
+                          >
+                            {showSecrets['sms_sid'] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-2">
+                          Auth Token / API Secret
+                          {isDefaultProvider && (
+                            <span className="text-xs text-muted-foreground">(optional)</span>
+                          )}
+                        </Label>
+                        <div className="relative">
+                          <Input
+                            type={showSecrets['sms_token'] ? 'text' : 'password'}
+                            placeholder={isDefaultProvider ? "Leave empty for default" : "Enter auth token"}
+                            value={config.auth_token || ''}
+                            onChange={(e) => updateConfig(channel, 'auth_token', e.target.value)}
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                            onClick={() => toggleShowSecret('sms_token')}
+                          >
+                            {showSecrets['sms_token'] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Phone Number / Sender ID</Label>
+                      <Input
+                        placeholder={isDefaultProvider ? "+1234567890 (optional)" : "+1234567890"}
+                        value={config.phone_number || ''}
+                        onChange={(e) => updateConfig(channel, 'phone_number', e.target.value)}
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* MSG91 uses Auth Key + Sender ID */}
+                {selectedProvider === 'msg91' && (
+                  <>
+                    <div className="space-y-2">
+                      <Label>Auth Key</Label>
+                      <div className="relative">
+                        <Input
+                          type={showSecrets['msg91_key'] ? 'text' : 'password'}
+                          placeholder="Enter MSG91 auth key"
+                          value={config.auth_key || ''}
+                          onChange={(e) => updateConfig(channel, 'auth_key', e.target.value)}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                          onClick={() => toggleShowSecret('msg91_key')}
+                        >
+                          {showSecrets['msg91_key'] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Sender ID</Label>
+                      <Input
+                        placeholder="RETHINK"
+                        value={config.sender_id || ''}
+                        onChange={(e) => updateConfig(channel, 'sender_id', e.target.value)}
+                        maxLength={6}
+                      />
+                      <p className="text-xs text-muted-foreground">6-character alphanumeric sender ID</p>
+                    </div>
+                  </>
+                )}
+
+                {/* AWS SNS */}
+                {selectedProvider === 'sns' && (
+                  <>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label>AWS Access Key ID</Label>
+                        <div className="relative">
+                          <Input
+                            type={showSecrets['sns_key'] ? 'text' : 'password'}
+                            placeholder="AKIAXXXXXXXX..."
+                            value={config.access_key || ''}
+                            onChange={(e) => updateConfig(channel, 'access_key', e.target.value)}
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                            onClick={() => toggleShowSecret('sns_key')}
+                          >
+                            {showSecrets['sns_key'] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>AWS Secret Access Key</Label>
+                        <div className="relative">
+                          <Input
+                            type={showSecrets['sns_secret'] ? 'text' : 'password'}
+                            placeholder="Enter secret key"
+                            value={config.secret_key || ''}
+                            onChange={(e) => updateConfig(channel, 'secret_key', e.target.value)}
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                            onClick={() => toggleShowSecret('sns_secret')}
+                          >
+                            {showSecrets['sns_secret'] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>AWS Region</Label>
+                      <Input
+                        placeholder="ap-south-1"
+                        value={config.region || 'ap-south-1'}
+                        onChange={(e) => updateConfig(channel, 'region', e.target.value)}
+                      />
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+          </div>
 
           <Separator />
 
