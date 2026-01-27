@@ -60,6 +60,7 @@ import { RecipientSelector } from '@/components/admin/notifications/recipient-se
 import { VariableEditor } from '@/components/admin/notifications/variable-editor';
 import { IntegrationSettings } from '@/components/admin/notifications/integration-settings';
 import { CohortImportDialog } from '@/components/admin/notifications/cohort-import-dialog';
+import { VariableConfigModal } from '@/components/admin/notifications/variable-config-modal';
 
 interface NotificationTemplate {
   id: string;
@@ -127,6 +128,7 @@ export default function AdminNotificationsPage() {
   const [showContactForm, setShowContactForm] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [showCohortImportDialog, setShowCohortImportDialog] = useState(false);
+  const [showVariableConfig, setShowVariableConfig] = useState(false);
   const [editingList, setEditingList] = useState<ContactList | null>(null);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const [listFormData, setListFormData] = useState({
@@ -1989,34 +1991,45 @@ export default function AdminNotificationsPage() {
             </div>
 
             {/* Variables Guide */}
-            <div className="p-4 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-950/20 dark:to-blue-950/20 border border-purple-200 dark:border-purple-900 rounded-lg">
+            <div
+              className="p-4 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-950/20 dark:to-blue-950/20 border border-purple-200 dark:border-purple-900 rounded-lg cursor-pointer hover:border-purple-400 dark:hover:border-purple-700 transition-colors"
+              onClick={() => setShowVariableConfig(true)}
+            >
               <div className="flex items-start gap-3">
                 <Zap className="w-5 h-5 text-purple-600 dark:text-purple-400 mt-0.5 flex-shrink-0" />
                 <div className="flex-1">
-                  <h4 className="font-semibold text-sm text-purple-900 dark:text-purple-100 mb-2">Dynamic Variables</h4>
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-semibold text-sm text-purple-900 dark:text-purple-100">Dynamic Variables</h4>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/50"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowVariableConfig(true);
+                      }}
+                    >
+                      <Settings className="w-3 h-3 mr-1" />
+                      Configure & Test
+                    </Button>
+                  </div>
                   <p className="text-xs text-purple-800 dark:text-purple-200 mb-3">
-                    Use variables to personalize each message. Variables will be replaced with actual values when sending.
+                    Use variables to personalize each message. Click to see all available variables and test with real data.
                   </p>
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div className="flex items-center gap-2">
                       <code className="px-2 py-1 bg-purple-100 dark:bg-purple-900/50 rounded text-purple-900 dark:text-purple-100">{`{{name}}`}</code>
-                      <span className="text-purple-700 dark:text-purple-300">Recipient name</span>
+                      <span className="text-purple-700 dark:text-purple-300">from profiles.full_name</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <code className="px-2 py-1 bg-purple-100 dark:bg-purple-900/50 rounded text-purple-900 dark:text-purple-100">{`{{cohort_name}}`}</code>
-                      <span className="text-purple-700 dark:text-purple-300">Cohort name</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <code className="px-2 py-1 bg-purple-100 dark:bg-purple-900/50 rounded text-purple-900 dark:text-purple-100">{`{{start_date}}`}</code>
-                      <span className="text-purple-700 dark:text-purple-300">Start date</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <code className="px-2 py-1 bg-purple-100 dark:bg-purple-900/50 rounded text-purple-900 dark:text-purple-100">{`{{link}}`}</code>
-                      <span className="text-purple-700 dark:text-purple-300">Custom link</span>
+                      <span className="text-purple-700 dark:text-purple-300">from cohorts.name</span>
                     </div>
                   </div>
-                  <p className="text-xs text-purple-700 dark:text-purple-300 mt-3">
-                    💡 <strong>Pro tip:</strong> You can define custom variables when sending the notification
+                  <p className="text-xs text-purple-600 dark:text-purple-400 mt-3 flex items-center gap-1">
+                    <Info className="w-3 h-3" />
+                    Click to view all variables, their data sources, and test with live data
                   </p>
                 </div>
               </div>
@@ -2400,6 +2413,26 @@ export default function AdminNotificationsPage() {
           onImportComplete={handleImportComplete}
         />
       )}
+
+      {/* Variable Config Modal */}
+      <VariableConfigModal
+        open={showVariableConfig}
+        onOpenChange={setShowVariableConfig}
+        onInsertVariable={(variable) => {
+          // Insert variable into the body textarea
+          setTemplateFormData(prev => ({
+            ...prev,
+            body: prev.body + variable,
+          }));
+        }}
+        customVariables={templateFormData.variables}
+        onCustomVariablesChange={(variables) => {
+          setTemplateFormData(prev => ({
+            ...prev,
+            variables,
+          }));
+        }}
+      />
     </div>
   );
 }
