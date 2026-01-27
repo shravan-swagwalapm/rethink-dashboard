@@ -98,7 +98,9 @@ export function CohortImportDialog({
       const response = await fetch('/api/admin/cohorts');
       if (!response.ok) throw new Error('Failed to fetch cohorts');
       const result = await response.json();
-      setCohorts(result.data || result.cohorts || []);
+      // API returns array directly, or may have data/cohorts wrapper
+      const cohortsData = Array.isArray(result) ? result : (result.data || result.cohorts || []);
+      setCohorts(cohortsData);
     } catch (error) {
       console.error('Error fetching cohorts:', error);
       toast.error('Failed to load cohorts');

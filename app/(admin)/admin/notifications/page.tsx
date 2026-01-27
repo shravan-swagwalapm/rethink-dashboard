@@ -1499,14 +1499,14 @@ export default function AdminNotificationsPage() {
                 <div className="space-y-2">
                   <Label htmlFor="filter-status">Status</Label>
                   <Select
-                    value={logsFilter.status}
-                    onValueChange={(v) => setLogsFilter({ ...logsFilter, status: v })}
+                    value={logsFilter.status || 'all'}
+                    onValueChange={(v) => setLogsFilter({ ...logsFilter, status: v === 'all' ? '' : v })}
                   >
                     <SelectTrigger id="filter-status">
                       <SelectValue placeholder="All statuses" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All statuses</SelectItem>
+                      <SelectItem value="all">All statuses</SelectItem>
                       <SelectItem value="sent">Sent</SelectItem>
                       <SelectItem value="delivered">Delivered</SelectItem>
                       <SelectItem value="failed">Failed</SelectItem>
