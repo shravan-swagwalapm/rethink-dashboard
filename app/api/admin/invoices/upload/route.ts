@@ -41,6 +41,7 @@ export async function POST(request: NextRequest) {
     const amount = formData.get('amount') as string;
     const dueDate = formData.get('due_date') as string | null;
     const paymentType = formData.get('payment_type') as string || 'full';
+    const invoiceStatus = formData.get('status') as string || 'pending';
     const emiNumber = formData.get('emi_number') as string | null;
     const totalEmis = formData.get('total_emis') as string | null;
 
@@ -148,7 +149,7 @@ export async function POST(request: NextRequest) {
         emi_number: emiNumber ? parseInt(emiNumber) : null,
         total_emis: totalEmis ? parseInt(totalEmis) : null,
         pdf_path: uploadData.path,
-        status: 'pending',
+        status: invoiceStatus,
       })
       .select(`
         *,

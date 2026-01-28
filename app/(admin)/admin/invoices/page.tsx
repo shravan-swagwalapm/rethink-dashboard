@@ -132,6 +132,7 @@ export default function AdminInvoicesPage() {
   const [invoiceAmount, setInvoiceAmount] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [paymentType, setPaymentType] = useState('full');
+  const [invoiceStatus, setInvoiceStatus] = useState('pending');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   // Bulk upload dialog state
@@ -246,6 +247,7 @@ export default function AdminInvoicesPage() {
       formData.append('amount', invoiceAmount);
       if (dueDate) formData.append('due_date', dueDate);
       formData.append('payment_type', paymentType);
+      formData.append('status', invoiceStatus);
 
       const response = await fetch('/api/admin/invoices/upload', {
         method: 'POST',
@@ -276,6 +278,7 @@ export default function AdminInvoicesPage() {
     setInvoiceAmount('');
     setDueDate('');
     setPaymentType('full');
+    setInvoiceStatus('pending');
     setSelectedFile(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
@@ -792,6 +795,20 @@ export default function AdminInvoicesPage() {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Invoice Status *</Label>
+              <Select value={invoiceStatus} onValueChange={setInvoiceStatus}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="paid">Paid</SelectItem>
+                  <SelectItem value="overdue">Overdue</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
