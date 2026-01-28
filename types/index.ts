@@ -199,6 +199,7 @@ export interface AttendanceSegment {
 export interface Invoice {
   id: string;
   user_id: string;
+  cohort_id: string | null;
   invoice_number: string;
   amount: number;
   payment_type: PaymentType;
@@ -209,6 +210,32 @@ export interface Invoice {
   due_date: string | null;
   paid_at: string | null;
   created_at: string;
+  updated_at: string;
+}
+
+// Extended Invoice type with relations
+export interface InvoiceWithRelations extends Invoice {
+  user?: Profile;
+  cohort?: Cohort;
+}
+
+// Invoice bulk upload types
+export interface InvoiceMappingRow {
+  filename: string;
+  email: string;
+  invoice_number: string;
+  amount: number;
+  due_date?: string;
+}
+
+export interface BulkInvoiceResult {
+  success: { row: InvoiceMappingRow; invoice_id: string }[];
+  failed: { row: InvoiceMappingRow; error: string }[];
+  stats: {
+    total: number;
+    successful: number;
+    failed: number;
+  };
 }
 
 export interface Notification {

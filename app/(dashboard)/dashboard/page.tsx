@@ -13,7 +13,13 @@ import { PageLoader } from '@/components/ui/page-loader';
 import { Calendar, Clock, Video, ChevronRight, BookOpen, FolderOpen } from 'lucide-react';
 import Link from 'next/link';
 import { format, isToday, isTomorrow, parseISO } from 'date-fns';
-import type { Session, DashboardStats, LearningModule, Resource } from '@/types';
+import { InvoiceCard } from '@/components/dashboard/invoice-card';
+import { toast } from 'sonner';
+import type { Session, DashboardStats, LearningModule, Resource, Invoice, Cohort } from '@/types';
+
+interface InvoiceWithCohort extends Invoice {
+  cohort?: Cohort;
+}
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -23,6 +29,8 @@ export default function DashboardPage() {
   const [upcomingSessions, setUpcomingSessions] = useState<Session[]>([]);
   const [recentModules, setRecentModules] = useState<LearningModule[]>([]);
   const [recentResources, setRecentResources] = useState<Resource[]>([]);
+  const [invoices, setInvoices] = useState<InvoiceWithCohort[]>([]);
+  const [pendingInvoiceAmount, setPendingInvoiceAmount] = useState(0);
   const [cohortStartDate, setCohortStartDate] = useState<Date | null>(null);
   const [cohortName, setCohortName] = useState<string>('');
   const [loading, setLoading] = useState(true);
@@ -136,6 +144,18 @@ export default function DashboardPage() {
           setRecentModules(modulesResult.data || []);
           setRecentResources(resourcesResult.data || []);
         }
+
+        // Fetch invoices separately (uses API route for proper auth)
+        try {
+          const invoiceResponse = await fetch('/api/invoices');
+          if (invoiceResponse.ok) {
+            const invoiceData = await invoiceResponse.json();
+            setInvoices(invoiceData.invoices || []);
+            setPendingInvoiceAmount(invoiceData.stats?.pending_amount || 0);
+          }
+        } catch (invoiceError) {
+          console.error('Error fetching invoices:', invoiceError);
+        }
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
       } finally {
@@ -153,6 +173,26 @@ export default function DashboardPage() {
     if (isToday(sessionDate)) return 'Today';
     if (isTomorrow(sessionDate)) return 'Tomorrow';
     return format(sessionDate, 'EEE, MMM d');
+  };
+
+  const handleInvoiceDownload = async (invoice: InvoiceWithCohort) => {
+    if (!invoice.pdf_path) {
+      toast.error('No PDF available for this invoice');
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/invoices/${invoice.id}/download`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to download invoice');
+      }
+
+      window.open(data.url, '_blank');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to download invoice');
+    }
   };
 
   // Show explicit loader while checking if user is logged in
@@ -308,6 +348,17 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Invoices Card */}
+      {invoices.length > 0 && (
+        <div className="lg:col-span-2">
+          <InvoiceCard
+            invoices={invoices}
+            pendingAmount={pendingInvoiceAmount}
+            onDownload={handleInvoiceDownload}
+          />
+        </div>
+      )}
 
       {/* Recent Resources */}
       <Card className="relative overflow-hidden border-2 dark:border-gray-700 dark:bg-gray-900/50 hover:shadow-xl hover:shadow-green-500/10 transition-all duration-500 hover:-translate-y-0.5">

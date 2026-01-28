@@ -16,6 +16,7 @@ import {
   ChevronRight,
   Sparkles,
   X,
+  Receipt,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -39,6 +40,7 @@ const navItems: NavItem[] = [
   { label: 'Calendar', href: '/calendar', icon: Calendar },
   { label: 'My Learnings', href: '/learnings', icon: BookOpen },
   { label: 'Resources', href: '/resources', icon: FolderOpen },
+  { label: 'Invoices', href: '/invoices', icon: Receipt },
   { label: 'Team', href: '/team', icon: Users, roles: ['admin', 'company_user', 'mentor'] },
   { label: 'Attendance', href: '/attendance', icon: BarChart3, roles: ['admin', 'company_user', 'mentor'] },
 ];
