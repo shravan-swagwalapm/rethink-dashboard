@@ -64,6 +64,7 @@ import {
   IndianRupee,
   Clock,
   AlertCircle,
+  Pencil,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import * as XLSX from 'xlsx';
@@ -148,6 +149,12 @@ export default function AdminInvoicesPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [invoiceToDelete, setInvoiceToDelete] = useState<InvoiceWithRelations | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // Edit status dialog
+  const [editStatusDialogOpen, setEditStatusDialogOpen] = useState(false);
+  const [invoiceToEdit, setInvoiceToEdit] = useState<InvoiceWithRelations | null>(null);
+  const [newStatus, setNewStatus] = useState('pending');
+  const [editStatusLoading, setEditStatusLoading] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bulkExcelInputRef = useRef<HTMLInputElement>(null);
@@ -400,6 +407,36 @@ export default function AdminInvoicesPage() {
       toast.error(error instanceof Error ? error.message : 'Failed to delete invoice');
     } finally {
       setDeleteLoading(false);
+    }
+  };
+
+  const handleEditStatus = async () => {
+    if (!invoiceToEdit) return;
+
+    setEditStatusLoading(true);
+    try {
+      const response = await fetch('/api/admin/invoices', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: invoiceToEdit.id,
+          status: newStatus,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to update invoice status');
+      }
+
+      toast.success('Invoice status updated successfully');
+      setEditStatusDialogOpen(false);
+      setInvoiceToEdit(null);
+      fetchInvoices(true);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to update invoice status');
+    } finally {
+      setEditStatusLoading(false);
     }
   };
 
@@ -685,6 +722,16 @@ export default function AdminInvoicesPage() {
                           <DropdownMenuItem onClick={() => handleViewPdf(invoice)}>
                             <Eye className="w-4 h-4 mr-2" />
                             View PDF
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setInvoiceToEdit(invoice);
+                              setNewStatus(invoice.status);
+                              setEditStatusDialogOpen(true);
+                            }}
+                          >
+                            <Pencil className="w-4 h-4 mr-2" />
+                            Edit Status
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => {
@@ -1101,6 +1148,40 @@ export default function AdminInvoicesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Edit Status Dialog */}
+      <Dialog open={editStatusDialogOpen} onOpenChange={setEditStatusDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Edit Invoice Status</DialogTitle>
+            <DialogDescription>
+              Update the status for invoice {invoiceToEdit?.invoice_number}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label>Status</Label>
+            <Select value={newStatus} onValueChange={setNewStatus}>
+              <SelectTrigger className="mt-2">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="paid">Paid</SelectItem>
+                <SelectItem value="overdue">Overdue</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditStatusDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleEditStatus} disabled={editStatusLoading}>
+              {editStatusLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Update Status
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
