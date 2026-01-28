@@ -182,7 +182,8 @@ export default function AdminInvoicesPage() {
       const response = await fetch('/api/admin/cohorts');
       if (!response.ok) throw new Error('Failed to fetch cohorts');
       const data = await response.json();
-      setCohorts(data.cohorts || []);
+      // API returns array directly, not { cohorts: [] }
+      setCohorts(Array.isArray(data) ? data : data.cohorts || []);
     } catch (error) {
       console.error('Error fetching cohorts:', error);
     }
