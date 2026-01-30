@@ -56,11 +56,11 @@ interface DashboardSidebarProps {
 
 export function DashboardSidebar({ mobileOpen, onMobileClose }: DashboardSidebarProps) {
   const pathname = usePathname();
-  const { profile } = useUser();
+  const { profile, activeRole } = useUser();
   const [collapsed, setCollapsed] = useState(false);
 
   const filteredNavItems = navItems.filter(
-    (item) => !item.roles || item.roles.includes(profile?.role || '')
+    (item) => !item.roles || item.roles.includes(activeRole || '')
   );
 
   // Close mobile menu when navigating

@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
+import { RoleSwitcher } from '@/components/dashboard/role-switcher';
 
 interface DashboardHeaderProps {
   onMenuClick?: () => void;
@@ -101,6 +102,9 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
 
         {/* Right side - Actions */}
         <div className="flex items-center gap-1 sm:gap-2">
+          {/* Role Switcher */}
+          <RoleSwitcher />
+
           {/* Admin link */}
           {isAdmin && (
             <Link href="/admin">

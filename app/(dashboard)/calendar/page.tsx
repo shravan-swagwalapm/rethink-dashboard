@@ -52,7 +52,7 @@ interface SessionWithRsvp extends Session {
 }
 
 export default function CalendarPage() {
-  const { profile, loading: userLoading } = useUser();
+  const { profile, loading: userLoading, activeCohortId, isAdmin } = useUser();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [sessions, setSessions] = useState<SessionWithRsvp[]>([]);
   const [selectedSession, setSelectedSession] = useState<SessionWithRsvp | null>(null);
@@ -64,31 +64,40 @@ export default function CalendarPage() {
 
   useEffect(() => {
     const fetchSessions = async () => {
-      if (!profile?.cohort_id) {
-        setLoading(false);
-        return;
-      }
-
       const supabase = getClient();
       const start = startOfMonth(currentMonth);
       const end = endOfMonth(currentMonth);
 
       try {
-        const { data: sessionsData, error: sessionsError } = await supabase
+        let query = supabase
           .from('sessions')
           .select('*')
-          .eq('cohort_id', profile.cohort_id)
           .gte('scheduled_at', start.toISOString())
           .lte('scheduled_at', end.toISOString())
           .order('scheduled_at', { ascending: true });
 
+        // FILTERING LOGIC:
+        // - Admin role: Show ALL sessions from all cohorts
+        // - Student role: Show ONLY sessions for active cohort
+        if (!isAdmin) {
+          if (!activeCohortId) {
+            setLoading(false);
+            return;
+          }
+          query = query.eq('cohort_id', activeCohortId);
+        }
+        // Admin: no cohort filter (shows all sessions)
+
+        const { data: sessionsData, error: sessionsError } = await query;
+
         if (sessionsError) throw sessionsError;
 
-        const { data: rsvpsData } = await supabase
+        // Fetch RSVPs only if user is logged in
+        const { data: rsvpsData } = profile ? await supabase
           .from('rsvps')
           .select('*')
           .eq('user_id', profile.id)
-          .in('session_id', sessionsData?.map((s: Session) => s.id) || []);
+          .in('session_id', sessionsData?.map((s: Session) => s.id) || []) : { data: null };
 
         const sessionsWithRsvp = sessionsData?.map((session: Session) => ({
           ...session,
@@ -107,7 +116,7 @@ export default function CalendarPage() {
     if (!userLoading) {
       fetchSessions();
     }
-  }, [profile, currentMonth, userLoading]);
+  }, [profile, currentMonth, userLoading, activeCohortId, isAdmin]);
 
   const handleRsvp = async (response: 'yes' | 'no') => {
     if (!selectedSession || !profile) return;

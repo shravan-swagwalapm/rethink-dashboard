@@ -45,7 +45,7 @@ import { format } from 'date-fns';
 import type { Resource } from '@/types';
 
 export default function ResourcesPage() {
-  const { profile, loading: userLoading } = useUser();
+  const { profile, loading: userLoading, activeCohortId, isAdmin } = useUser();
   const [resources, setResources] = useState<Resource[]>([]);
   const [currentFolder, setCurrentFolder] = useState<string | null>(null);
   const [breadcrumbs, setBreadcrumbs] = useState<Resource[]>([]);
@@ -55,20 +55,27 @@ export default function ResourcesPage() {
 
   useEffect(() => {
     const fetchResources = async () => {
-      if (!profile?.cohort_id) {
-        setLoading(false);
-        return;
-      }
-
       const supabase = getClient();
 
       try {
         let query = supabase
           .from('resources')
           .select('*')
-          .eq('cohort_id', profile.cohort_id)
           .order('type', { ascending: true })
           .order('name', { ascending: true });
+
+        // FILTERING LOGIC:
+        // - Admin role: Show ALL resources (global + all cohorts)
+        // - Student role: Show ONLY resources tagged to active cohort
+        if (!isAdmin) {
+          // Student role: filter by active cohort only
+          if (!activeCohortId) {
+            setLoading(false);
+            return;
+          }
+          query = query.eq('cohort_id', activeCohortId);
+        }
+        // Admin role: no cohort filter (shows all resources)
 
         if (currentFolder) {
           query = query.eq('parent_id', currentFolder);
@@ -92,7 +99,7 @@ export default function ResourcesPage() {
     if (!userLoading) {
       fetchResources();
     }
-  }, [profile, currentFolder, userLoading]);
+  }, [profile, currentFolder, userLoading, activeCohortId, isAdmin]);
 
   // Build breadcrumbs when folder changes
   useEffect(() => {

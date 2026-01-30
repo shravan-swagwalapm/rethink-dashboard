@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { PageLoader } from '@/components/ui/page-loader';
-import { Calendar, Clock, Video, ChevronRight, BookOpen, FolderOpen } from 'lucide-react';
+import { Calendar, Clock, Video, ChevronRight, BookOpen, FolderOpen, Shield } from 'lucide-react';
 import Link from 'next/link';
 import { format, isToday, isTomorrow, parseISO } from 'date-fns';
 import { InvoiceCard } from '@/components/dashboard/invoice-card';
@@ -23,7 +23,7 @@ interface InvoiceWithCohort extends Invoice {
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { profile, loading: userLoading, isAdmin } = useUser();
+  const { profile, loading: userLoading, isAdmin, activeCohortId } = useUser();
   const [stats, setStats] = useState<DashboardStats | null>(null);
 
   const [upcomingSessions, setUpcomingSessions] = useState<Session[]>([]);
@@ -51,8 +51,14 @@ export default function DashboardPage() {
       const supabase = getClient();
 
       try {
-        // Fetch all data in parallel for better performance
-        if (profile.cohort_id) {
+        // Admin role: skip cohort-specific data fetch
+        if (isAdmin) {
+          setLoading(false);
+          return;
+        }
+
+        // Student role: fetch cohort-specific data
+        if (activeCohortId) {
           const [
             cohortResult,
             studentsCountResult,
@@ -67,13 +73,13 @@ export default function DashboardPage() {
             supabase
               .from('cohorts')
               .select('*')
-              .eq('id', profile.cohort_id)
+              .eq('id', activeCohortId)
               .single(),
             // Fetch stats - count all users in cohort
             supabase
               .from('profiles')
               .select('*', { count: 'exact', head: true })
-              .eq('cohort_id', profile.cohort_id),
+              .eq('cohort_id', activeCohortId),
             // Fetch attendance
             supabase
               .from('attendance')
@@ -84,18 +90,18 @@ export default function DashboardPage() {
               .from('rankings')
               .select('rank')
               .eq('user_id', profile.id)
-              .eq('cohort_id', profile.cohort_id)
+              .eq('cohort_id', activeCohortId)
               .single(),
             // Fetch total resources count for the cohort
             supabase
               .from('resources')
               .select('*', { count: 'exact', head: true })
-              .eq('cohort_id', profile.cohort_id),
+              .eq('cohort_id', activeCohortId),
             // Fetch upcoming sessions
             supabase
               .from('sessions')
               .select('*')
-              .eq('cohort_id', profile.cohort_id)
+              .eq('cohort_id', activeCohortId)
               .gte('scheduled_at', new Date().toISOString())
               .order('scheduled_at', { ascending: true })
               .limit(3),
@@ -103,14 +109,14 @@ export default function DashboardPage() {
             supabase
               .from('learning_modules')
               .select('*')
-              .eq('cohort_id', profile.cohort_id)
+              .eq('cohort_id', activeCohortId)
               .order('created_at', { ascending: false })
               .limit(4),
             // Fetch recent resources
             supabase
               .from('resources')
               .select('*')
-              .eq('cohort_id', profile.cohort_id)
+              .eq('cohort_id', activeCohortId)
               .eq('type', 'file')
               .order('created_at', { ascending: false })
               .limit(4),
@@ -198,6 +204,65 @@ export default function DashboardPage() {
   // Show explicit loader while checking if user is logged in
   if (userLoading) {
     return <PageLoader message="Loading dashboard..." />;
+  }
+
+  // Admin role: Show empty state (no cohort-specific dashboard)
+  if (isAdmin) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center">
+                <Shield className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <CardTitle className="text-2xl">Admin Dashboard</CardTitle>
+                <CardDescription>
+                  Switch to a student role to view cohort-specific dashboard
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <div className="text-center py-12">
+              <p className="text-muted-foreground mb-4">
+                As an admin, you have access to all cohorts via the admin panel.
+              </p>
+              <div className="flex gap-3 justify-center">
+                <Link href="/admin">
+                  <Button>
+                    <Shield className="w-4 h-4 mr-2" />
+                    Go to Admin Panel
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Student role without cohort: Show error state
+  if (!activeCohortId) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>No Cohort Assigned</CardTitle>
+            <CardDescription>
+              This role is not assigned to any cohort
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Please contact your administrator to assign you to a cohort.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (

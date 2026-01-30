@@ -86,7 +86,7 @@ function getCaseStudyEmbedUrl(docId: string, docUrl: string | null): string {
 }
 
 export default function LearningsPage() {
-  const { profile, loading: userLoading } = useUser();
+  const { profile, loading: userLoading, activeCohortId, isAdmin } = useUser();
   const [modules, setModules] = useState<ModuleWithResources[]>([]);
   const [caseStudies, setCaseStudies] = useState<CaseStudy[]>([]);
   const [loading, setLoading] = useState(true);
@@ -97,21 +97,31 @@ export default function LearningsPage() {
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!profile?.cohort_id) {
-        setLoading(false);
-        return;
-      }
-
       const supabase = getClient();
 
       try {
-        // Fetch all modules for the cohort
-        const { data: modulesData, error: modulesError } = await supabase
+        let query = supabase
           .from('learning_modules')
           .select('*')
-          .eq('cohort_id', profile.cohort_id)
           .order('week_number', { ascending: true })
           .order('order_index', { ascending: true });
+
+        // FILTERING LOGIC:
+        // - Admin role: Show ONLY global library (cohort_id IS NULL)
+        // - Student role: Show ONLY modules tagged to active cohort
+        if (isAdmin) {
+          // Admin: only global library
+          query = query.is('cohort_id', null);
+        } else {
+          // Student: only active cohort
+          if (!activeCohortId) {
+            setLoading(false);
+            return;
+          }
+          query = query.eq('cohort_id', activeCohortId);
+        }
+
+        const { data: modulesData, error: modulesError } = await query;
 
         if (modulesError) throw modulesError;
 
@@ -132,13 +142,20 @@ export default function LearningsPage() {
 
         setModules(modulesWithResources);
 
-        // Fetch case studies for the cohort
-        const { data: caseStudiesData } = await supabase
+        // Fetch case studies with same filtering logic
+        let caseStudyQuery = supabase
           .from('case_studies')
           .select('*')
-          .eq('cohort_id', profile.cohort_id)
           .order('week_number', { ascending: true })
           .order('order_index', { ascending: true });
+
+        if (isAdmin) {
+          caseStudyQuery = caseStudyQuery.is('cohort_id', null);
+        } else if (activeCohortId) {
+          caseStudyQuery = caseStudyQuery.eq('cohort_id', activeCohortId);
+        }
+
+        const { data: caseStudiesData } = await caseStudyQuery;
 
         setCaseStudies(caseStudiesData || []);
 
@@ -157,7 +174,7 @@ export default function LearningsPage() {
     if (!userLoading) {
       fetchData();
     }
-  }, [profile, userLoading]);
+  }, [profile, userLoading, activeCohortId, isAdmin]);
 
   // Organize content by week
   const weekContent: Record<number, WeekContent> = {};

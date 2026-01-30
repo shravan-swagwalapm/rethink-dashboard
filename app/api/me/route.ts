@@ -15,10 +15,19 @@ export async function GET() {
       return response;
     }
 
-    // Fetch profile
+    // Fetch profile with role assignments
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('*')
+      .select(`
+        *,
+        role_assignments:user_role_assignments(
+          id,
+          role,
+          cohort_id,
+          cohort:cohorts(id, name, tag, status),
+          created_at
+        )
+      `)
       .eq('id', user.id)
       .single();
 
