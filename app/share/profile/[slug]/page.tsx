@@ -1,7 +1,6 @@
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { Mail, Phone, Globe, Linkedin, MapPin } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Mail, Phone, Globe, Linkedin, MapPin, Sparkles } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Metadata } from 'next';
 
@@ -76,14 +75,6 @@ export default async function PublicProfilePage({ params }: PublicProfilePagePro
     // Silently ignore errors - view tracking is non-critical
   });
 
-  // Helper to get initials
-  const getInitials = (name: string | null): string => {
-    if (!name) return '?';
-    const parts = name.trim().split(' ');
-    if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
-    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
-  };
-
   // Helper to format role display
   const getRoleDisplay = (role: string): string => {
     const roleMap: Record<string, string> = {
@@ -97,41 +88,57 @@ export default async function PublicProfilePage({ params }: PublicProfilePagePro
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-purple-50 dark:from-gray-950 dark:via-gray-900 dark:to-purple-950/20">
-      {/* Animated background decorations */}
+    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center py-12 px-4">
+      {/* Animated Background Gradient Blobs - Static versions */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-300/20 dark:bg-purple-600/10 rounded-full blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-300/20 dark:bg-purple-600/10 rounded-full blur-3xl" />
+        <div className="absolute -top-40 -left-40 w-80 h-80 bg-purple-600/30 rounded-full blur-3xl" />
+        <div className="absolute -bottom-40 -right-40 w-80 h-80 bg-cyan-600/30 rounded-full blur-3xl" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl" />
       </div>
 
-      <div className="relative py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-2xl mx-auto">
-          {/* Profile Card */}
-          <Card className="border-0 shadow-2xl overflow-hidden bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl">
-            {/* Header Gradient */}
-            <div className="h-36 sm:h-40 bg-gradient-to-r from-purple-500 via-purple-550 to-purple-600 relative overflow-hidden">
-              {/* Decorative pattern overlay */}
-              <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmZmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PHBhdGggZD0iTTM2IDM0djItSDI0di0yaDEyek0zNiAyNHYySDI0di0yaDEyeiIvPjwvZz48L2c+PC9zdmc+')] opacity-50" />
-              {/* Gradient overlay for depth */}
-              <div className="absolute inset-0 bg-gradient-to-b from-transparent to-purple-600/20" />
-            </div>
+      {/* Main Card Container */}
+      <div className="relative w-full max-w-lg">
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 border-2 border-purple-500/30 shadow-2xl shadow-purple-500/25">
 
-            <CardContent className="relative pt-0 pb-8 px-6 sm:px-8">
-              {/* Avatar - elevated and centered */}
-              <div className="relative -mt-20 sm:-mt-24 mb-6 flex justify-center">
-                <div className="relative group">
-                  <div className="absolute -inset-1 bg-gradient-to-r from-purple-400 to-purple-600 rounded-2xl blur opacity-25 group-hover:opacity-40 transition-opacity duration-300" />
-                  <div className="relative w-32 h-32 sm:w-40 sm:h-40 rounded-2xl bg-white dark:bg-gray-800 p-1.5 sm:p-2 shadow-2xl ring-4 ring-white dark:ring-gray-800">
+          {/* Background Gradient Blobs inside card */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            <div className="absolute -top-40 -left-40 w-80 h-80 bg-purple-600/30 rounded-full blur-3xl" />
+            <div className="absolute -bottom-40 -right-40 w-80 h-80 bg-cyan-600/30 rounded-full blur-3xl" />
+          </div>
+
+          {/* Glassmorphism Overlay */}
+          <div className="relative backdrop-blur-xl bg-white/5 border-t border-white/10">
+
+            {/* Top Section: Profile Image */}
+            <div className="relative pt-12 pb-8 px-8">
+              {/* Sparkle Icon */}
+              <div className="absolute top-6 right-6">
+                <Sparkles className="w-6 h-6 text-purple-400 animate-pulse" />
+              </div>
+
+              {/* Profile Image with Rainbow Glow Ring */}
+              <div className="relative mx-auto w-32 h-32">
+                {/* Static Glow Ring - rainbow gradient */}
+                <div
+                  className="absolute inset-0 rounded-3xl bg-gradient-to-r from-purple-500 via-pink-500 to-cyan-500 shadow-lg shadow-purple-500/50"
+                  style={{ padding: '3px' }}
+                >
+                  <div className="w-full h-full rounded-3xl bg-gray-900" />
+                </div>
+
+                {/* Profile Image Container */}
+                <div className="absolute inset-0 p-[3px]">
+                  <div className="w-full h-full rounded-3xl overflow-hidden bg-gradient-to-br from-purple-900/30 to-cyan-900/30 shadow-xl shadow-purple-500/50">
                     {profile.avatar_url ? (
                       <img
                         src={profile.avatar_url}
                         alt={profile.full_name || 'Profile'}
-                        className="w-full h-full rounded-xl object-cover"
+                        className="w-full h-full object-cover"
                       />
                     ) : (
-                      <div className="w-full h-full rounded-xl bg-gradient-to-br from-purple-100 to-purple-50 dark:from-purple-900/40 dark:to-gray-700 flex items-center justify-center">
-                        <span className="text-4xl sm:text-5xl font-bold text-purple-600 dark:text-purple-400 select-none">
-                          {getInitials(profile.full_name)}
+                      <div className="w-full h-full flex items-center justify-center">
+                        <span className="text-5xl font-bold bg-gradient-to-br from-purple-600 to-cyan-600 bg-clip-text text-transparent">
+                          {profile.full_name?.charAt(0).toUpperCase() || '?'}
                         </span>
                       </div>
                     )}
@@ -140,193 +147,124 @@ export default async function PublicProfilePage({ params }: PublicProfilePagePro
               </div>
 
               {/* Name and Role */}
-              <div className="text-center mb-8">
-                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100 mb-3 tracking-tight">
+              <div className="text-center mt-6 space-y-3">
+                <h2 className="text-2xl font-bold bg-gradient-to-r from-white via-purple-200 to-cyan-200 bg-clip-text text-transparent">
                   {profile.full_name || 'No Name Provided'}
-                </h1>
-                <Badge
-                  variant="secondary"
-                  className="text-sm px-4 py-1.5 bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 border-0 font-medium"
-                >
+                </h2>
+                <Badge className="bg-gradient-to-r from-purple-500/20 to-cyan-500/20 border-purple-500/50 text-purple-200 backdrop-blur-sm">
                   {getRoleDisplay(profile.role)}
                 </Badge>
               </div>
+            </div>
 
-              {/* Contact Information Cards */}
-              <div className="space-y-3">
-                {/* Email */}
-                {profile.email && (
-                  <a
-                    href={`mailto:${profile.email}`}
-                    className="flex items-center gap-4 p-4 rounded-xl bg-gray-50 dark:bg-gray-800/50
-                               hover:bg-purple-50 dark:hover:bg-purple-900/20
-                               border border-transparent hover:border-purple-200 dark:hover:border-purple-800
-                               transition-all duration-200 group cursor-pointer"
-                  >
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600
-                                    flex items-center justify-center shadow-lg shadow-purple-500/20
-                                    group-hover:scale-110 group-hover:shadow-purple-500/30
-                                    transition-all duration-200">
-                      <Mail className="w-5 h-5 text-white" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider mb-0.5">
-                        Email
-                      </p>
-                      <p className="text-sm sm:text-base font-medium text-gray-900 dark:text-gray-100 truncate
-                                    group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
-                        {profile.email}
-                      </p>
-                    </div>
-                  </a>
-                )}
-
-                {/* Phone */}
-                {profile.phone && (
-                  <a
-                    href={`tel:${profile.phone}`}
-                    className="flex items-center gap-4 p-4 rounded-xl bg-gray-50 dark:bg-gray-800/50
-                               hover:bg-purple-50 dark:hover:bg-purple-900/20
-                               border border-transparent hover:border-purple-200 dark:hover:border-purple-800
-                               transition-all duration-200 group cursor-pointer"
-                  >
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600
-                                    flex items-center justify-center shadow-lg shadow-purple-500/20
-                                    group-hover:scale-110 group-hover:shadow-purple-500/30
-                                    transition-all duration-200">
-                      <Phone className="w-5 h-5 text-white" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider mb-0.5">
-                        Phone
-                      </p>
-                      <p className="text-sm sm:text-base font-medium text-gray-900 dark:text-gray-100
-                                    group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
-                        {profile.phone}
-                      </p>
-                    </div>
-                  </a>
-                )}
-
-                {/* Timezone */}
-                {profile.timezone && (
-                  <div className="flex items-center gap-4 p-4 rounded-xl bg-gray-50 dark:bg-gray-800/50
-                                  border border-transparent">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600
-                                    flex items-center justify-center shadow-lg shadow-purple-500/20">
-                      <MapPin className="w-5 h-5 text-white" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider mb-0.5">
-                        Timezone
-                      </p>
-                      <p className="text-sm sm:text-base font-medium text-gray-900 dark:text-gray-100">
-                        {profile.timezone}
-                      </p>
-                    </div>
+            {/* Contact Information Section */}
+            <div className="px-8 pb-8 space-y-3">
+              {/* Email */}
+              {profile.email && (
+                <a
+                  href={`mailto:${profile.email}`}
+                  className="group flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-r from-purple-500/10 to-transparent border border-purple-500/20 hover:border-purple-500/50 backdrop-blur-sm transition-all duration-300 cursor-pointer"
+                >
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500/20 to-purple-600/20 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                    <Mail className="w-5 h-5 text-purple-400" />
                   </div>
-                )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Email</p>
+                    <p className="text-sm text-white truncate mt-0.5">{profile.email}</p>
+                  </div>
+                  <div className="w-2 h-2 rounded-full bg-purple-400 animate-pulse" />
+                </a>
+              )}
 
-                {/* LinkedIn */}
-                {profile.linkedin_url && (
-                  <a
-                    href={profile.linkedin_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-4 p-4 rounded-xl bg-gray-50 dark:bg-gray-800/50
-                               hover:bg-purple-50 dark:hover:bg-purple-900/20
-                               border border-transparent hover:border-purple-200 dark:hover:border-purple-800
-                               transition-all duration-200 group cursor-pointer"
-                  >
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600
-                                    flex items-center justify-center shadow-lg shadow-purple-500/20
-                                    group-hover:scale-110 group-hover:shadow-purple-500/30
-                                    transition-all duration-200">
-                      <Linkedin className="w-5 h-5 text-white" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider mb-0.5">
-                        LinkedIn
-                      </p>
-                      <p className="text-sm sm:text-base font-medium text-gray-900 dark:text-gray-100 truncate
-                                    group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
-                        View Profile
-                      </p>
-                    </div>
-                    <svg
-                      className="w-5 h-5 text-gray-400 group-hover:text-purple-500 group-hover:translate-x-1 transition-all duration-200"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                    </svg>
-                  </a>
-                )}
+              {/* Phone */}
+              {profile.phone && (
+                <a
+                  href={`tel:${profile.phone}`}
+                  className="group flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-r from-cyan-500/10 to-transparent border border-cyan-500/20 hover:border-cyan-500/50 backdrop-blur-sm transition-all duration-300 cursor-pointer"
+                >
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500/20 to-cyan-600/20 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                    <Phone className="w-5 h-5 text-cyan-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Phone</p>
+                    <p className="text-sm text-white mt-0.5">{profile.phone}</p>
+                  </div>
+                  <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                </a>
+              )}
 
-                {/* Portfolio */}
-                {profile.portfolio_url && (
-                  <a
-                    href={profile.portfolio_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-4 p-4 rounded-xl bg-gray-50 dark:bg-gray-800/50
-                               hover:bg-purple-50 dark:hover:bg-purple-900/20
-                               border border-transparent hover:border-purple-200 dark:hover:border-purple-800
-                               transition-all duration-200 group cursor-pointer"
-                  >
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600
-                                    flex items-center justify-center shadow-lg shadow-purple-500/20
-                                    group-hover:scale-110 group-hover:shadow-purple-500/30
-                                    transition-all duration-200">
-                      <Globe className="w-5 h-5 text-white" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider mb-0.5">
-                        Portfolio
-                      </p>
-                      <p className="text-sm sm:text-base font-medium text-gray-900 dark:text-gray-100 truncate
-                                    group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
-                        Visit Website
-                      </p>
-                    </div>
-                    <svg
-                      className="w-5 h-5 text-gray-400 group-hover:text-purple-500 group-hover:translate-x-1 transition-all duration-200"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                    </svg>
-                  </a>
-                )}
-              </div>
-            </CardContent>
+              {/* Timezone */}
+              {profile.timezone && (
+                <div className="flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-r from-pink-500/10 to-transparent border border-pink-500/20 hover:border-pink-500/50 backdrop-blur-sm transition-all duration-300">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-pink-500/20 to-pink-600/20 flex items-center justify-center">
+                    <MapPin className="w-5 h-5 text-pink-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Timezone</p>
+                    <p className="text-sm text-white mt-0.5">{profile.timezone}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* LinkedIn */}
+              {profile.linkedin_url && (
+                <a
+                  href={profile.linkedin_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-r from-blue-500/10 to-transparent border border-blue-500/20 hover:border-blue-500/50 backdrop-blur-sm transition-all duration-300 cursor-pointer"
+                >
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500/20 to-blue-600/20 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                    <Linkedin className="w-5 h-5 text-blue-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">LinkedIn</p>
+                    <p className="text-sm text-white truncate mt-0.5">View Profile</p>
+                  </div>
+                </a>
+              )}
+
+              {/* Portfolio */}
+              {profile.portfolio_url && (
+                <a
+                  href={profile.portfolio_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-r from-emerald-500/10 to-transparent border border-emerald-500/20 hover:border-emerald-500/50 backdrop-blur-sm transition-all duration-300 cursor-pointer"
+                >
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500/20 to-emerald-600/20 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                    <Globe className="w-5 h-5 text-emerald-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Portfolio</p>
+                    <p className="text-sm text-white truncate mt-0.5">Visit Website</p>
+                  </div>
+                </a>
+              )}
+            </div>
 
             {/* Footer */}
-            <div className="px-6 sm:px-8 py-5 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-800/30
-                            border-t border-gray-200/50 dark:border-gray-700/50">
-              <p className="text-center text-sm text-gray-500 dark:text-gray-400">
+            <div className="px-8 py-4 border-t border-white/10 bg-gradient-to-r from-purple-500/5 to-cyan-500/5 backdrop-blur-sm">
+              <p className="text-center text-xs text-gray-400">
                 Powered by{' '}
                 <a
                   href="https://rethink.systems"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="font-semibold text-purple-600 dark:text-purple-400
-                             hover:text-purple-700 dark:hover:text-purple-300
-                             transition-colors duration-200 hover:underline underline-offset-2"
+                  className="font-semibold bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent hover:from-purple-300 hover:to-cyan-300 transition-all"
                 >
                   Rethink Systems
                 </a>
               </p>
             </div>
-          </Card>
 
-          {/* Subtle branding watermark */}
-          <p className="text-center text-xs text-gray-400 dark:text-gray-600 mt-6">
-            Create your own shareable profile card at rethink.systems
-          </p>
+          </div>
         </div>
+
+        {/* Subtle branding watermark */}
+        <p className="text-center text-xs text-gray-500 mt-6">
+          Create your own shareable profile card at rethink.systems
+        </p>
       </div>
     </div>
   );
