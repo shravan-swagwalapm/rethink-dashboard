@@ -34,7 +34,6 @@ export default function DashboardPage() {
   const [cohortStartDate, setCohortStartDate] = useState<Date | null>(null);
   const [cohortName, setCohortName] = useState<string>('');
   const [loading, setLoading] = useState(true);
-  const hasFetchedRef = useRef(false);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -43,10 +42,6 @@ export default function DashboardPage() {
         setLoading(false);
         return;
       }
-
-      // Prevent re-fetching on tab switch
-      if (hasFetchedRef.current) return;
-      hasFetchedRef.current = true;
 
       const supabase = getClient();
 
@@ -172,7 +167,7 @@ export default function DashboardPage() {
     if (!userLoading) {
       fetchDashboardData();
     }
-  }, [profile, userLoading]);
+  }, [profile, userLoading, activeCohortId, isAdmin]);
 
   const getSessionTimeLabel = (date: string) => {
     const sessionDate = parseISO(date);
