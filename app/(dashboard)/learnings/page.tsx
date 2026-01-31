@@ -282,7 +282,7 @@ export default function LearningsPage() {
 
       if (progressRes.ok) {
         const { progress } = await progressRes.json();
-        const completed = new Set(
+        const completed = new Set<string>(
           progress.filter((p: ResourceProgress) => p.is_completed).map((p: ResourceProgress) => p.resource_id)
         );
         setCompletedResources(completed);
@@ -290,7 +290,7 @@ export default function LearningsPage() {
 
       if (favoritesRes.ok) {
         const { favorites } = await favoritesRes.json();
-        const favSet = new Set(favorites.map((f: ResourceFavorite) => f.resource_id));
+        const favSet = new Set<string>(favorites.map((f: ResourceFavorite) => f.resource_id));
         setFavoriteResources(favSet);
       }
 
