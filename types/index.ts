@@ -199,6 +199,16 @@ export interface ResourceFavorite {
   created_at: string;
 }
 
+export interface ProfileCard {
+  id: string;
+  user_id: string;
+  slug: string;
+  is_active: boolean;
+  view_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
 // Extended ModuleResource with tracking data
 export interface ModuleResourceWithTracking extends ModuleResource {
   is_completed?: boolean;
