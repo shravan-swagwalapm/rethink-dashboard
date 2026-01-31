@@ -170,6 +170,7 @@ export interface ModuleResource {
   id: string;
   module_id: string | null;
   title: string;
+  description?: string | null;
   content_type: ModuleResourceType;
   google_drive_id: string | null;
   external_url: string | null;
@@ -178,6 +179,32 @@ export interface ModuleResource {
   order_index: number;
   session_number: number | null;
   created_at: string;
+}
+
+export interface ResourceProgress {
+  id: string;
+  user_id: string;
+  resource_id: string;
+  is_completed: boolean;
+  last_viewed_at: string | null;
+  progress_seconds: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ResourceFavorite {
+  id: string;
+  user_id: string;
+  resource_id: string;
+  created_at: string;
+}
+
+// Extended ModuleResource with tracking data
+export interface ModuleResourceWithTracking extends ModuleResource {
+  is_completed?: boolean;
+  is_favorite?: boolean;
+  progress_seconds?: number;
+  last_viewed_at?: string;
 }
 
 export interface UserEmailAlias {

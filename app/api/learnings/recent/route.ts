@@ -1,0 +1,90 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { getClient } from '@/lib/supabase/server';
+
+// GET: Fetch recently viewed resources
+export async function GET(request: NextRequest) {
+  const supabase = getClient();
+
+  try {
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const limit = parseInt(searchParams.get('limit') || '5');
+
+    // Fetch recent progress records with resource details
+    const { data: progressData, error: progressError } = await supabase
+      .from('resource_progress')
+      .select('*, module_resources(*)')
+      .eq('user_id', user.id)
+      .not('last_viewed_at', 'is', null)
+      .order('last_viewed_at', { ascending: false })
+      .limit(limit);
+
+    if (progressError) {
+      console.error('Error fetching recent activity:', progressError);
+      return NextResponse.json({ error: 'Failed to fetch recent activity' }, { status: 500 });
+    }
+
+    // Transform data to include resource details
+    const recentResources = progressData?.map(p => ({
+      ...p.module_resources,
+      progress: {
+        is_completed: p.is_completed,
+        progress_seconds: p.progress_seconds,
+        last_viewed_at: p.last_viewed_at,
+      }
+    })) || [];
+
+    return NextResponse.json({ recent: recentResources });
+  } catch (error) {
+    console.error('Error in GET /api/learnings/recent:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+// POST: Update last viewed timestamp
+export async function POST(request: NextRequest) {
+  const supabase = getClient();
+
+  try {
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { resource_id } = body;
+
+    if (!resource_id) {
+      return NextResponse.json({ error: 'resource_id is required' }, { status: 400 });
+    }
+
+    // Upsert to update last_viewed_at
+    const { data, error } = await supabase
+      .from('resource_progress')
+      .upsert({
+        user_id: user.id,
+        resource_id,
+        last_viewed_at: new Date().toISOString(),
+      }, {
+        onConflict: 'user_id,resource_id'
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating last viewed:', error);
+      return NextResponse.json({ error: 'Failed to update last viewed' }, { status: 500 });
+    }
+
+    return NextResponse.json({ progress: data });
+  } catch (error) {
+    console.error('Error in POST /api/learnings/recent:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}

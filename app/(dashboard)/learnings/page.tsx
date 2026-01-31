@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useUser } from '@/hooks/use-user';
 import { getClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -29,9 +29,13 @@ import {
   FileQuestion,
   CheckCircle2,
   Calendar,
+  Check,
+  Star,
+  Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { LearningModule, ModuleResource, ModuleResourceType, CaseStudy } from '@/types';
+import { toast } from 'sonner';
+import type { LearningModule, ModuleResource, ModuleResourceType, CaseStudy, ResourceProgress, ResourceFavorite } from '@/types';
 
 interface ModuleWithResources extends LearningModule {
   resources: ModuleResource[];
@@ -50,10 +54,10 @@ interface WeekContent {
 function getContentIcon(type: ModuleResourceType, className?: string) {
   const iconClass = cn('w-5 h-5', className);
   switch (type) {
-    case 'video': return <Video className={cn(iconClass, 'text-purple-500')} />;
-    case 'slides': return <Presentation className={cn(iconClass, 'text-orange-500')} />;
-    case 'document': return <FileText className={cn(iconClass, 'text-blue-500')} />;
-    default: return <Link2 className={cn(iconClass, 'text-gray-500')} />;
+    case 'video': return <Video className={iconClass} />;
+    case 'slides': return <Presentation className={iconClass} />;
+    case 'document': return <FileText className={iconClass} />;
+    default: return <Link2 className={iconClass} />;
   }
 }
 
@@ -94,6 +98,13 @@ export default function LearningsPage() {
   const [selectedResource, setSelectedResource] = useState<ModuleResource | null>(null);
   const [selectedCaseStudy, setSelectedCaseStudy] = useState<{ caseStudy: CaseStudy; type: 'problem' | 'solution' } | null>(null);
   const [activeWeek, setActiveWeek] = useState<string>('');
+
+  // New state for tracking features
+  const [completedResources, setCompletedResources] = useState<Set<string>>(new Set());
+  const [favoriteResources, setFavoriteResources] = useState<Set<string>>(new Set());
+  const [recentActivity, setRecentActivity] = useState<ModuleResource[]>([]);
+  const [iframeLoading, setIframeLoading] = useState(true);
+  const [weekProgress, setWeekProgress] = useState<Record<number, { completed: number; total: number }>>({});
 
   useEffect(() => {
     const fetchData = async () => {
@@ -260,11 +271,216 @@ export default function LearningsPage() {
     });
   };
 
-  const handleResourceClick = (resource: ModuleResource) => {
+  // Fetch tracking data (progress, favorites, recent activity)
+  const fetchTrackingData = async () => {
+    try {
+      const [progressRes, favoritesRes, recentRes] = await Promise.all([
+        fetch('/api/learnings/progress'),
+        fetch('/api/learnings/favorites'),
+        fetch('/api/learnings/recent?limit=3'),
+      ]);
+
+      if (progressRes.ok) {
+        const { progress } = await progressRes.json();
+        const completed = new Set(
+          progress.filter((p: ResourceProgress) => p.is_completed).map((p: ResourceProgress) => p.resource_id)
+        );
+        setCompletedResources(completed);
+      }
+
+      if (favoritesRes.ok) {
+        const { favorites } = await favoritesRes.json();
+        const favSet = new Set(favorites.map((f: ResourceFavorite) => f.resource_id));
+        setFavoriteResources(favSet);
+      }
+
+      if (recentRes.ok) {
+        const { recent } = await recentRes.json();
+        setRecentActivity(recent);
+      }
+    } catch (error) {
+      console.error('Error fetching tracking data:', error);
+    }
+  };
+
+  // Mark resource as complete/incomplete
+  const handleMarkComplete = async (resourceId: string) => {
+    const isCompleted = completedResources.has(resourceId);
+    const newCompleted = new Set(completedResources);
+
+    if (isCompleted) {
+      newCompleted.delete(resourceId);
+    } else {
+      newCompleted.add(resourceId);
+    }
+
+    setCompletedResources(newCompleted);
+
+    try {
+      const response = await fetch('/api/learnings/progress', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resource_id: resourceId, is_completed: !isCompleted }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update progress');
+      }
+
+      toast.success(isCompleted ? 'Marked as incomplete' : 'Marked as complete');
+
+      // Recalculate week progress
+      calculateWeekProgress();
+    } catch (error) {
+      console.error('Error marking complete:', error);
+      toast.error('Failed to update completion status');
+      setCompletedResources(completedResources);
+    }
+  };
+
+  // Toggle favorite
+  const handleToggleFavorite = async (resourceId: string) => {
+    const isFavorite = favoriteResources.has(resourceId);
+    const newFavorites = new Set(favoriteResources);
+
+    if (isFavorite) {
+      newFavorites.delete(resourceId);
+    } else {
+      newFavorites.add(resourceId);
+    }
+
+    setFavoriteResources(newFavorites);
+
+    try {
+      if (isFavorite) {
+        const response = await fetch(`/api/learnings/favorites?resource_id=${resourceId}`, {
+          method: 'DELETE',
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to remove favorite');
+        }
+
+        toast.success('Removed from favorites');
+      } else {
+        const response = await fetch('/api/learnings/favorites', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ resource_id: resourceId }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to add favorite');
+        }
+
+        toast.success('Added to favorites');
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+      toast.error('Failed to update favorite');
+      setFavoriteResources(favoriteResources);
+    }
+  };
+
+  // Calculate week progress
+  const calculateWeekProgress = () => {
+    const progress: Record<number, { completed: number; total: number }> = {};
+
+    modules.forEach(module => {
+      const week = module.week_number || 1;
+      if (!progress[week]) {
+        progress[week] = { completed: 0, total: 0 };
+      }
+
+      module.resources.forEach(resource => {
+        progress[week].total++;
+        if (completedResources.has(resource.id)) {
+          progress[week].completed++;
+        }
+      });
+    });
+
+    setWeekProgress(progress);
+  };
+
+  // Calculate related resources for modal
+  const relatedResources = useMemo(() => {
+    if (!selectedResource) return [];
+
+    const currentWeek = modules.find(m =>
+      m.resources.some(r => r.id === selectedResource.id)
+    )?.week_number;
+
+    if (!currentWeek) return [];
+
+    return modules
+      .filter(m => m.week_number === currentWeek)
+      .flatMap(m => m.resources)
+      .filter(r => r.id !== selectedResource.id);
+  }, [selectedResource, modules]);
+
+  // Fetch tracking data on mount
+  useEffect(() => {
+    if (!userLoading && profile) {
+      fetchTrackingData();
+    }
+  }, [userLoading, profile]);
+
+  // Recalculate week progress when modules or completed resources change
+  useEffect(() => {
+    if (modules.length > 0) {
+      calculateWeekProgress();
+    }
+  }, [modules, completedResources]);
+
+  // Keyboard shortcuts for modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!selectedResource) return;
+
+      if (e.key === 'Escape') {
+        setSelectedResource(null);
+      } else if (e.key === 'ArrowRight') {
+        // Navigate to next resource
+        const currentIndex = relatedResources.findIndex(r => r.id === selectedResource.id);
+        if (currentIndex >= 0 && currentIndex < relatedResources.length - 1) {
+          setSelectedResource(relatedResources[currentIndex + 1]);
+          setIframeLoading(true);
+        } else if (relatedResources.length > 0 && currentIndex === -1) {
+          setSelectedResource(relatedResources[0]);
+          setIframeLoading(true);
+        }
+      } else if (e.key === 'ArrowLeft') {
+        // Navigate to previous resource
+        const currentIndex = relatedResources.findIndex(r => r.id === selectedResource.id);
+        if (currentIndex > 0) {
+          setSelectedResource(relatedResources[currentIndex - 1]);
+          setIframeLoading(true);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedResource, relatedResources]);
+
+  const handleResourceClick = async (resource: ModuleResource) => {
     if (resource.content_type === 'link' && resource.external_url) {
       window.open(resource.external_url, '_blank');
     } else {
       setSelectedResource(resource);
+      setIframeLoading(true);
+
+      // Track resource view
+      try {
+        await fetch('/api/learnings/recent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ resource_id: resource.id }),
+        });
+      } catch (error) {
+        console.error('Error tracking resource view:', error);
+      }
     }
   };
 
@@ -282,19 +498,23 @@ export default function LearningsPage() {
 
   const currentWeekContent = activeWeek ? weekContent[parseInt(activeWeek)] : null;
 
-  // Content section component
+  // Content section component with elevated cards
   const ContentSection = ({
     title,
     icon: Icon,
     iconColor,
     resources,
-    emptyMessage
+    emptyMessage,
+    gradientFrom,
+    gradientTo
   }: {
     title: string;
     icon: React.ElementType;
     iconColor: string;
     resources: ModuleResource[];
     emptyMessage: string;
+    gradientFrom: string;
+    gradientTo: string;
   }) => {
     const filtered = filterResources(resources);
     if (resources.length === 0 && !searchQuery) return null;
@@ -303,48 +523,104 @@ export default function LearningsPage() {
       <div className="space-y-3">
         <div className="flex items-center gap-2">
           <Icon className={cn('w-5 h-5', iconColor)} />
-          <h3 className="font-semibold">{title}</h3>
+          <h3 className="font-semibold text-gray-900 dark:text-gray-100">{title}</h3>
           <Badge variant="secondary" className="ml-auto">
             {filtered.length}
           </Badge>
         </div>
         {filtered.length === 0 ? (
-          <p className="text-sm text-muted-foreground pl-7">{emptyMessage}</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400 pl-7">{emptyMessage}</p>
         ) : (
-          <div className="space-y-2">
-            {filtered.map((resource) => (
-              <button
-                key={resource.id}
-                onClick={() => handleResourceClick(resource)}
-                className="w-full flex items-center gap-3 p-3 rounded-lg border hover:bg-muted transition-colors group"
-              >
-                <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
-                  {getContentIcon(resource.content_type)}
-                </div>
-                <div className="flex-1 text-left min-w-0">
-                  <p className="font-medium truncate group-hover:text-primary transition-colors">
-                    {resource.title}
-                  </p>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    {resource.session_number && (
-                      <span>Session {resource.session_number}</span>
-                    )}
-                    {resource.duration_seconds && (
-                      <>
-                        {resource.session_number && <span>•</span>}
-                        <Clock className="w-3 h-3" />
-                        <span>{formatDuration(resource.duration_seconds)}</span>
-                      </>
+          <div className="space-y-3">
+            {filtered.map((resource) => {
+              const isCompleted = completedResources.has(resource.id);
+              const isFavorite = favoriteResources.has(resource.id);
+
+              return (
+                <button
+                  key={resource.id}
+                  onClick={() => handleResourceClick(resource)}
+                  className="relative w-full flex items-center gap-4 p-4 rounded-xl border-2 border-gray-200/50 dark:border-gray-700/50 bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-800/50 hover:shadow-lg hover:shadow-purple-500/10 dark:hover:shadow-purple-500/20 hover:-translate-y-0.5 transition-all duration-300 group"
+                >
+                  {/* Favorite button */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleToggleFavorite(resource.id);
+                    }}
+                    className="absolute top-3 left-3 w-7 h-7 rounded-full bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-all hover:scale-110 z-10"
+                  >
+                    <Star className={cn(
+                      "w-3.5 h-3.5",
+                      isFavorite ? "fill-yellow-400 text-yellow-400" : "text-gray-400"
+                    )} />
+                  </button>
+
+                  {/* Completion checkbox */}
+                  <div className="absolute top-3 right-3 z-10">
+                    {isCompleted ? (
+                      <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center shadow-lg">
+                        <Check className="w-3.5 h-3.5 text-white" />
+                      </div>
+                    ) : (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleMarkComplete(resource.id);
+                        }}
+                        className="w-6 h-6 rounded-full border-2 border-gray-300 dark:border-gray-600 hover:border-green-500 dark:hover:border-green-400 transition-colors opacity-0 group-hover:opacity-100"
+                      />
                     )}
                   </div>
-                </div>
-                {resource.content_type === 'link' ? (
-                  <ExternalLink className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                ) : (
-                  <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
-                )}
-              </button>
-            ))}
+
+                  {/* Icon container */}
+                  <div className={cn(
+                    "relative w-12 h-12 rounded-xl bg-gradient-to-br flex items-center justify-center flex-shrink-0 shadow-md group-hover:scale-110 group-hover:shadow-lg transition-all duration-300",
+                    gradientFrom, gradientTo
+                  )}>
+                    {getContentIcon(resource.content_type, 'text-white')}
+                  </div>
+
+                  {/* Content */}
+                  <div className="flex-1 text-left min-w-0">
+                    <p className="font-medium text-gray-900 dark:text-gray-100 truncate group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors mb-1">
+                      {resource.title}
+                    </p>
+
+                    {/* Metadata row */}
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                      {resource.session_number && (
+                        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-gray-100 dark:bg-gray-800">
+                          <Video className="w-3 h-3 text-gray-600 dark:text-gray-400" />
+                          <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Session {resource.session_number}</span>
+                        </div>
+                      )}
+
+                      {resource.duration_seconds && (
+                        <Badge className="bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 font-semibold">
+                          <Clock className="w-3 h-3 mr-1" />
+                          {formatDuration(resource.duration_seconds)}
+                        </Badge>
+                      )}
+                    </div>
+
+                    {/* Description preview */}
+                    {resource.description && (
+                      <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-1">
+                        {resource.description}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Chevron/external link icon */}
+                  {resource.content_type === 'link' ? (
+                    <ExternalLink className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                  ) : (
+                    <ChevronRight className="w-5 h-5 text-gray-400 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all flex-shrink-0" />
+                  )}
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
@@ -453,19 +729,98 @@ export default function LearningsPage() {
         </Card>
       ) : (
         <div className="space-y-6">
-          {/* Week Tabs */}
+          {/* Recent Activity Section */}
+          {recentActivity.length > 0 && (
+            <Card className="overflow-hidden border-2 border-purple-200 dark:border-purple-800 bg-gradient-to-br from-purple-50 to-white dark:from-purple-950/20 dark:to-gray-900">
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-md">
+                    <Clock className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-gray-900 dark:text-gray-100">Continue Learning</CardTitle>
+                    <CardDescription className="text-gray-600 dark:text-gray-400">Pick up where you left off</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {recentActivity.map((resource: any) => {
+                    const isFavorite = favoriteResources.has(resource.id);
+                    return (
+                      <button
+                        key={resource.id}
+                        onClick={() => handleResourceClick(resource)}
+                        className="relative p-4 rounded-xl border-2 border-purple-200/50 dark:border-purple-700/50 bg-white dark:bg-gray-900 hover:shadow-lg hover:shadow-purple-500/20 hover:-translate-y-0.5 transition-all duration-300 group text-left"
+                      >
+                        <div className="flex items-start gap-3 mb-3">
+                          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-md flex-shrink-0">
+                            {getContentIcon(resource.content_type, 'w-4 h-4 text-white')}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-gray-900 dark:text-gray-100 text-sm line-clamp-2 mb-1">
+                              {resource.title}
+                            </p>
+                            {resource.duration_seconds && (
+                              <p className="text-xs text-gray-600 dark:text-gray-400 flex items-center gap-1">
+                                <Clock className="w-3 h-3" />
+                                {formatDuration(resource.duration_seconds)}
+                              </p>
+                            )}
+                          </div>
+                          {isFavorite && (
+                            <Star className="w-4 h-4 fill-yellow-400 text-yellow-400 flex-shrink-0" />
+                          )}
+                        </div>
+                        {resource.progress?.progress_seconds > 0 && resource.duration_seconds && (
+                          <div className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-purple-500 rounded-full transition-all duration-500"
+                              style={{ width: `${Math.min((resource.progress.progress_seconds / resource.duration_seconds) * 100, 100)}%` }}
+                            />
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Week Tabs with Progress */}
           <Tabs value={activeWeek} onValueChange={setActiveWeek}>
             <ScrollArea className="w-full">
-              <TabsList className="inline-flex h-10 items-center justify-start rounded-lg bg-muted p-1 w-auto">
-                {weeks.map((week) => (
-                  <TabsTrigger
-                    key={week}
-                    value={week.toString()}
-                    className="px-4"
-                  >
-                    Week {week}
-                  </TabsTrigger>
-                ))}
+              <TabsList className="inline-flex h-auto items-center justify-start rounded-lg bg-muted p-1 w-auto">
+                {weeks.map((week) => {
+                  const progress = weekProgress[week];
+                  const progressPercent = progress ? Math.round((progress.completed / progress.total) * 100) : 0;
+
+                  return (
+                    <TabsTrigger
+                      key={week}
+                      value={week.toString()}
+                      className="px-6 py-2.5 rounded-lg data-[state=active]:bg-gradient-to-br data-[state=active]:from-purple-500 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-purple-500/30 transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                    >
+                      <div className="flex flex-col items-center gap-1">
+                        <span className="font-semibold">Week {week}</span>
+                        {progress && progress.total > 0 && (
+                          <>
+                            <div className="w-full h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-purple-500 data-[state=active]:bg-white rounded-full transition-all duration-500"
+                                style={{ width: `${progressPercent}%` }}
+                              />
+                            </div>
+                            <span className="text-xs opacity-75">
+                              {progress.completed}/{progress.total}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </TabsTrigger>
+                  );
+                })}
               </TabsList>
             </ScrollArea>
 
@@ -495,6 +850,8 @@ export default function LearningsPage() {
                       iconColor="text-purple-500"
                       resources={content.recordings}
                       emptyMessage="No recordings available"
+                      gradientFrom="from-purple-500"
+                      gradientTo="to-purple-600"
                     />
 
                     <ContentSection
@@ -503,6 +860,8 @@ export default function LearningsPage() {
                       iconColor="text-orange-500"
                       resources={content.presentations}
                       emptyMessage="No presentations available"
+                      gradientFrom="from-orange-500"
+                      gradientTo="to-orange-600"
                     />
 
                     <ContentSection
@@ -511,6 +870,8 @@ export default function LearningsPage() {
                       iconColor="text-blue-500"
                       resources={content.notes}
                       emptyMessage="No session notes available"
+                      gradientFrom="from-blue-500"
+                      gradientTo="to-blue-600"
                     />
 
                     <CaseStudiesSection studies={content.caseStudies} />
@@ -540,37 +901,134 @@ export default function LearningsPage() {
       {/* Resource Viewer Modal */}
       <Dialog open={!!selectedResource} onOpenChange={() => setSelectedResource(null)}>
         <DialogContent className="max-w-[95vw] w-[95vw] max-h-[95vh] h-[95vh] sm:max-w-[95vw] flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 pr-8">
-              {selectedResource && getContentIcon(selectedResource.content_type)}
-              {selectedResource?.title}
-            </DialogTitle>
-            {selectedResource?.duration_seconds && (
-              <p className="text-sm text-muted-foreground flex items-center gap-1">
-                <Clock className="w-3 h-3" />
-                {formatDuration(selectedResource.duration_seconds)}
-              </p>
-            )}
+          <DialogHeader className="border-b pb-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1 space-y-2">
+                <DialogTitle className="flex items-center gap-3 text-xl text-gray-900 dark:text-gray-100">
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-md">
+                    {selectedResource && getContentIcon(selectedResource.content_type, 'w-5 h-5 text-white')}
+                  </div>
+                  {selectedResource?.title}
+                </DialogTitle>
+
+                {/* Metadata row */}
+                <div className="flex flex-wrap items-center gap-3 text-sm">
+                  {selectedResource?.session_number && (
+                    <Badge variant="secondary">
+                      Session {selectedResource.session_number}
+                    </Badge>
+                  )}
+                  {selectedResource?.duration_seconds && (
+                    <Badge className="bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">
+                      <Clock className="w-3 h-3 mr-1" />
+                      {formatDuration(selectedResource.duration_seconds)}
+                    </Badge>
+                  )}
+                  {selectedResource?.description && (
+                    <p className="text-gray-600 dark:text-gray-400 line-clamp-1">
+                      {selectedResource.description}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Action buttons */}
+              {selectedResource && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => handleToggleFavorite(selectedResource.id)}
+                  >
+                    <Star className={cn(
+                      "w-4 h-4",
+                      favoriteResources.has(selectedResource.id) ? "fill-yellow-400 text-yellow-400" : ""
+                    )} />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => handleMarkComplete(selectedResource.id)}
+                  >
+                    <Check className={cn(
+                      "w-4 h-4",
+                      completedResources.has(selectedResource.id) ? "text-green-500" : ""
+                    )} />
+                  </Button>
+                </div>
+              )}
+            </div>
           </DialogHeader>
 
-          {/* Content Display */}
+          {/* Content Display with Sidebar */}
           {selectedResource && (
-            <div className="w-full flex-1 min-h-0">
-              <iframe
-                src={selectedResource.google_drive_id
-                  ? `https://drive.google.com/file/d/${selectedResource.google_drive_id}/preview`
-                  : getEmbedUrl(selectedResource)
-                }
-                className="w-full h-full rounded-lg"
-                allow="autoplay; encrypted-media; fullscreen"
-                allowFullScreen
-                title={selectedResource.title}
-              />
+            <div className="flex gap-6 flex-1 min-h-0">
+              {/* Main content */}
+              <div className="flex-1 min-w-0 relative">
+                {iframeLoading && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-900 rounded-lg z-10">
+                    <div className="flex flex-col items-center gap-3">
+                      <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Loading content...</p>
+                    </div>
+                  </div>
+                )}
+                <iframe
+                  src={selectedResource.google_drive_id
+                    ? `https://drive.google.com/file/d/${selectedResource.google_drive_id}/preview`
+                    : getEmbedUrl(selectedResource)
+                  }
+                  onLoad={() => setIframeLoading(false)}
+                  className={cn(
+                    "w-full h-full rounded-lg transition-opacity duration-300",
+                    iframeLoading ? "opacity-0" : "opacity-100"
+                  )}
+                  allow="autoplay; encrypted-media; fullscreen"
+                  allowFullScreen
+                  title={selectedResource.title}
+                />
+              </div>
+
+              {/* Related content sidebar */}
+              {relatedResources.length > 0 && (
+                <div className="w-80 border-l pl-6 overflow-y-auto">
+                  <h3 className="font-semibold mb-3 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+                    <BookOpen className="w-4 h-4" />
+                    More from this week
+                  </h3>
+                  <div className="space-y-2">
+                    {relatedResources.map(resource => (
+                      <button
+                        key={resource.id}
+                        onClick={() => {
+                          setSelectedResource(resource);
+                          setIframeLoading(true);
+                        }}
+                        className={cn(
+                          "w-full p-3 rounded-lg border text-left hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors",
+                          selectedResource?.id === resource.id && "bg-purple-50 dark:bg-purple-950/20 border-purple-500"
+                        )}
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          {getContentIcon(resource.content_type, 'w-4 h-4 text-purple-500')}
+                          <p className="font-medium text-sm line-clamp-1 text-gray-900 dark:text-gray-100">{resource.title}</p>
+                        </div>
+                        {resource.duration_seconds && (
+                          <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            {formatDuration(resource.duration_seconds)}
+                          </p>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
           {selectedResource?.external_url && (
-            <div className="flex justify-end">
+            <div className="flex justify-end border-t pt-4">
               <Button variant="outline" size="sm" asChild>
                 <a href={selectedResource.external_url} target="_blank" rel="noopener noreferrer">
                   <ExternalLink className="w-4 h-4 mr-2" />
