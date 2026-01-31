@@ -89,6 +89,7 @@ export default function ProfilePage() {
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [avatarCacheKey, setAvatarCacheKey] = useState<number>(Date.now());
 
   // Shareable profile card state
   const [profileCard, setProfileCard] = useState<ProfileCard | null>(null);
@@ -171,22 +172,34 @@ export default function ProfilePage() {
 
     setUploadingAvatar(true);
     try {
-      const formData = new FormData();
-      formData.append('file', avatarFile);
+      const uploadFormData = new FormData();
+      uploadFormData.append('file', avatarFile);
 
       const res = await fetch('/api/profile/image', {
         method: 'POST',
-        body: formData,
+        body: uploadFormData,
       });
 
       const data = await res.json();
 
       if (res.ok) {
+        console.log('Upload successful, avatar URL:', data.avatar_url);
+        console.log('Current profile before update:', profile);
+
+        // Update cache key to force image refresh with cache-busting
+        const newCacheKey = Date.now();
+        setAvatarCacheKey(newCacheKey);
+
+        // Also refresh from Supabase
         await refreshProfile();
+
+        console.log('Profile after refresh - avatar_url:', data.avatar_url);
+
         setAvatarFile(null);
         setAvatarPreview(null);
         toast.success('Profile image uploaded successfully');
       } else {
+        console.error('Upload failed:', data.error);
         toast.error(data.error || 'Failed to upload image');
       }
     } catch (error) {
@@ -386,7 +399,7 @@ export default function ProfilePage() {
         <CardHeader className="pb-4">
           <div className="flex items-center gap-4">
             <Avatar className="w-20 h-20 border-4 border-background shadow-lg">
-              <AvatarImage src={profile?.avatar_url || ''} />
+              <AvatarImage src={profile?.avatar_url ? `${profile.avatar_url}?t=${avatarCacheKey}` : ''} />
               <AvatarFallback className="gradient-bg text-white text-2xl font-medium">
                 {profile?.full_name?.charAt(0) || profile?.email?.charAt(0)?.toUpperCase() || 'U'}
               </AvatarFallback>
@@ -519,7 +532,7 @@ export default function ProfilePage() {
                 <div className="w-32 h-32 rounded-2xl bg-gradient-to-br from-purple-100 to-purple-50 dark:from-purple-900/20 dark:to-gray-800 flex items-center justify-center overflow-hidden border-2 border-purple-200 dark:border-purple-700 shadow-lg">
                   {(avatarPreview || profile?.avatar_url) ? (
                     <img
-                      src={avatarPreview || profile?.avatar_url || ''}
+                      src={avatarPreview || (profile?.avatar_url ? `${profile.avatar_url}?t=${avatarCacheKey}` : '')}
                       alt="Profile"
                       className="w-full h-full object-cover"
                     />

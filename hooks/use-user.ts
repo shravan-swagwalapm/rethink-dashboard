@@ -161,7 +161,10 @@ export function useUser() {
       .eq('id', user.id)
       .maybeSingle();
 
-    if (!error) {
+    if (error) {
+      console.error('refreshProfile: Error fetching profile:', error);
+    } else {
+      console.log('refreshProfile: Profile data refreshed successfully:', profileData);
       setProfile(profileData);
     }
   };
