@@ -19,6 +19,7 @@ import {
   Receipt,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   Sheet,
@@ -198,9 +199,15 @@ export function DashboardSidebar({ mobileOpen, onMobileClose }: DashboardSidebar
         <div className="px-3 pb-4">
           <div className="p-3 rounded-xl bg-sidebar-accent/50 border border-sidebar-border">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl gradient-bg flex items-center justify-center text-white font-medium">
-                {profile.full_name?.charAt(0) || profile.email.charAt(0).toUpperCase()}
-              </div>
+              <Avatar className="w-10 h-10 border-2 border-background">
+                <AvatarImage
+                  src={profile.avatar_url ? `${profile.avatar_url}?t=${Date.now()}` : ''}
+                  alt={profile.full_name || 'User'}
+                />
+                <AvatarFallback className="gradient-bg text-white font-medium">
+                  {profile.full_name?.charAt(0) || profile.email.charAt(0).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">
                   {profile.full_name || 'User'}

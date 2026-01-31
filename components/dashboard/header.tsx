@@ -212,7 +212,7 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
               <Button variant="ghost" className="relative h-9 w-9 rounded-full hover-scale">
                 <Avatar className="h-9 w-9 border-2 border-border">
                   <AvatarImage
-                    src={profile?.avatar_url || ''}
+                    src={profile?.avatar_url ? `${profile.avatar_url}?t=${Date.now()}` : ''}
                     alt={profile?.full_name || 'User'}
                   />
                   <AvatarFallback className="gradient-bg text-white font-medium">
