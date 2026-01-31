@@ -277,7 +277,7 @@ export default function LearningsPage() {
       const [progressRes, favoritesRes, recentRes] = await Promise.all([
         fetch('/api/learnings/progress'),
         fetch('/api/learnings/favorites'),
-        fetch('/api/learnings/recent?limit=3'),
+        fetch(`/api/learnings/recent?limit=3&cohort_id=${activeCohortId}`),
       ]);
 
       if (progressRes.ok) {
@@ -419,12 +419,12 @@ export default function LearningsPage() {
       .filter(r => r.id !== selectedResource.id);
   }, [selectedResource, modules]);
 
-  // Fetch tracking data on mount
+  // Fetch tracking data on mount and when cohort changes
   useEffect(() => {
-    if (!userLoading && profile) {
+    if (!userLoading && profile && activeCohortId) {
       fetchTrackingData();
     }
-  }, [userLoading, profile]);
+  }, [userLoading, profile, activeCohortId]);
 
   // Recalculate week progress when modules or completed resources change
   useEffect(() => {
@@ -731,19 +731,21 @@ export default function LearningsPage() {
         <div className="space-y-6">
           {/* Recent Activity Section */}
           {recentActivity.length > 0 && (
-            <Card className="overflow-hidden border-2 border-purple-200 dark:border-purple-800 bg-gradient-to-br from-purple-50 to-white dark:from-purple-950/20 dark:to-gray-900">
-              <CardHeader>
+            <Card className="overflow-hidden border-2 border-purple-200 dark:border-purple-800 bg-gradient-to-br from-purple-50 to-white dark:from-purple-950/20 dark:to-gray-900 shadow-lg">
+              <CardHeader className="pb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-md">
-                    <Clock className="w-5 h-5 text-white" />
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-lg">
+                    <Clock className="w-6 h-6 text-white" />
                   </div>
                   <div>
-                    <CardTitle className="text-gray-900 dark:text-gray-100">Continue Learning</CardTitle>
-                    <CardDescription className="text-gray-600 dark:text-gray-400">Pick up where you left off</CardDescription>
+                    <CardTitle className="text-xl text-gray-900 dark:text-gray-100">Continue Learning</CardTitle>
+                    <CardDescription className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">
+                      Pick up where you left off • {recentActivity.length} {recentActivity.length === 1 ? 'resource' : 'resources'}
+                    </CardDescription>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="pt-0">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {recentActivity.map((resource: any) => {
                     const isFavorite = favoriteResources.has(resource.id);
@@ -751,35 +753,46 @@ export default function LearningsPage() {
                       <button
                         key={resource.id}
                         onClick={() => handleResourceClick(resource)}
-                        className="relative p-4 rounded-xl border-2 border-purple-200/50 dark:border-purple-700/50 bg-white dark:bg-gray-900 hover:shadow-lg hover:shadow-purple-500/20 hover:-translate-y-0.5 transition-all duration-300 group text-left"
+                        className="relative p-5 rounded-xl border-2 border-purple-200/50 dark:border-purple-700/50 bg-white dark:bg-gray-900 hover:shadow-xl hover:shadow-purple-500/25 hover:-translate-y-1 hover:border-purple-400 dark:hover:border-purple-500 transition-all duration-300 group text-left"
                       >
                         <div className="flex items-start gap-3 mb-3">
-                          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-md flex-shrink-0">
-                            {getContentIcon(resource.content_type, 'w-4 h-4 text-white')}
+                          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-md flex-shrink-0 group-hover:scale-105 transition-transform duration-300">
+                            {getContentIcon(resource.content_type, 'w-5 h-5 text-white')}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium text-gray-900 dark:text-gray-100 text-sm line-clamp-2 mb-1">
+                            <p className="font-semibold text-gray-900 dark:text-gray-100 text-sm line-clamp-2 mb-1.5 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
                               {resource.title}
                             </p>
                             {resource.duration_seconds && (
-                              <p className="text-xs text-gray-600 dark:text-gray-400 flex items-center gap-1">
-                                <Clock className="w-3 h-3" />
-                                {formatDuration(resource.duration_seconds)}
-                              </p>
+                              <div className="flex items-center gap-1.5">
+                                <Clock className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
+                                <p className="text-xs text-gray-600 dark:text-gray-400 font-medium">
+                                  {formatDuration(resource.duration_seconds)}
+                                </p>
+                              </div>
                             )}
                           </div>
                           {isFavorite && (
-                            <Star className="w-4 h-4 fill-yellow-400 text-yellow-400 flex-shrink-0" />
+                            <Star className="w-4 h-4 fill-yellow-400 text-yellow-400 flex-shrink-0 animate-pulse" />
                           )}
                         </div>
                         {resource.progress?.progress_seconds > 0 && resource.duration_seconds && (
-                          <div className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-purple-500 rounded-full transition-all duration-500"
-                              style={{ width: `${Math.min((resource.progress.progress_seconds / resource.duration_seconds) * 100, 100)}%` }}
-                            />
+                          <div className="space-y-1.5">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-gray-600 dark:text-gray-400 font-medium">Progress</span>
+                              <span className="text-purple-600 dark:text-purple-400 font-semibold">
+                                {Math.min(Math.round((resource.progress.progress_seconds / resource.duration_seconds) * 100), 100)}%
+                              </span>
+                            </div>
+                            <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-gradient-to-r from-purple-500 to-purple-600 rounded-full transition-all duration-500 shadow-sm"
+                                style={{ width: `${Math.min((resource.progress.progress_seconds / resource.duration_seconds) * 100, 100)}%` }}
+                              />
+                            </div>
                           </div>
                         )}
+                        <ChevronRight className="absolute top-5 right-5 w-5 h-5 text-gray-400 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
                       </button>
                     );
                   })}
@@ -791,7 +804,7 @@ export default function LearningsPage() {
           {/* Week Tabs with Progress */}
           <Tabs value={activeWeek} onValueChange={setActiveWeek}>
             <ScrollArea className="w-full">
-              <TabsList className="inline-flex h-auto items-center justify-start rounded-lg bg-muted p-1 w-auto">
+              <TabsList className="inline-flex h-auto items-center justify-start rounded-xl bg-gray-100 dark:bg-gray-800 p-1.5 w-auto gap-1">
                 {weeks.map((week) => {
                   const progress = weekProgress[week];
                   const progressPercent = progress ? Math.round((progress.completed / progress.total) * 100) : 0;
@@ -800,19 +813,19 @@ export default function LearningsPage() {
                     <TabsTrigger
                       key={week}
                       value={week.toString()}
-                      className="px-6 py-2.5 rounded-lg data-[state=active]:bg-gradient-to-br data-[state=active]:from-purple-500 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-purple-500/30 transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                      className="px-5 py-3 rounded-lg data-[state=active]:bg-gradient-to-br data-[state=active]:from-purple-500 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-purple-500/40 transition-all duration-300 hover:bg-gray-200 dark:hover:bg-gray-700"
                     >
-                      <div className="flex flex-col items-center gap-1">
-                        <span className="font-semibold">Week {week}</span>
+                      <div className="flex flex-col items-center gap-1.5">
+                        <span className="font-semibold text-sm">Week {week}</span>
                         {progress && progress.total > 0 && (
                           <>
-                            <div className="w-full h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                            <div className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                               <div
-                                className="h-full bg-purple-500 data-[state=active]:bg-white rounded-full transition-all duration-500"
+                                className="h-full data-[state=active]:bg-white bg-purple-500 rounded-full transition-all duration-500"
                                 style={{ width: `${progressPercent}%` }}
                               />
                             </div>
-                            <span className="text-xs opacity-75">
+                            <span className="text-xs font-medium opacity-80">
                               {progress.completed}/{progress.total}
                             </span>
                           </>
