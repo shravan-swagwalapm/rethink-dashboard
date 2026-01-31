@@ -11,10 +11,7 @@ CREATE TABLE IF NOT EXISTS profile_cards (
   is_active BOOLEAN DEFAULT true, -- Can deactivate cards
   view_count INTEGER DEFAULT 0, -- Track how many times viewed
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW(),
-
-  -- Ensure one active card per user
-  CONSTRAINT unique_active_card_per_user UNIQUE (user_id, is_active) WHERE is_active = true
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ============================================
@@ -26,6 +23,9 @@ CREATE INDEX idx_profile_cards_slug ON profile_cards(slug) WHERE is_active = tru
 
 -- Index for user lookups
 CREATE INDEX idx_profile_cards_user_id ON profile_cards(user_id);
+
+-- Partial unique index to ensure one active card per user
+CREATE UNIQUE INDEX idx_unique_active_card_per_user ON profile_cards(user_id) WHERE is_active = true;
 
 -- ============================================
 -- 3. Enable Row Level Security
