@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
 
 // GET: Fetch recently viewed resources
 export async function GET(request: NextRequest) {
-  const supabase = getClient();
+  const supabase = await createClient();
 
   try {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
 
 // POST: Update last viewed timestamp
 export async function POST(request: NextRequest) {
-  const supabase = getClient();
+  const supabase = await createClient();
 
   try {
     const { data: { user }, error: userError } = await supabase.auth.getUser();

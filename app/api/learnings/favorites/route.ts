@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
 
 // GET: Fetch user's favorited resources
 export async function GET(request: NextRequest) {
-  const supabase = getClient();
+  const supabase = await createClient();
 
   try {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
 
 // POST: Add resource to favorites
 export async function POST(request: NextRequest) {
-  const supabase = getClient();
+  const supabase = await createClient();
 
   try {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
 
 // DELETE: Remove resource from favorites
 export async function DELETE(request: NextRequest) {
-  const supabase = getClient();
+  const supabase = await createClient();
 
   try {
     const { data: { user }, error: userError } = await supabase.auth.getUser();

@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
 
 // GET: Fetch user's progress for all resources
 export async function GET(request: NextRequest) {
-  const supabase = getClient();
+  const supabase = await createClient();
 
   try {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
 
 // POST: Toggle resource completion or update progress
 export async function POST(request: NextRequest) {
-  const supabase = getClient();
+  const supabase = await createClient();
 
   try {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
 
 // PATCH: Update video progress (current timestamp)
 export async function PATCH(request: NextRequest) {
-  const supabase = getClient();
+  const supabase = await createClient();
 
   try {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
