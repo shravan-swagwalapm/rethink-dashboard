@@ -31,6 +31,16 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -77,6 +87,8 @@ export default function CohortsPage() {
   const [showRetagDialog, setShowRetagDialog] = useState(false);
   const [retagCohort, setRetagCohort] = useState<Cohort | null>(null);
   const [newTag, setNewTag] = useState('');
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deletingCohort, setDeletingCohort] = useState<Cohort | null>(null);
   const hasFetchedRef = useRef(false);
 
   const fetchCohorts = useCallback(async (force = false) => {
@@ -93,8 +105,7 @@ export default function CohortsPage() {
       const data = await response.json();
       setCohorts(data);
     } catch (error) {
-      console.error('Error fetching cohorts:', error);
-      toast.error('Failed to load cohorts');
+      toast.error(error instanceof Error ? error.message : 'Failed to load cohorts');
     } finally {
       setLoading(false);
     }
@@ -167,20 +178,22 @@ export default function CohortsPage() {
       setShowForm(false);
       fetchCohorts(true);
     } catch (error) {
-      console.error('Error saving cohort:', error);
-      toast.error('Failed to save cohort');
+      toast.error(error instanceof Error ? error.message : 'Failed to save cohort');
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDelete = async (cohortId: string) => {
-    if (!confirm('Are you sure you want to delete this cohort? This action cannot be undone.')) {
-      return;
-    }
+  const handleDeleteClick = (cohort: Cohort) => {
+    setDeletingCohort(cohort);
+    setShowDeleteDialog(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deletingCohort) return;
 
     try {
-      const response = await fetch(`/api/admin/cohorts?id=${cohortId}`, {
+      const response = await fetch(`/api/admin/cohorts?id=${deletingCohort.id}`, {
         method: 'DELETE',
       });
 
@@ -189,10 +202,11 @@ export default function CohortsPage() {
       }
 
       toast.success('Cohort deleted');
+      setShowDeleteDialog(false);
+      setDeletingCohort(null);
       fetchCohorts(true);
     } catch (error) {
-      console.error('Error deleting cohort:', error);
-      toast.error('Failed to delete cohort');
+      toast.error(error instanceof Error ? error.message : 'Failed to delete cohort');
     }
   };
 
@@ -211,8 +225,7 @@ export default function CohortsPage() {
       toast.success('Cohort archived');
       fetchCohorts(true);
     } catch (error) {
-      console.error('Error archiving cohort:', error);
-      toast.error('Failed to archive cohort');
+      toast.error(error instanceof Error ? error.message : 'Failed to archive cohort');
     }
   };
 
@@ -246,8 +259,7 @@ export default function CohortsPage() {
       setNewTag('');
       fetchCohorts(true);
     } catch (error) {
-      console.error('Error retagging cohort:', error);
-      toast.error('Failed to retag cohort');
+      toast.error(error instanceof Error ? error.message : 'Failed to retag cohort');
     } finally {
       setSaving(false);
     }
@@ -373,7 +385,7 @@ export default function CohortsPage() {
                               </DropdownMenuItem>
                             )}
                             <DropdownMenuItem
-                              onClick={() => handleDelete(cohort.id)}
+                              onClick={() => handleDeleteClick(cohort)}
                               className="text-destructive focus:text-destructive"
                             >
                               <Trash2 className="w-4 h-4 mr-2" />
@@ -530,6 +542,30 @@ export default function CohortsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete <strong>{deletingCohort?.name}</strong> and all associated data.
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeletingCohort(null)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
