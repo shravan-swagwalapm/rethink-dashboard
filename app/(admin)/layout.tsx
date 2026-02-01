@@ -52,9 +52,13 @@ export default function AdminLayout({
   const pathname = usePathname();
 
   useEffect(() => {
+    // Check if user has intended_role=admin cookie (just logged in as admin)
+    const hasAdminIntent = document.cookie.includes('intended_role=admin');
+
     // Only redirect if profile is loaded AND user is confirmed not admin
     // Don't redirect if profile is null - could be a race condition with useUser timeout
-    if (!loading && profile && !isAdmin) {
+    // Don't redirect if user just logged in as admin (has intended_role cookie)
+    if (!loading && profile && !isAdmin && !hasAdminIntent) {
       router.push('/dashboard');
     }
   }, [loading, profile, isAdmin, router]);
@@ -66,7 +70,9 @@ export default function AdminLayout({
 
   // If profile loaded and user is NOT admin, don't render (redirect will happen via useEffect)
   // If profile is null, trust the auth callback verification and show the UI
-  if (profile && !isAdmin) {
+  // If user has intended_role=admin cookie, allow rendering (they just logged in)
+  const hasAdminIntent = typeof document !== 'undefined' && document.cookie.includes('intended_role=admin');
+  if (profile && !isAdmin && !hasAdminIntent) {
     return null;
   }
 
