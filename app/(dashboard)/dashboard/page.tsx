@@ -364,24 +364,6 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         </div>
-
-        {/* Link to Admin Control Panel */}
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium">Need to manage users, cohorts, or system settings?</p>
-                <p className="text-sm text-muted-foreground">Access the full admin control panel</p>
-              </div>
-              <Link href="/admin">
-                <Button>
-                  <Shield className="w-4 h-4 mr-2" />
-                  Go to Admin Panel
-                </Button>
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     );
   }
