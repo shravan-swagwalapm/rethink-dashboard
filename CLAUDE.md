@@ -1,6 +1,6 @@
 # CLAUDE.md - Product Development Rules & Memory
 
-**Last Updated**: 2026-02-02
+**Last Updated**: 2026-02-02 (Session 2: Multi-Role Dashboard Complete)
 **Project**: Rethink Dashboard (Educational Platform)
 
 ---
@@ -250,6 +250,12 @@
 - Update 2026-02-02: Sidebar displayed profile.role instead of activeRole → Always display computed activeRole for users with multiple roles, not the legacy profile.role field
 - Update 2026-02-02: Bug affected 3 out of 5 admin users → Always audit ALL users of a type when fixing role/permission bugs. Create audit scripts to verify fixes comprehensively
 
+**Multi-Role Dashboard & Access Control (2026-02-02)**:
+- Update 2026-02-02: Initially used router.push() for role switching which navigated to different routes → Use window.location.reload() to stay on current page and refresh view with new role. More reliable for ensuring all components sync with state changes
+- Update 2026-02-02: Had "Go to Admin Panel" button in dashboard admin view → Remove all navigation shortcuts to /admin. Enforce explicit "Sign in as Administrator" login flow for proper access control
+- Update 2026-02-02: Had Admin button in header providing quick access to /admin → Strict access control - /admin should ONLY be accessible via explicit admin login, never through convenience links
+- Update 2026-02-02: Dashboard initially redirected based on role instead of showing different views → Same route (/dashboard) should show role-specific views (student view vs admin view) based on activeRole. Better UX than navigation
+
 [Claude: Add new entries here after each mistake]
 
 ---
@@ -263,6 +269,7 @@
 - 2026-02-02: Futuristic theme with glow effects → Use gradient and glow variables for modern feel
 - 2026-02-02: Educational platform context → Focus on clarity and learning UX
 - 2026-02-02: Admin dashboard + student portal → Separate concerns, clear role-based access
+- 2026-02-02: Strict admin access control → /admin route should ONLY be accessible via explicit "Sign in as Administrator" login. No shortcuts, links, or buttons to /admin anywhere in the dashboard interface. This enforces proper intentional access
 
 [Claude: Add new entries based on user feedback]
 
@@ -278,6 +285,10 @@
 - Server Components: Better performance, less JS → Default to Server Components
 - Zod validation: Type-safe forms → Always validate with Zod schemas
 - Supabase SSR: Secure auth → Follow SSR pattern for authentication
+- Multi-role dashboard views (2026-02-02): Single route shows different views based on activeRole (student vs admin) → Better UX than navigating between routes. Implemented via conditional rendering with separate data fetching per role
+- window.location.reload() for role switching (2026-02-02): Ensures complete component state synchronization when switching roles → More reliable than router.refresh() or router.push() for major state changes
+- Dedicated admin stats API endpoint (2026-02-02): Created /api/admin/dashboard-stats for system-wide data → Clean separation between student (cohort-specific) and admin (system-wide) data sources
+- Explicit access control patterns (2026-02-02): Removed all navigation shortcuts to /admin, enforced login-based access → Clear, intentional access patterns prevent confusion and improve security
 
 [Claude: Add new entries when something works really well]
 
@@ -459,6 +470,17 @@ When Claude makes the same mistake twice, this file needs updating.
 - Check user role before rendering admin components
 - Show appropriate loading states during auth checks
 - Graceful fallback if user not authorized
+- **CRITICAL**: `/admin` is ONLY accessible via explicit "Sign in as Administrator" login
+- **NEVER** add navigation links/buttons to `/admin` from dashboard or header
+- Admin users can view admin data in `/dashboard` by switching to admin role
+
+### Multi-Role Dashboard (`/dashboard`)
+- Shows different views based on `activeRole` (not navigation)
+- **Student role selected**: Shows cohort-specific data (sessions, learnings, invoices for their cohort)
+- **Admin role selected**: Shows system-wide data (all cohorts, total stats, all sessions)
+- **Mentor role selected**: Shows students they mentor
+- Use `window.location.reload()` for role switching to ensure full component sync
+- Fetch data from different API endpoints based on role (e.g., `/api/admin/dashboard-stats` for admin view)
 
 ### Student Portal
 - Public routes accessible to authenticated students
