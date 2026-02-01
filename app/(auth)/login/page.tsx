@@ -61,7 +61,6 @@ function LoginContent() {
 
     // Listen for auth state changes (handles magic link tokens in URL hash)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
-      console.log('Auth state change:', event);
       if (event === 'SIGNED_IN' && session) {
         toast.success('Signed in successfully!');
         router.push('/dashboard');
@@ -90,8 +89,6 @@ function LoginContent() {
         ? `${window.location.origin}/auth/callback/admin`
         : `${window.location.origin}/auth/callback`;
 
-      console.log('Login: OAuth redirectTo (path-based):', redirectUrl);
-
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -105,8 +102,9 @@ function LoginContent() {
 
       if (error) throw error;
     } catch (error) {
-      toast.error('Failed to sign in with Google');
-      console.error(error);
+      const errorMessage = error instanceof Error ? error.message : 'Authentication failed';
+      toast.error(`Failed to sign in with Google: ${errorMessage}`);
+      setError(errorMessage);
       setGoogleLoading(false);
       setAdminLoading(false);
     }
@@ -131,9 +129,10 @@ function LoginContent() {
       });
 
       if (error) {
-        console.error('OTP error:', error);
         if (error.message.includes('User not found') || error.message.includes('Signups not allowed')) {
-          setError('Account not found. Please contact admin for access.');
+          const errorMsg = 'Account not found. Please contact admin for access.';
+          setError(errorMsg);
+          toast.error(errorMsg);
           setLoading(false);
           return;
         }
@@ -143,9 +142,9 @@ function LoginContent() {
       toast.success('Check your email for the magic link!');
       setStep('otp');
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      toast.error(`Failed to send magic link: ${errorMessage}`);
-      console.error('Send OTP error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to send magic link';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -183,8 +182,9 @@ function LoginContent() {
         router.push('/dashboard');
       }
     } catch (error) {
-      toast.error('Invalid verification code');
-      console.error(error);
+      const errorMessage = error instanceof Error ? error.message : 'Invalid verification code';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -221,8 +221,9 @@ function LoginContent() {
       toast.success('Password set successfully! Redirecting...');
       router.push('/dashboard');
     } catch (error) {
-      toast.error('Failed to set password');
-      console.error(error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to set password';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -230,6 +231,7 @@ function LoginContent() {
 
   const handleResendOtp = async () => {
     setLoading(true);
+    setError(null);
     try {
       const { error } = await supabase.auth.signInWithOtp({
         email,
@@ -242,7 +244,9 @@ function LoginContent() {
       if (error) throw error;
       toast.success('New login link sent to your email');
     } catch (error) {
-      toast.error('Failed to resend link');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to resend link';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
