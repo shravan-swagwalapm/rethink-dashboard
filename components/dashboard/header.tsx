@@ -105,19 +105,6 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
           {/* Role Switcher */}
           <RoleSwitcher />
 
-          {/* Admin link */}
-          {isAdmin && (
-            <Link href="/admin">
-              <Button variant="ghost" size="sm" className="gap-2 hidden sm:flex">
-                <Shield className="w-4 h-4" />
-                <span>Admin</span>
-              </Button>
-              <Button variant="ghost" size="icon" className="sm:hidden">
-                <Shield className="w-4 h-4" />
-              </Button>
-            </Link>
-          )}
-
           {/* Theme toggle */}
           <Button
             variant="ghost"
