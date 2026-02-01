@@ -191,8 +191,14 @@ export function useUser() {
     if (assignment) {
       setActiveRoleAssignment(assignment);
       localStorage.setItem('active_role_assignment_id', roleAssignmentId);
-      // Refresh current page data using Next.js router
-      router.refresh();
+
+      // Navigate to appropriate dashboard based on new role to ensure full state sync
+      const newRole = assignment.role;
+      if (newRole === 'admin' || newRole === 'company_user') {
+        router.push('/admin');
+      } else {
+        router.push('/dashboard');
+      }
     }
   };
 

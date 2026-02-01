@@ -93,6 +93,20 @@ export async function GET(request: Request) {
 
       if (profile) {
         userRole = profile.role;
+
+        // Also check user_role_assignments for admin role
+        // This ensures users with admin role assignment but 'student' in profiles.role still get admin access
+        const { data: adminAssignments } = await adminClient
+          .from('user_role_assignments')
+          .select('role')
+          .eq('user_id', data.session.user.id)
+          .in('role', ['admin', 'company_user'])
+          .limit(1);
+
+        // If admin assignment exists, use that role (override profiles.role)
+        if (adminAssignments && adminAssignments.length > 0) {
+          userRole = adminAssignments[0].role;
+        }
       }
     }
 

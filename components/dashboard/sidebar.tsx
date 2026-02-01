@@ -213,7 +213,7 @@ export function DashboardSidebar({ mobileOpen, onMobileClose }: DashboardSidebar
                   {profile.full_name || 'User'}
                 </p>
                 <p className="text-xs text-muted-foreground capitalize">
-                  {profile.role}
+                  {activeRole || profile.role}
                 </p>
               </div>
             </div>
