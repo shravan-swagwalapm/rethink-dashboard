@@ -244,9 +244,8 @@ export function useUser() {
   };
 
   // Compute active values
-  const activeRole = activeRoleAssignment?.role ||
-    (profile?.role_assignments?.length ? null : profile?.role) ||
-    null;
+  // Fall back to profile.role during initialization or for single-role users
+  const activeRole = activeRoleAssignment?.role || profile?.role || null;
   const activeCohortId = activeRoleAssignment?.cohort_id || profile?.cohort_id || null;
   const hasMultipleRoles = (profile?.role_assignments?.length || 0) > 1;
 
