@@ -1,11 +1,13 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { User, AuthChangeEvent, Session } from '@supabase/supabase-js';
 import { getClient, resetClient } from '@/lib/supabase/client';
 import type { Profile, UserRoleAssignment } from '@/types';
 
 export function useUser() {
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -14,6 +16,7 @@ export function useUser() {
   const isMountedRef = useRef(true);
   const currentUserIdRef = useRef<string | null>(null);
   const initialFetchDoneRef = useRef(false);
+  const retryCountRef = useRef(0);
 
   useEffect(() => {
     const supabase = getClient();
@@ -30,7 +33,6 @@ export function useUser() {
     // Safety timeout - ensure loading becomes false within 1500ms max
     const timeoutId = setTimeout(() => {
       if (!loadingCompletedRef.current) {
-        console.warn('useUser: Auth check timed out after 1500ms, forcing loading to false');
         completeLoading();
       }
     }, 1500);
@@ -50,7 +52,21 @@ export function useUser() {
         setProfile(data.profile);
         currentUserIdRef.current = data.user?.id || null;
       } catch (error) {
-        console.error('useUser: Error fetching user:', error);
+        // Retry once on failure
+        if (retryCountRef.current === 0 && isMountedRef.current) {
+          retryCountRef.current = 1;
+          try {
+            const response = await fetch('/api/me', { cache: 'no-store' });
+            const data = await response.json();
+            if (isMountedRef.current) {
+              setUser(data.user);
+              setProfile(data.profile);
+              currentUserIdRef.current = data.user?.id || null;
+            }
+          } catch {
+            // Silently fail - user will remain null
+          }
+        }
       } finally {
         clearTimeout(timeoutId);
         completeLoading();
@@ -87,10 +103,12 @@ export function useUser() {
               if (!isMountedRef.current) return;
               setUser(data.user);
               setProfile(data.profile);
-            } catch (err) {
-              console.error('useUser: Profile fetch error:', err);
-              setUser(session.user);
-              setProfile(null);
+            } catch {
+              // Fallback to session user without full profile
+              if (isMountedRef.current) {
+                setUser(session.user);
+                setProfile(null);
+              }
             }
           }
         } else {
@@ -130,7 +148,6 @@ export function useUser() {
   }, [profile?.role_assignments]);
 
   const signOut = async () => {
-    console.log('useUser.signOut: Starting Supabase sign out...');
     // Clear state immediately
     setUser(null);
     setProfile(null);
@@ -138,34 +155,34 @@ export function useUser() {
     try {
       const supabase = getClient();
       // Use scope: 'global' to sign out from all sessions
-      const { error } = await supabase.auth.signOut({ scope: 'global' });
-      if (error) {
-        console.error('useUser.signOut: Error signing out:', error);
-      }
-      console.log('useUser.signOut: Supabase sign out successful');
+      await supabase.auth.signOut({ scope: 'global' });
       // Reset the client singleton to clear any cached session
       resetClient();
-    } catch (error) {
-      console.error('useUser.signOut: Exception during sign out:', error);
+    } catch {
+      // Always reset client even on error to ensure clean state
       resetClient();
     }
   };
 
-  const refreshProfile = async () => {
-    if (!user) return;
+  const refreshProfile = async (): Promise<boolean> => {
+    if (!user) return false;
 
-    const supabase = getClient();
-    const { data: profileData, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .maybeSingle();
+    try {
+      const supabase = getClient();
+      const { data: profileData, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .maybeSingle();
 
-    if (error) {
-      console.error('refreshProfile: Error fetching profile:', error);
-    } else {
-      console.log('refreshProfile: Profile data refreshed successfully:', profileData);
+      if (error) {
+        return false;
+      }
+
       setProfile(profileData);
+      return true;
+    } catch {
+      return false;
     }
   };
 
@@ -174,8 +191,8 @@ export function useUser() {
     if (assignment) {
       setActiveRoleAssignment(assignment);
       localStorage.setItem('active_role_assignment_id', roleAssignmentId);
-      // Force refresh of current page data
-      window.location.reload();
+      // Refresh current page data using Next.js router
+      router.refresh();
     }
   };
 
