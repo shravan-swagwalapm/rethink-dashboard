@@ -6,6 +6,19 @@ import { User, AuthChangeEvent, Session } from '@supabase/supabase-js';
 import { getClient, resetClient } from '@/lib/supabase/client';
 import type { Profile, UserRoleAssignment } from '@/types';
 
+// Helper to read cookie value
+function getCookie(name: string): string | null {
+  if (typeof document === 'undefined') return null;
+
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) {
+    const cookieValue = parts.pop()?.split(';').shift();
+    return cookieValue || null;
+  }
+  return null;
+}
+
 export function useUser() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
@@ -136,10 +149,32 @@ export function useUser() {
       const savedAssignment = profile.role_assignments.find(ra => ra.id === savedId);
 
       if (savedAssignment) {
+        // Use saved role
         setActiveRoleAssignment(savedAssignment);
       } else {
-        // Default to first assignment
-        setActiveRoleAssignment(profile.role_assignments[0]);
+        // Smart default based on login type
+        const intendedRole = getCookie('intended_role'); // student or admin
+
+        let defaultAssignment;
+        if (intendedRole === 'admin') {
+          // Find admin or company_user role
+          defaultAssignment = profile.role_assignments.find(
+            ra => ra.role === 'admin' || ra.role === 'company_user'
+          );
+        } else {
+          // Default to student role for regular login
+          defaultAssignment = profile.role_assignments.find(
+            ra => ra.role === 'student'
+          );
+        }
+
+        // Fallback to first assignment if intended role not found
+        setActiveRoleAssignment(defaultAssignment || profile.role_assignments[0]);
+
+        // Clear the cookie after using it
+        if (intendedRole) {
+          document.cookie = 'intended_role=; max-age=0';
+        }
       }
     } else {
       // No role assignments, clear active role
@@ -192,18 +227,16 @@ export function useUser() {
       setActiveRoleAssignment(assignment);
       localStorage.setItem('active_role_assignment_id', roleAssignmentId);
 
-      // Navigate to appropriate dashboard based on new role to ensure full state sync
-      const newRole = assignment.role;
-      if (newRole === 'admin' || newRole === 'company_user') {
-        router.push('/admin');
-      } else {
-        router.push('/dashboard');
-      }
+      // Refresh current page to show new role's view
+      // Force full reload to ensure all components sync
+      window.location.reload();
     }
   };
 
   // Compute active values
-  const activeRole = activeRoleAssignment?.role || profile?.role || null;
+  const activeRole = activeRoleAssignment?.role ||
+    (profile?.role_assignments?.length ? null : profile?.role) ||
+    null;
   const activeCohortId = activeRoleAssignment?.cohort_id || profile?.cohort_id || null;
   const hasMultipleRoles = (profile?.role_assignments?.length || 0) > 1;
 

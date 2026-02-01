@@ -39,7 +39,7 @@ interface DashboardHeaderProps {
 export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
   const { theme, setTheme } = useTheme();
   const router = useRouter();
-  const { profile, signOut, isAdmin } = useUser();
+  const { profile, signOut, isAdmin, activeRole } = useUser();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
 
   const handleSignOut = () => {
@@ -227,7 +227,7 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
                   <p className="text-sm font-medium">{profile?.full_name || 'User'}</p>
                   <p className="text-xs text-muted-foreground truncate">{profile?.email}</p>
                   <Badge variant="secondary" className="w-fit mt-1 capitalize">
-                    {profile?.role}
+                    {activeRole || profile?.role}
                   </Badge>
                 </div>
               </DropdownMenuLabel>

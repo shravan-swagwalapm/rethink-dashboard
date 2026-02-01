@@ -124,7 +124,17 @@ export async function GET(request: Request) {
 
     if (shouldGoToAdmin) {
       console.log('Auth callback: Redirecting to /admin');
-      return NextResponse.redirect(`${origin}/admin`);
+      const response = NextResponse.redirect(`${origin}/admin`);
+
+      // Set intended role cookie for multi-role users
+      response.cookies.set('intended_role', 'admin', {
+        httpOnly: false, // Allow JS access
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 5, // 5 minutes (just for initial load)
+      });
+
+      return response;
     } else {
       // User tried admin login but doesn't have admin role
       console.log('Auth callback: User is not admin, redirecting to /dashboard');

@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Mail, Phone, Globe, Linkedin, MapPin, Sparkles, X } from 'lucide-react';
 import { Profile } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useUser } from '@/hooks/use-user';
 
 interface ProfileCardPreviewModalProps {
   open: boolean;
@@ -13,6 +14,7 @@ interface ProfileCardPreviewModalProps {
 }
 
 export function ProfileCardPreviewModal({ open, onClose, profile }: ProfileCardPreviewModalProps) {
+  const { activeRole } = useUser();
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-lg p-0 bg-transparent border-none shadow-none overflow-visible">
@@ -152,9 +154,10 @@ export function ProfileCardPreviewModal({ open, onClose, profile }: ProfileCardP
                         {profile.full_name || 'No Name Provided'}
                       </h2>
                       <Badge className="bg-gradient-to-r from-purple-500/20 to-cyan-500/20 border-purple-500/50 text-purple-200 backdrop-blur-sm">
-                        {profile.role === 'student' ? 'Student' :
-                         profile.role === 'mentor' ? 'Mentor' :
-                         profile.role === 'admin' ? 'Admin' : 'User'}
+                        {activeRole === 'student' ? 'Student' :
+                         activeRole === 'mentor' ? 'Mentor' :
+                         activeRole === 'admin' ? 'Admin' :
+                         activeRole === 'company_user' ? 'Admin' : 'User'}
                       </Badge>
                     </motion.div>
                   </div>

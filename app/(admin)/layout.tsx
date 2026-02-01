@@ -47,7 +47,7 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { profile, isAdmin, loading, signOut } = useUser();
+  const { profile, isAdmin, loading, signOut, activeRole } = useUser();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -150,7 +150,7 @@ export default function AdminLayout({
                   {profile?.full_name || 'Admin'}
                 </p>
                 <p className="text-xs text-muted-foreground capitalize">
-                  {profile?.role}
+                  {activeRole || profile?.role}
                 </p>
               </div>
             </div>

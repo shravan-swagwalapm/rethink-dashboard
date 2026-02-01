@@ -35,6 +35,11 @@ export default function DashboardPage() {
   const [cohortName, setCohortName] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
+  // Admin-specific state
+  const [adminStats, setAdminStats] = useState<any>(null);
+  const [adminSessions, setAdminSessions] = useState<any[]>([]);
+  const [adminLearnings, setAdminLearnings] = useState<any[]>([]);
+
   useEffect(() => {
     const fetchDashboardData = async () => {
       if (!profile) {
@@ -46,8 +51,15 @@ export default function DashboardPage() {
       const supabase = getClient();
 
       try {
-        // Admin role: skip cohort-specific data fetch
+        // Admin role: fetch system-wide data
         if (isAdmin) {
+          const response = await fetch('/api/admin/dashboard-stats');
+          if (response.ok) {
+            const data = await response.json();
+            setAdminStats(data.stats);
+            setAdminSessions(data.upcomingSessions || []);
+            setAdminLearnings(data.recentLearnings || []);
+          }
           setLoading(false);
           return;
         }
@@ -201,37 +213,172 @@ export default function DashboardPage() {
     return <PageLoader message="Loading dashboard..." />;
   }
 
-  // Admin role: Show empty state (no cohort-specific dashboard)
+  // Admin role: Show system-wide dashboard
   if (isAdmin) {
     return (
       <div className="space-y-6">
-        <Card>
+        {/* Admin Welcome Banner */}
+        <Card className="relative overflow-hidden border-2">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-cyan-500 to-blue-500" />
           <CardHeader>
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center">
                 <Shield className="w-6 h-6 text-white" />
               </div>
               <div>
-                <CardTitle className="text-2xl">Admin Dashboard</CardTitle>
+                <CardTitle className="text-2xl">Admin Overview</CardTitle>
                 <CardDescription>
-                  Switch to a student role to view cohort-specific dashboard
+                  System-wide dashboard across all cohorts
                 </CardDescription>
               </div>
             </div>
           </CardHeader>
-          <CardContent className="pt-6">
-            <div className="text-center py-12">
-              <p className="text-muted-foreground mb-4">
-                As an admin, you have access to all cohorts via the admin panel.
-              </p>
-              <div className="flex gap-3 justify-center">
-                <Link href="/admin">
-                  <Button>
-                    <Shield className="w-4 h-4 mr-2" />
-                    Go to Admin Panel
-                  </Button>
-                </Link>
+        </Card>
+
+        {/* System-wide Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardDescription>Total Users</CardDescription>
+              <CardTitle className="text-3xl font-bold">{adminStats?.totalStudents || 0}</CardTitle>
+            </CardHeader>
+          </Card>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardDescription>Active Cohorts</CardDescription>
+              <CardTitle className="text-3xl font-bold">{adminStats?.activeCohorts || 0}</CardTitle>
+            </CardHeader>
+          </Card>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardDescription>Upcoming Sessions</CardDescription>
+              <CardTitle className="text-3xl font-bold">{adminStats?.upcomingSessionsCount || 0}</CardTitle>
+            </CardHeader>
+          </Card>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardDescription>Total Learnings</CardDescription>
+              <CardTitle className="text-3xl font-bold">{adminStats?.totalLearnings || 0}</CardTitle>
+            </CardHeader>
+          </Card>
+        </div>
+
+        {/* Content Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* All Upcoming Sessions */}
+          <Card className="relative overflow-hidden border-2">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-cyan-500 to-blue-500" />
+            <CardHeader className="flex flex-row items-center justify-between pb-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center">
+                    <Calendar className="w-4 h-4 text-white" />
+                  </div>
+                  <CardTitle className="text-xl">All Upcoming Sessions</CardTitle>
+                </div>
+                <CardDescription>Across all cohorts</CardDescription>
               </div>
+            </CardHeader>
+            <CardContent>
+              {!adminSessions || adminSessions.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-blue-50 dark:bg-blue-950/30 flex items-center justify-center">
+                    <Calendar className="w-8 h-8 text-blue-500 dark:text-blue-400" />
+                  </div>
+                  <p className="text-sm font-medium">No upcoming sessions</p>
+                  <p className="text-xs text-muted-foreground">Check back later</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {adminSessions.slice(0, 5).map((session, index) => (
+                    <div
+                      key={session.id}
+                      className="group relative flex items-center gap-4 p-4 rounded-xl border bg-gradient-to-br from-blue-50/50 to-cyan-50/50 dark:from-blue-950/20 dark:to-cyan-950/20 hover:from-blue-50 hover:to-cyan-50 dark:hover:from-blue-950/30 dark:hover:to-cyan-950/30 transition-all duration-300"
+                    >
+                      <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center text-white">
+                        <Video className="w-6 h-6" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold truncate">{session.title}</p>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Clock className="w-3.5 h-3.5" />
+                          <span>{format(parseISO(session.scheduled_at), 'MMM d, h:mm a')}</span>
+                          <span>•</span>
+                          <span>{session.cohortTag}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Recent Learnings */}
+          <Card className="relative overflow-hidden border-2">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 via-pink-500 to-purple-500" />
+            <CardHeader className="flex flex-row items-center justify-between pb-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center">
+                    <BookOpen className="w-4 h-4 text-white" />
+                  </div>
+                  <CardTitle className="text-xl">Recent Learnings</CardTitle>
+                </div>
+                <CardDescription>Latest content added</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {!adminLearnings || adminLearnings.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-purple-50 dark:bg-purple-950/30 flex items-center justify-center">
+                    <BookOpen className="w-8 h-8 text-purple-500 dark:text-purple-400" />
+                  </div>
+                  <p className="text-sm font-medium">No learnings yet</p>
+                  <p className="text-xs text-muted-foreground">Add content to get started</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {adminLearnings.slice(0, 5).map((learning, index) => (
+                    <div
+                      key={learning.id}
+                      className="group relative flex items-center gap-4 p-4 rounded-xl border bg-gradient-to-br from-purple-50/50 to-pink-50/50 dark:from-purple-950/20 dark:to-pink-950/20 hover:from-purple-50 hover:to-pink-50 dark:hover:from-purple-950/30 dark:hover:to-pink-950/30 transition-all duration-300"
+                    >
+                      <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center text-white">
+                        <BookOpen className="w-6 h-6" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold truncate">{learning.title}</p>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Badge variant="secondary" className="text-xs">
+                            {learning.type}
+                          </Badge>
+                          <span>•</span>
+                          <span>{learning.cohortTag}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Link to Admin Control Panel */}
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium">Need to manage users, cohorts, or system settings?</p>
+                <p className="text-sm text-muted-foreground">Access the full admin control panel</p>
+              </div>
+              <Link href="/admin">
+                <Button>
+                  <Shield className="w-4 h-4 mr-2" />
+                  Go to Admin Panel
+                </Button>
+              </Link>
             </div>
           </CardContent>
         </Card>

@@ -139,7 +139,17 @@ export async function GET(request: Request) {
 
     // User mode always redirects to dashboard
     console.log('Auth callback (USER path): Redirecting to /dashboard');
-    return NextResponse.redirect(`${origin}/dashboard`);
+    const response = NextResponse.redirect(`${origin}/dashboard`);
+
+    // Set intended role cookie for multi-role users
+    response.cookies.set('intended_role', 'student', {
+      httpOnly: false, // Allow JS access
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 5, // 5 minutes (just for initial load)
+    });
+
+    return response;
   }
 
   return NextResponse.redirect(`${origin}/login?error=auth`);
