@@ -244,6 +244,12 @@
 - Update 2026-02-02: Using OKLCH colors → Always use OKLCH color space, never hex codes for consistency
 - Update 2026-02-02: Next.js 16 uses App Router → Always use Server Components unless interactivity needed
 
+**Admin Authentication Bug (2026-02-02)**:
+- Update 2026-02-02: Admin users had 'student' in profiles.role despite having admin role assignments → When using dual storage (legacy + new tables), ALWAYS check BOTH tables for authentication/authorization. Auth callbacks must check user_role_assignments in addition to profiles.role
+- Update 2026-02-02: router.refresh() didn't sync Client Component state after role switch → For role switching or major state changes, use router.push() to navigate to appropriate route instead of router.refresh(). Full navigation ensures all components re-render with new state
+- Update 2026-02-02: Sidebar displayed profile.role instead of activeRole → Always display computed activeRole for users with multiple roles, not the legacy profile.role field
+- Update 2026-02-02: Bug affected 3 out of 5 admin users → Always audit ALL users of a type when fixing role/permission bugs. Create audit scripts to verify fixes comprehensively
+
 [Claude: Add new entries here after each mistake]
 
 ---
