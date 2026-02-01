@@ -145,16 +145,11 @@ export function useUser() {
   // Load saved role from localStorage when profile changes
   useEffect(() => {
     if (profile?.role_assignments?.length) {
-      const savedId = localStorage.getItem('active_role_assignment_id');
-      const savedAssignment = profile.role_assignments.find(ra => ra.id === savedId);
+      // Check intended_role cookie FIRST (explicit login choice)
+      const intendedRole = getCookie('intended_role'); // student or admin
 
-      if (savedAssignment) {
-        // Use saved role
-        setActiveRoleAssignment(savedAssignment);
-      } else {
-        // Smart default based on login type
-        const intendedRole = getCookie('intended_role'); // student or admin
-
+      if (intendedRole) {
+        // User just logged in with explicit role choice - prioritize over localStorage
         let defaultAssignment;
         if (intendedRole === 'admin') {
           // Find admin or company_user role
@@ -171,9 +166,24 @@ export function useUser() {
         // Fallback to first assignment if intended role not found
         setActiveRoleAssignment(defaultAssignment || profile.role_assignments[0]);
 
+        // Update localStorage with new role
+        if (defaultAssignment) {
+          localStorage.setItem('active_role_assignment_id', defaultAssignment.id);
+        }
+
         // Clear the cookie after using it
-        if (intendedRole) {
-          document.cookie = 'intended_role=; max-age=0';
+        document.cookie = 'intended_role=; max-age=0';
+      } else {
+        // No intended role cookie - check localStorage for saved preference
+        const savedId = localStorage.getItem('active_role_assignment_id');
+        const savedAssignment = profile.role_assignments.find(ra => ra.id === savedId);
+
+        if (savedAssignment) {
+          // Use saved role from previous session
+          setActiveRoleAssignment(savedAssignment);
+        } else {
+          // No saved role - default to first assignment
+          setActiveRoleAssignment(profile.role_assignments[0]);
         }
       }
     } else {
