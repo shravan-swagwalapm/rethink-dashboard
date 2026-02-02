@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { PageLoader } from '@/components/ui/page-loader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -58,6 +59,8 @@ import {
   EyeOff,
   Calendar,
   Globe,
+  AlertTriangle,
+  Info,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import type { Cohort, LearningModule, ModuleResource, LearningModuleWithResources, CaseStudy } from '@/types';
@@ -121,6 +124,7 @@ export default function LearningsPage() {
   const [selectedWeek, setSelectedWeek] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [cohortStats, setCohortStats] = useState<any>(null); // Link status for selected cohort
 
   // Expanded sections
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
@@ -193,6 +197,23 @@ export default function LearningsPage() {
     }
   }, []);
 
+  const fetchCohortStats = useCallback(async () => {
+    if (!selectedCohort || selectedCohort === GLOBAL_LIBRARY_ID) {
+      setCohortStats(null);
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/admin/cohorts/${selectedCohort}/stats`);
+      if (response.ok) {
+        const data = await response.json();
+        setCohortStats(data);
+      }
+    } catch (error) {
+      console.error('Error fetching cohort stats:', error);
+    }
+  }, [selectedCohort]);
+
   const fetchModules = useCallback(async () => {
     if (!selectedCohort) return;
 
@@ -241,9 +262,9 @@ export default function LearningsPage() {
   useEffect(() => {
     if (selectedCohort) {
       setLoading(true);
-      Promise.all([fetchModules(), fetchCaseStudies()]).finally(() => setLoading(false));
+      Promise.all([fetchModules(), fetchCaseStudies(), fetchCohortStats()]).finally(() => setLoading(false));
     }
-  }, [selectedCohort, fetchModules, fetchCaseStudies]);
+  }, [selectedCohort, fetchModules, fetchCaseStudies, fetchCohortStats]);
 
   // Get unique weeks from modules
   const weeks = [...new Set(modules.map(m => m.week_number).filter(Boolean))].sort((a, b) => (a as number) - (b as number));
@@ -719,6 +740,31 @@ export default function LearningsPage() {
           </Select>
         </div>
       </div>
+
+      {/* Link Status Alert - Show when cohort is linked to another source */}
+      {cohortStats && cohortStats.active_source !== 'own' && (
+        <Alert className="border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 animate-in fade-in slide-in-from-top-2 duration-300">
+          <Info className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+          <AlertDescription className="text-sm text-amber-800 dark:text-amber-200">
+            <div className="flex flex-col gap-1">
+              <p className="font-medium">
+                ℹ️ This cohort is linked to{' '}
+                {cohortStats.active_source === 'global' ? (
+                  <span className="font-semibold text-purple-700 dark:text-purple-400">Global Library</span>
+                ) : (
+                  <span className="font-semibold text-green-700 dark:text-green-400">{cohortStats.linked_cohort_name}</span>
+                )}
+              </p>
+              <p className="text-xs">
+                Students see <strong>{cohortStats.visible_modules} modules</strong> from the linked source.
+                {cohortStats.own_modules > 0 && (
+                  <span> Your {cohortStats.own_modules} own module{cohortStats.own_modules !== 1 ? 's' : ''} below {cohortStats.own_modules !== 1 ? 'are' : 'is'} hidden from students but can still be managed here.</span>
+                )}
+              </p>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Week Tabs */}
       <Card className="border-2 dark:border-gray-800 dark:bg-gray-950/50 shadow-sm">
