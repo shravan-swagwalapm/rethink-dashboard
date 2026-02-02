@@ -1,6 +1,6 @@
 # CLAUDE.md - Product Development Rules & Memory
 
-**Last Updated**: 2026-02-02 (Session 2: Multi-Role Dashboard Complete)
+**Last Updated**: 2026-02-02 (Session 3: Phone Numbers, Filtering & Data Quality)
 **Project**: Rethink Dashboard (Educational Platform)
 
 ---
@@ -369,6 +369,17 @@ Changes should only touch what's necessary. Avoid introducing bugs.
 - Update 2026-02-02: Phone numbers need country code → Store phone with country code prefix. Format: `+[code][number]` for international support
 - Update 2026-02-02: Session creation after OTP verification is complex → Use Supabase admin.generateLink() API for creating sessions. More reliable than manual token generation
 
+**Phone Numbers & Data Quality (2026-02-02 - Session 3)**:
+- Update 2026-02-02: CSV import had spam/test accounts mixed with real users → Always verify and clean data before bulk operations. Create verification scripts to identify anomalies (emails like aabc@gmail.com, aaabc@gmail.com)
+- Update 2026-02-02: Bulk imported 332 users but only 325 were real → Query database first, match CSV with existing records, skip non-existent users. Prevent blind SQL execution on unverified data
+- Update 2026-02-02: TypeScript strict types on Select onChange → When using shadcn Select with typed state, wrap onValueChange: `(value) => setState(value as TypeName)` to satisfy type checker
+- Update 2026-02-02: Phone number variations in CSV → Support multiple column name formats when parsing: 'Phone', 'Phone Number', 'phone', 'phone_number'. Makes templates more flexible
+
+**Filtering System Implementation (2026-02-02 - Session 3)**:
+- Update 2026-02-02: Built comprehensive filters without exploring existing patterns first → ALWAYS use Plan Mode and Explore subagent for complex UI features. Discovered Invoices page had server-side filtering pattern to follow
+- Update 2026-02-02: Client-side vs server-side filtering decision → For <500 records, client-side filtering is instant and simpler. For >1000 records, migrate to server-side with API params pattern
+- Update 2026-02-02: Filter state management - used individual useState for each filter → This is correct pattern (not combined filter object). Matches existing codebase patterns and easier to manage
+
 [Claude: Add new entries here after each mistake]
 
 ---
@@ -383,6 +394,9 @@ Changes should only touch what's necessary. Avoid introducing bugs.
 - 2026-02-02: Educational platform context → Focus on clarity and learning UX
 - 2026-02-02: Admin dashboard + student portal → Separate concerns, clear role-based access
 - 2026-02-02: Strict admin access control → /admin route should ONLY be accessible via explicit "Sign in as Administrator" login. No shortcuts, links, or buttons to /admin anywhere in the dashboard interface. This enforces proper intentional access
+- 2026-02-02 (Session 3): Comprehensive filtering for user management → User wants ability to filter by name, email, phone, cohort, phone status, date range, role count. Implemented with collapsible panel, active filter chips, and Excel export
+- 2026-02-02 (Session 3): Phone numbers in bulk upload → Add phone number column to Excel template so users can be created with OTP capability immediately
+- 2026-02-02 (Session 3): Data quality matters → Remove spam/test accounts before showing to user. User expects clean production data
 
 [Claude: Add new entries based on user feedback]
 
@@ -410,6 +424,28 @@ Changes should only touch what's necessary. Avoid introducing bugs.
 - Rate limiting with progressive blocking: 5 requests per window, 30-min block → Prevents abuse while allowing legitimate retries
 - Country code picker for phone input: Better UX than requiring manual entry → Always provide dropdown for common countries
 - 4-digit OTP input component: Individual boxes with auto-focus → Better UX than single input field, easier to remember
+
+**Phone Numbers & Bulk Import (2026-02-02 - Session 3)**:
+- CSV matching with database query before updates: Query existing users, match with CSV, generate SQL only for matches → Prevents errors and shows clear statistics (320 matched, 3 already had phones, 6 not found)
+- Phone number bulk import in template: Added Phone Number column to Excel template → Users can be created with OTP capability immediately, no manual phone addition needed
+- Data verification scripts: Created find/verify/delete scripts for data quality → Easy to audit and clean data, catch test accounts before they pollute production
+- Progressive data migration: Add phone numbers to existing 318 users in single operation → Batch operations with verification, 100% success rate, immediate rollback capability
+
+**Comprehensive Filtering System (2026-02-02 - Session 3)**:
+- Plan Mode for complex UI features: Used Explore subagent to find existing patterns (Invoices, Sessions, Learnings) → Consistent implementation matching codebase style
+- Collapsible filter panel pattern: Collapsed (search + badge count) / Expanded (all options) → Saves space, shows filter count, progressive disclosure
+- Active filter chips with remove buttons: Visual feedback of applied filters, click X to remove → Users understand what's filtered, easy to modify individual filters
+- Multi-select using Checkboxes in grid: 2-column grid with checkboxes for cohorts → Better UX than multi-select dropdown, see all options at once
+- Date range picker with shadcn Calendar: Dual Popover with Calendar components → Clean UI, familiar date selection pattern
+- Export filtered results to Excel: XLSX export with filtered data → Admins can download exactly what they see, useful for reports
+- Stats cards showing filtered vs total: "12 / 325" format when filters active → Clear indication of filter impact on data
+- Enhanced search across multiple fields: Search name OR email OR phone simultaneously → Single input, maximum flexibility
+- Client-side filtering for <500 records: Instant updates, no API calls → Better UX than server-side for small datasets
+
+**Data Quality & Maintenance (2026-02-02 - Session 3)**:
+- Spam account detection pattern: Test emails with patterns (aabc, aaabc, aaaabc) → Easy to spot and remove before production use
+- Database cleanup scripts: Created reusable delete/verify scripts → Can audit and clean data safely
+- Match-before-update pattern: Query database → match CSV → generate SQL → verify → execute → Prevents blind updates, shows statistics at each step
 
 [Claude: Add new entries when something works really well]
 
