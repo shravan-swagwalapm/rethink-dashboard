@@ -84,6 +84,7 @@ export async function GET(request: NextRequest) {
     const cohortId = searchParams.get('cohort_id');
     const moduleId = searchParams.get('module_id');
     const isGlobalFilter = searchParams.get('is_global');
+    const showOwn = searchParams.get('show_own'); // For admin management: bypass override logic
 
     const adminClient = await createAdminClient();
 
@@ -146,69 +147,84 @@ export async function GET(request: NextRequest) {
     let modulesError;
 
     if (cohortId) {
-      // OVERRIDE MODEL: Show only highest priority source
-      // Priority: Linked Source (cohort OR global) > Own Modules
+      // ADMIN MANAGEMENT MODE: If show_own=true, bypass override logic and show cohort's own modules
+      if (showOwn === 'true') {
+        // Show ONLY own modules (for admin content management)
+        const modulesQuery = adminClient
+          .from('learning_modules')
+          .select('*')
+          .eq('cohort_id', cohortId)
+          .order('week_number', { ascending: true })
+          .order('order_index', { ascending: true });
 
-      // Step 1: Fetch cohort state to determine active link type
-      const { data: cohort } = await adminClient
-        .from('cohorts')
-        .select('id, active_link_type, linked_cohort_id')
-        .eq('id', cohortId)
-        .single();
+        const result = await modulesQuery;
+        modules = result.data;
+        modulesError = result.error;
+      } else {
+        // OVERRIDE MODEL: Show only highest priority source (for student view preview)
+        // Priority: Linked Source (cohort OR global) > Own Modules
 
-      if (!cohort) {
-        return NextResponse.json({ error: 'Cohort not found' }, { status: 404 });
-      }
+        // Step 1: Fetch cohort state to determine active link type
+        const { data: cohort } = await adminClient
+          .from('cohorts')
+          .select('id, active_link_type, linked_cohort_id')
+          .eq('id', cohortId)
+          .single();
 
-      // Step 2: Fetch modules based on active link type (OVERRIDE logic)
-      let modulesQuery;
+        if (!cohort) {
+          return NextResponse.json({ error: 'Cohort not found' }, { status: 404 });
+        }
 
-      switch (cohort.active_link_type) {
-        case 'global':
-          // ONLY global modules (overrides own)
-          modulesQuery = adminClient
-            .from('learning_modules')
-            .select('*')
-            .eq('is_global', true)
-            .order('week_number', { ascending: true })
-            .order('order_index', { ascending: true });
-          break;
+        // Step 2: Fetch modules based on active link type (OVERRIDE logic)
+        let modulesQuery;
 
-        case 'cohort':
-          // ONLY modules from linked cohort (overrides own)
-          if (cohort.linked_cohort_id) {
+        switch (cohort.active_link_type) {
+          case 'global':
+            // ONLY global modules (overrides own)
             modulesQuery = adminClient
               .from('learning_modules')
               .select('*')
-              .eq('cohort_id', cohort.linked_cohort_id)
+              .eq('is_global', true)
               .order('week_number', { ascending: true })
               .order('order_index', { ascending: true });
-          } else {
-            // Fallback if linked_cohort_id is missing (shouldn't happen)
+            break;
+
+          case 'cohort':
+            // ONLY modules from linked cohort (overrides own)
+            if (cohort.linked_cohort_id) {
+              modulesQuery = adminClient
+                .from('learning_modules')
+                .select('*')
+                .eq('cohort_id', cohort.linked_cohort_id)
+                .order('week_number', { ascending: true })
+                .order('order_index', { ascending: true });
+            } else {
+              // Fallback if linked_cohort_id is missing (shouldn't happen)
+              modulesQuery = adminClient
+                .from('learning_modules')
+                .select('*')
+                .eq('cohort_id', cohortId)
+                .order('week_number', { ascending: true })
+                .order('order_index', { ascending: true });
+            }
+            break;
+
+          case 'own':
+          default:
+            // ONLY own modules (default)
             modulesQuery = adminClient
               .from('learning_modules')
               .select('*')
               .eq('cohort_id', cohortId)
               .order('week_number', { ascending: true })
               .order('order_index', { ascending: true });
-          }
-          break;
+            break;
+        }
 
-        case 'own':
-        default:
-          // ONLY own modules (default)
-          modulesQuery = adminClient
-            .from('learning_modules')
-            .select('*')
-            .eq('cohort_id', cohortId)
-            .order('week_number', { ascending: true })
-            .order('order_index', { ascending: true });
-          break;
+        const result = await modulesQuery;
+        modules = result.data;
+        modulesError = result.error;
       }
-
-      const result = await modulesQuery;
-      modules = result.data;
-      modulesError = result.error;
     } else {
       // No cohort filter - fetch all modules
       const modulesQuery = adminClient

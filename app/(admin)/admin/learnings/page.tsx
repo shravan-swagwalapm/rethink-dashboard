@@ -203,8 +203,8 @@ export default function LearningsPage() {
         // Fetch only global modules
         url = '/api/admin/learnings?is_global=true';
       } else {
-        // Fetch cohort-specific modules (existing behavior)
-        url = `/api/admin/learnings?cohort_id=${selectedCohort}`;
+        // Fetch cohort's OWN modules (for admin management, bypass override logic)
+        url = `/api/admin/learnings?cohort_id=${selectedCohort}&show_own=true`;
       }
 
       const response = await fetch(url);
