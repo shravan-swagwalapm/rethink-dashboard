@@ -39,6 +39,7 @@ export function VideoPlayer({
   const [error, setError] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [isVideoJsReady, setIsVideoJsReady] = useState(false);
+  const [useIframe, setUseIframe] = useState(false);
 
   const {
     progress,
@@ -82,9 +83,11 @@ export function VideoPlayer({
     const fetchUrl = async () => {
       try {
         setIsLoading(true);
-        const result = getGoogleDriveVideoUrl(googleDriveId, true);
+        // Use iframe embed (false) instead of direct streaming (true) to avoid 403/404 errors
+        const result = getGoogleDriveVideoUrl(googleDriveId, false);
         console.log('[VideoPlayer] Video URL generated:', result);
         setVideoUrl(result.url);
+        setUseIframe(result.method === 'iframe');
         setError(null);
       } catch (err) {
         console.error('Failed to generate video URL:', err);
@@ -282,7 +285,7 @@ export function VideoPlayer({
   }, [videoUrl, isVideoJsReady, videojs, progress, resourceId, thumbnail, autoplay, captions, handleProgressSave, markComplete, onComplete]);
 
   // Loading state
-  if (isLoading || !isVideoJsReady) {
+  if (isLoading || (!useIframe && !isVideoJsReady)) {
     return (
       <div className="w-full h-full bg-muted rounded-lg flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
@@ -307,7 +310,25 @@ export function VideoPlayer({
     );
   }
 
-  // Main video player
+  // Render iframe for Google Drive embeds
+  if (useIframe && videoUrl) {
+    return (
+      <div className="video-player-container w-full h-full">
+        <div className="rounded-lg overflow-hidden w-full h-full bg-black">
+          <iframe
+            src={videoUrl}
+            className="w-full h-full"
+            style={{ minHeight: '400px' }}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            title={title}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Main video player (video.js for non-iframe sources)
   return (
     <div className="video-player-container space-y-3 w-full h-full">
       <div data-vjs-player className="rounded-lg overflow-hidden w-full h-full">
