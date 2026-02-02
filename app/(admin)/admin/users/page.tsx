@@ -58,9 +58,17 @@ import {
   Star,
   Pencil,
   Phone,
+  X,
+  Download,
+  Filter,
+  Calendar as CalendarIcon,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import * as XLSX from 'xlsx';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
+import { cn } from '@/lib/utils';
 import {
   Tooltip,
   TooltipContent,
@@ -97,6 +105,14 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
+
+  // NEW: Advanced filter state
+  const [selectedCohorts, setSelectedCohorts] = useState<string[]>([]);
+  const [phoneStatusFilter, setPhoneStatusFilter] = useState<'all' | 'has_phone' | 'no_phone'>('all');
+  const [dateRangeFrom, setDateRangeFrom] = useState<Date | undefined>();
+  const [dateRangeTo, setDateRangeTo] = useState<Date | undefined>();
+  const [multiRoleFilter, setMultiRoleFilter] = useState<'all' | 'single' | 'multiple'>('all');
+  const [showFilters, setShowFilters] = useState(false);
 
   // Create user dialog state
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -445,15 +461,108 @@ export default function UsersPage() {
     }
   };
 
-  const filteredUsers = users.filter(user => {
-    const matchesSearch =
-      !searchQuery ||
-      user.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchQuery.toLowerCase());
+  // Helper: Get active filter count
+  const getActiveFilterCount = () => {
+    let count = 0;
+    if (roleFilter !== 'all') count++;
+    if (selectedCohorts.length > 0) count++;
+    if (phoneStatusFilter !== 'all') count++;
+    if (dateRangeFrom || dateRangeTo) count++;
+    if (multiRoleFilter !== 'all') count++;
+    return count;
+  };
 
+  // Helper: Clear all filters
+  const clearAllFilters = () => {
+    setSearchQuery('');
+    setRoleFilter('all');
+    setSelectedCohorts([]);
+    setPhoneStatusFilter('all');
+    setDateRangeFrom(undefined);
+    setDateRangeTo(undefined);
+    setMultiRoleFilter('all');
+  };
+
+  // Helper: Export filtered users to Excel
+  const handleExportFiltered = () => {
+    const exportData = filteredUsers.map(user => ({
+      'Name': user.full_name || 'Unnamed',
+      'Email': user.email,
+      'Phone': user.phone || 'N/A',
+      'Role': user.role,
+      'Cohort': user.cohort?.name || 'No Cohort',
+      'Joined': format(new Date(user.created_at), 'yyyy-MM-dd'),
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Filtered Users');
+
+    XLSX.writeFile(wb, `users_filtered_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+
+    toast.success(`Exported ${filteredUsers.length} users`);
+  };
+
+  // Enhanced filtering logic
+  const filteredUsers = users.filter(user => {
+    // 1. Search filter (name, email, phone)
+    const matchesSearch = !searchQuery || (() => {
+      const query = searchQuery.toLowerCase();
+      return (
+        user.full_name?.toLowerCase().includes(query) ||
+        user.email.toLowerCase().includes(query) ||
+        user.phone?.toLowerCase().includes(query)
+      );
+    })();
+
+    // 2. Role filter (existing)
     const matchesRole = roleFilter === 'all' || user.role === roleFilter;
 
-    return matchesSearch && matchesRole;
+    // 3. Cohort filter (multi-select)
+    const matchesCohort = selectedCohorts.length === 0 || (() => {
+      // Check if user has ANY of the selected cohorts
+      if (selectedCohorts.includes('no_cohort')) {
+        // Include users with no cohort
+        if (!user.cohort_id) return true;
+      }
+      // Check role assignments for cohort matches
+      const userCohortIds = user.role_assignments
+        ?.map(ra => ra.cohort_id)
+        .filter(Boolean) || [user.cohort_id].filter(Boolean);
+
+      return userCohortIds.some(cohortId => selectedCohorts.includes(cohortId as string));
+    })();
+
+    // 4. Phone status filter
+    const matchesPhoneStatus = (() => {
+      if (phoneStatusFilter === 'all') return true;
+      if (phoneStatusFilter === 'has_phone') return !!user.phone;
+      if (phoneStatusFilter === 'no_phone') return !user.phone;
+      return true;
+    })();
+
+    // 5. Registration date filter
+    const matchesDateRange = (() => {
+      if (!dateRangeFrom && !dateRangeTo) return true;
+      const userDate = new Date(user.created_at);
+
+      if (dateRangeFrom && userDate < dateRangeFrom) return false;
+      if (dateRangeTo && userDate > dateRangeTo) return false;
+
+      return true;
+    })();
+
+    // 6. Multi-role filter
+    const matchesMultiRole = (() => {
+      if (multiRoleFilter === 'all') return true;
+      const roleCount = user.role_assignments?.length || 1;
+      if (multiRoleFilter === 'single') return roleCount === 1;
+      if (multiRoleFilter === 'multiple') return roleCount > 1;
+      return true;
+    })();
+
+    return matchesSearch && matchesRole && matchesCohort &&
+           matchesPhoneStatus && matchesDateRange && matchesMultiRole;
   });
 
   const getRoleIcon = (role: string) => {
@@ -537,6 +646,15 @@ export default function UsersPage() {
           >
             <Upload className="w-4 h-4 mr-2" />
             Bulk Upload
+          </Button>
+
+          {/* Export Filtered Users */}
+          <Button
+            variant="outline"
+            onClick={handleExportFiltered}
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Export ({filteredUsers.length})
           </Button>
 
           {/* Create User Dialog */}
@@ -909,57 +1027,325 @@ export default function UsersPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Search users..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        <Select value={roleFilter} onValueChange={setRoleFilter}>
-          <SelectTrigger className="w-[150px]">
-            <SelectValue placeholder="Filter by role" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Roles</SelectItem>
-            <SelectItem value="admin">Admin</SelectItem>
-            <SelectItem value="company_user">Company User</SelectItem>
-            <SelectItem value="mentor">Mentor</SelectItem>
-            <SelectItem value="student">Student</SelectItem>
-            <SelectItem value="master">Guest</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      {/* Enhanced Filter Panel */}
+      <Card className="border-dashed">
+        <CardContent className="p-4">
+          {/* Collapsed state */}
+          {!showFilters && (
+            <div className="flex items-center justify-between gap-4">
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search by name, email, or phone..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => setShowFilters(true)}
+              >
+                <Filter className="w-4 h-4 mr-2" />
+                Filters
+                {getActiveFilterCount() > 0 && (
+                  <Badge variant="secondary" className="ml-2 px-1.5 py-0.5 text-xs">
+                    {getActiveFilterCount()}
+                  </Badge>
+                )}
+              </Button>
+            </div>
+          )}
 
-      {/* Stats */}
+          {/* Expanded state */}
+          {showFilters && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-medium">Advanced Filters</h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowFilters(false)}
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+
+              {/* Search (always visible) */}
+              <div className="space-y-2">
+                <Label>Search</Label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Name, email, or phone..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+
+              {/* Rest of filters in grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {/* Role filter */}
+                <div className="space-y-2">
+                  <Label>Role</Label>
+                  <Select value={roleFilter} onValueChange={setRoleFilter}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Roles</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="company_user">Company User</SelectItem>
+                      <SelectItem value="mentor">Mentor</SelectItem>
+                      <SelectItem value="student">Student</SelectItem>
+                      <SelectItem value="master">Guest</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Phone Status filter */}
+                <div className="space-y-2">
+                  <Label>Phone Status</Label>
+                  <Select value={phoneStatusFilter} onValueChange={(value) => setPhoneStatusFilter(value as 'all' | 'has_phone' | 'no_phone')}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Users</SelectItem>
+                      <SelectItem value="has_phone">Has Phone Number</SelectItem>
+                      <SelectItem value="no_phone">Missing Phone Number</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Multi-role filter */}
+                <div className="space-y-2">
+                  <Label>Role Count</Label>
+                  <Select value={multiRoleFilter} onValueChange={(value) => setMultiRoleFilter(value as 'all' | 'single' | 'multiple')}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Users</SelectItem>
+                      <SelectItem value="single">Single Role Only</SelectItem>
+                      <SelectItem value="multiple">Multiple Roles</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Cohort multi-select */}
+              <div className="space-y-2">
+                <Label>Cohorts (Multi-select)</Label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3 border rounded-lg bg-muted/30 max-h-48 overflow-y-auto">
+                  {cohorts.map((cohort) => (
+                    <div key={cohort.id} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`cohort-${cohort.id}`}
+                        checked={selectedCohorts.includes(cohort.id)}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelectedCohorts([...selectedCohorts, cohort.id]);
+                          } else {
+                            setSelectedCohorts(selectedCohorts.filter(id => id !== cohort.id));
+                          }
+                        }}
+                      />
+                      <label
+                        htmlFor={`cohort-${cohort.id}`}
+                        className="text-sm cursor-pointer flex-1"
+                      >
+                        {cohort.name} ({cohort.tag})
+                      </label>
+                    </div>
+                  ))}
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="cohort-none"
+                      checked={selectedCohorts.includes('no_cohort')}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedCohorts([...selectedCohorts, 'no_cohort']);
+                        } else {
+                          setSelectedCohorts(selectedCohorts.filter(id => id !== 'no_cohort'));
+                        }
+                      }}
+                    />
+                    <label htmlFor="cohort-none" className="text-sm cursor-pointer flex-1">
+                      No Cohort Assigned
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Date range picker */}
+              <div className="space-y-2">
+                <Label>Registration Date</Label>
+                <div className="flex gap-2">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "flex-1 justify-start text-left font-normal",
+                          !dateRangeFrom && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {dateRangeFrom ? format(dateRangeFrom, "MMM d, yyyy") : "From date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={dateRangeFrom}
+                        onSelect={setDateRangeFrom}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "flex-1 justify-start text-left font-normal",
+                          !dateRangeTo && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {dateRangeTo ? format(dateRangeTo, "MMM d, yyyy") : "To date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={dateRangeTo}
+                        onSelect={setDateRangeTo}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex justify-between pt-2">
+                <Button variant="outline" onClick={clearAllFilters}>
+                  Clear All Filters
+                </Button>
+                <Button onClick={() => setShowFilters(false)} className="gradient-bg">
+                  Apply Filters
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Active Filter Chips */}
+      {getActiveFilterCount() > 0 && (
+        <div className="flex flex-wrap gap-2 items-center">
+          <span className="text-sm text-muted-foreground">Active Filters:</span>
+
+          {roleFilter !== 'all' && (
+            <Badge variant="secondary" className="gap-1">
+              Role: {roleFilter === 'master' ? 'Guest' : roleFilter.replace('_', ' ')}
+              <X className="w-3 h-3 cursor-pointer" onClick={() => setRoleFilter('all')} />
+            </Badge>
+          )}
+
+          {selectedCohorts.map(cohortId => (
+            <Badge key={cohortId} variant="secondary" className="gap-1">
+              {cohortId === 'no_cohort' ? 'No Cohort' : cohorts.find(c => c.id === cohortId)?.name}
+              <X className="w-3 h-3 cursor-pointer"
+                 onClick={() => setSelectedCohorts(prev => prev.filter(id => id !== cohortId))} />
+            </Badge>
+          ))}
+
+          {phoneStatusFilter !== 'all' && (
+            <Badge variant="secondary" className="gap-1">
+              {phoneStatusFilter === 'has_phone' ? 'Has Phone' : 'Missing Phone'}
+              <X className="w-3 h-3 cursor-pointer" onClick={() => setPhoneStatusFilter('all')} />
+            </Badge>
+          )}
+
+          {(dateRangeFrom || dateRangeTo) && (
+            <Badge variant="secondary" className="gap-1">
+              Date: {dateRangeFrom ? format(dateRangeFrom, 'MMM d') : '...'} -
+              {dateRangeTo ? format(dateRangeTo, 'MMM d, yyyy') : '...'}
+              <X className="w-3 h-3 cursor-pointer"
+                 onClick={() => { setDateRangeFrom(undefined); setDateRangeTo(undefined); }} />
+            </Badge>
+          )}
+
+          {multiRoleFilter !== 'all' && (
+            <Badge variant="secondary" className="gap-1">
+              {multiRoleFilter === 'single' ? 'Single Role' : 'Multiple Roles'}
+              <X className="w-3 h-3 cursor-pointer" onClick={() => setMultiRoleFilter('all')} />
+            </Badge>
+          )}
+
+          <Button variant="ghost" size="sm" onClick={clearAllFilters}>
+            Clear All
+          </Button>
+        </div>
+      )}
+
+      {/* Stats - Updated to show filtered counts */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Total Users</p>
-            <p className="text-2xl font-bold">{users.length}</p>
+            <p className="text-2xl font-bold">
+              {filteredUsers.length}
+              {filteredUsers.length !== users.length && (
+                <span className="text-sm font-normal text-muted-foreground ml-2">
+                  / {users.length}
+                </span>
+              )}
+            </p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Students</p>
-            <p className="text-2xl font-bold">{users.filter(u => u.role === 'student').length}</p>
+            <p className="text-2xl font-bold">
+              {filteredUsers.filter(u => u.role === 'student').length}
+              {filteredUsers.length !== users.length && (
+                <span className="text-sm font-normal text-muted-foreground ml-2">
+                  / {users.filter(u => u.role === 'student').length}
+                </span>
+              )}
+            </p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Mentors</p>
-            <p className="text-2xl font-bold">{users.filter(u => u.role === 'mentor').length}</p>
+            <p className="text-2xl font-bold">
+              {filteredUsers.filter(u => u.role === 'mentor').length}
+              {filteredUsers.length !== users.length && (
+                <span className="text-sm font-normal text-muted-foreground ml-2">
+                  / {users.filter(u => u.role === 'mentor').length}
+                </span>
+              )}
+            </p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Admins</p>
             <p className="text-2xl font-bold">
-              {users.filter(u => ['admin', 'company_user'].includes(u.role)).length}
+              {filteredUsers.filter(u => ['admin', 'company_user'].includes(u.role)).length}
+              {filteredUsers.length !== users.length && (
+                <span className="text-sm font-normal text-muted-foreground ml-2">
+                  / {users.filter(u => ['admin', 'company_user'].includes(u.role)).length}
+                </span>
+              )}
             </p>
           </CardContent>
         </Card>
@@ -971,6 +1357,7 @@ export default function UsersPage() {
           <CardTitle>All Users</CardTitle>
           <CardDescription>
             {filteredUsers.length} user{filteredUsers.length !== 1 ? 's' : ''}
+            {getActiveFilterCount() > 0 && ' matching filters'}
           </CardDescription>
         </CardHeader>
         <CardContent>
