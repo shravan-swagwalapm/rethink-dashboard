@@ -90,6 +90,7 @@ interface RoleAssignmentInput {
 interface BulkUser {
   email: string;
   full_name: string;
+  phone: string;
   cohort_tag: string;
 }
 
@@ -374,9 +375,9 @@ export default function UsersPage() {
   const downloadTemplate = () => {
     // Create sample data with headers and example rows
     const templateData = [
-      { 'Email': 'john.doe@example.com', 'Full Name': 'John Doe', 'Cohort Tag': 'BATCH2025' },
-      { 'Email': 'jane.smith@example.com', 'Full Name': 'Jane Smith', 'Cohort Tag': 'BATCH2025' },
-      { 'Email': 'user@company.com', 'Full Name': 'User Name', 'Cohort Tag': 'BATCH2025' },
+      { 'Email': 'john.doe@example.com', 'Full Name': 'John Doe', 'Phone Number': '+919876543210', 'Cohort Tag': 'BATCH2025' },
+      { 'Email': 'jane.smith@example.com', 'Full Name': 'Jane Smith', 'Phone Number': '+919876543211', 'Cohort Tag': 'BATCH2025' },
+      { 'Email': 'user@company.com', 'Full Name': 'User Name', 'Phone Number': '+919876543212', 'Cohort Tag': 'BATCH2025' },
     ];
 
     // Create workbook and worksheet
@@ -386,6 +387,7 @@ export default function UsersPage() {
     ws['!cols'] = [
       { wch: 30 }, // Email
       { wch: 25 }, // Full Name
+      { wch: 18 }, // Phone Number
       { wch: 15 }, // Cohort Tag
     ];
 
@@ -415,6 +417,7 @@ export default function UsersPage() {
         const parsedUsers: BulkUser[] = jsonData.map((row) => ({
           email: (row['Email'] || row['email'] || '').trim(),
           full_name: (row['Name'] || row['Full Name'] || row['full_name'] || '').trim(),
+          phone: (row['Phone'] || row['Phone Number'] || row['phone'] || row['phone_number'] || '').trim(),
           cohort_tag: (row['Cohort'] || row['Cohort Tag'] || row['cohort_tag'] || '').trim(),
         })).filter(u => u.email); // Filter out empty rows
 
@@ -819,6 +822,7 @@ export default function UsersPage() {
                     <TableRow>
                       <TableHead>Email</TableHead>
                       <TableHead>Name</TableHead>
+                      <TableHead>Phone Number</TableHead>
                       <TableHead>Cohort Tag</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -827,6 +831,7 @@ export default function UsersPage() {
                       <TableRow key={idx}>
                         <TableCell className="font-mono text-sm">{user.email}</TableCell>
                         <TableCell>{user.full_name || '-'}</TableCell>
+                        <TableCell className="font-mono text-sm">{user.phone || '-'}</TableCell>
                         <TableCell>
                           <Badge variant="outline">{user.cohort_tag}</Badge>
                         </TableCell>

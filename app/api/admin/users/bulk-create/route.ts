@@ -30,6 +30,7 @@ async function verifyAdmin() {
 interface UserToCreate {
   email: string;
   full_name?: string;
+  phone?: string;
   cohort_tag: string;
 }
 
@@ -204,11 +205,12 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        // Update profile with cohort
+        // Update profile with cohort and phone
         await adminClient
           .from('profiles')
           .update({
             full_name: userData.full_name || null,
+            phone: userData.phone || null,
             cohort_id: cohortId,
             role: 'student',
           })
