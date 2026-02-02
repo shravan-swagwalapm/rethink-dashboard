@@ -40,6 +40,60 @@ export default function DashboardPage() {
   const [adminSessions, setAdminSessions] = useState<any[]>([]);
   const [adminLearnings, setAdminLearnings] = useState<any[]>([]);
 
+  /**
+   * Fetch recent learning modules with override logic
+   * Respects cohort linking: shows modules from linked source (cohort or global)
+   */
+  const fetchRecentModules = async (cohortId: string) => {
+    const supabase = getClient();
+
+    try {
+      // Step 1: Get cohort's active link configuration
+      const { data: cohort } = await supabase
+        .from('cohorts')
+        .select('id, active_link_type, linked_cohort_id')
+        .eq('id', cohortId)
+        .single();
+
+      if (!cohort) {
+        return { data: null, error: null };
+      }
+
+      // Step 2: Build query based on override logic
+      let query = supabase
+        .from('learning_modules')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(4);
+
+      switch (cohort.active_link_type) {
+        case 'global':
+          // Show ONLY global modules
+          query = query.eq('is_global', true);
+          break;
+        case 'cohort':
+          // Show ONLY linked cohort's modules
+          if (cohort.linked_cohort_id) {
+            query = query.eq('cohort_id', cohort.linked_cohort_id);
+          } else {
+            // Fallback if linked_cohort_id is missing
+            query = query.eq('cohort_id', cohortId);
+          }
+          break;
+        case 'own':
+        default:
+          // Show own modules
+          query = query.eq('cohort_id', cohortId);
+          break;
+      }
+
+      return await query;
+    } catch (error) {
+      console.error('Error fetching recent modules:', error);
+      return { data: null, error };
+    }
+  };
+
   useEffect(() => {
     const fetchDashboardData = async () => {
       if (!profile) {
@@ -112,13 +166,8 @@ export default function DashboardPage() {
               .gte('scheduled_at', new Date().toISOString())
               .order('scheduled_at', { ascending: true })
               .limit(3),
-            // Fetch recent learning modules
-            supabase
-              .from('learning_modules')
-              .select('*')
-              .eq('cohort_id', activeCohortId)
-              .order('created_at', { ascending: false })
-              .limit(4),
+            // Fetch recent learning modules (with override logic)
+            fetchRecentModules(activeCohortId),
             // Fetch recent resources
             supabase
               .from('resources')
