@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { getClient } from '@/lib/supabase/client';
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 import { Button } from '@/components/ui/button';
@@ -39,6 +40,7 @@ function LoginContent() {
   const [error, setError] = useState<string | null>(null);
   const [resendCooldown, setResendCooldown] = useState(0);
   const [otpExpiresIn, setOtpExpiresIn] = useState(300); // 5 minutes
+  const [loadingMessage, setLoadingMessage] = useState<string>(''); // Clear status messages
 
   const supabase = getClient();
 
@@ -142,7 +144,10 @@ function LoginContent() {
       return;
     }
 
+    // ✅ OPTIMIZATION: Show OTP screen immediately (optimistic UI)
+    setStep('otp');
     setLoading(true);
+    setLoadingMessage('Sending verification code...');
     setError(null);
 
     try {
@@ -158,12 +163,14 @@ function LoginContent() {
       const data = await response.json();
 
       if (!response.ok) {
+        // Revert to identifier screen on error
+        setStep('identifier');
         throw new Error(data.error || 'Failed to send OTP');
       }
 
-      toast.success('OTP sent to your phone!');
-      setStep('otp');
+      toast.success('Code sent! Check your phone');
       setOtpExpiresIn(data.expiresIn || 300);
+      setLoadingMessage('');
     } catch (error: any) {
       setError(error.message);
       toast.error(error.message);
@@ -183,6 +190,7 @@ function LoginContent() {
     const identifier = `${countryCode}${phone}`;
 
     setLoading(true);
+    setLoadingMessage('Verifying code...');
     setError(null);
 
     try {
@@ -203,12 +211,16 @@ function LoginContent() {
         throw new Error(data.error || 'Invalid OTP');
       }
 
-      // Success! Navigate to auth URL
-      toast.success('OTP verified! Signing you in...');
+      // ✅ OPTIMIZATION: Show clear progress message
+      setLoadingMessage('Signing you in...');
+      toast.success('Verified! Redirecting...');
+
+      // Navigate to auth URL
       window.location.href = data.authUrl;
     } catch (error: any) {
       setError(error.message);
       toast.error(error.message);
+      setLoadingMessage('');
       // Clear OTP on error
       setOtp(['', '', '', '']);
     } finally {
@@ -279,6 +291,16 @@ function LoginContent() {
           </p>
         </div>
 
+        {/* Loading Overlay */}
+        {loadingMessage && (
+          <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in">
+            <div className="bg-card p-6 rounded-lg shadow-lg border border-border flex flex-col items-center gap-4">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              <p className="text-lg font-medium">{loadingMessage}</p>
+            </div>
+          </div>
+        )}
+
         {/* Error Alert */}
         {error && (
           <Alert variant="destructive" className="mb-4 animate-in-up">
@@ -299,7 +321,7 @@ function LoginContent() {
             </CardDescription>
           </CardHeader>
 
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 transition-all duration-300 ease-in-out">
             {step === 'identifier' && (
               <>
                 {/* Phone OTP Login */}
@@ -518,6 +540,11 @@ function LoginContent() {
             shravan@naum.systems
           </a>
         </p>
+
+        {/* ✅ OPTIMIZATION: Prefetch dashboard for faster navigation */}
+        <Link href="/dashboard" prefetch={true} className="hidden">
+          Prefetch Dashboard
+        </Link>
       </div>
     </div>
   );
