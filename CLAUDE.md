@@ -1,23 +1,357 @@
-# CLAUDE.md - Product Development Rules & Memory
+# CLAUDE.md
 
-**Last Updated**: 2026-02-02 (Session 3: Phone Numbers, Filtering & Data Quality)
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+**Last Updated**: 2026-02-03 (Architecture Analysis & Init Command)
 **Project**: Rethink Dashboard (Educational Platform)
 
 ---
 
-## 📖 HOW TO USE THIS FILE
+## 🏗️ ARCHITECTURE OVERVIEW
 
-**For You (Product Builder)**:
-- Fill in remaining [FILL THIS IN] sections below
-- After each mistake, add to "Past Mistakes" section
-- Review and update weekly
-- Tell Claude to read this file at the start of each session
+### High-Level System Design
 
-**For Claude**:
-- READ THIS FILE at the start of every session
-- FOLLOW all rules and principles below
-- UPDATE "Past Mistakes" section when errors occur
-- SUGGEST improvements to this file based on learnings
+**Rethink Dashboard** is an educational platform supporting cohort-based learning with multi-role users (students, mentors, admins). Built on Next.js 16 App Router with Supabase backend.
+
+**Key Architectural Decisions**:
+- **Server Components by default** for optimal performance
+- **Multi-channel authentication**: Phone OTP (MSG91) + Google OAuth
+- **Multi-role system**: Users can have multiple roles across different cohorts
+- **Strict admin access control**: `/admin` only via explicit login, no UI shortcuts
+- **Role-based dashboard views**: Single `/dashboard` route shows different data based on active role
+
+---
+
+## 🚀 DEVELOPMENT COMMANDS
+
+### Common Commands
+
+```bash
+# Development
+npm run dev          # Start dev server at http://localhost:3000
+
+# Build & Production
+npm run build        # Production build (required before deploy)
+npm run start        # Run production server locally
+
+# Code Quality
+npm run lint         # Run ESLint
+
+# Testing (Playwright)
+npx playwright test                    # Run all E2E tests
+npx playwright test --ui              # Interactive UI mode
+npx playwright test --headed          # Run with browser visible
+npx playwright test tests/auth.spec.ts # Run single test file
+npx playwright show-report            # View test results
+```
+
+### Environment Setup
+
+Required environment variables (see `.env.local.example`):
+
+```env
+# Supabase (Database + Auth)
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=        # Server-side only, never expose
+
+# MSG91 (OTP/SMS)
+MSG91_AUTH_KEY=
+MSG91_TEMPLATE_ID=                # Must be pre-approved
+MSG91_SENDER_ID=NAUM
+
+# OAuth
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+
+# Email
+RESEND_API_KEY=
+
+# App
+NEXT_PUBLIC_APP_URL=              # Production URL
+```
+
+---
+
+## 📁 PROJECT STRUCTURE
+
+### App Router Organization (Route Groups)
+
+```
+app/
+├── (auth)/                       # Public routes
+│   └── login/                   # OTP + Google OAuth login
+│
+├── (dashboard)/                 # Student/Mentor portal (protected)
+│   ├── dashboard/              # Multi-role dashboard (student/admin/mentor views)
+│   ├── learnings/              # Course modules
+│   ├── resources/              # Videos & documents
+│   ├── sessions/               # Class schedule
+│   ├── invoices/               # Payments
+│   ├── profile/                # User settings
+│   ├── team/                   # Mentor-only: assigned students
+│   ├── attendance/             # Mentor-only: attendance tracking
+│   └── layout.tsx              # Sidebar layout
+│
+├── (admin)/admin/              # Admin panel (protected, admin-only)
+│   ├── users/                  # User management + bulk import
+│   ├── cohorts/                # Cohort management + module linking
+│   ├── sessions/               # Session scheduling
+│   ├── invoices/               # Invoice management
+│   ├── notifications/          # SMS/email campaigns
+│   ├── learnings/              # Module management
+│   └── analytics/              # System analytics
+│
+├── api/                        # Server-side API routes
+│   ├── auth/otp/              # OTP send/verify/resend
+│   ├── admin/                 # Admin operations
+│   ├── resources/             # Content APIs
+│   └── attendance/webhook/    # Zoom webhook
+│
+└── auth/callback/             # OAuth handlers
+    ├── route.ts               # Student callback
+    └── admin/route.ts         # Admin callback
+```
+
+### Core Directories
+
+```
+components/
+├── ui/                        # 48 Radix UI components (shadcn/ui pattern)
+└── [feature]/                 # Feature-specific components
+
+lib/
+├── supabase/                  # Database clients (server, client, middleware)
+├── integrations/              # External APIs (MSG91, Resend)
+├── services/                  # Business logic (rate limiting, etc.)
+└── utils/                     # Helpers (phone formatting, date handling)
+
+hooks/
+├── use-user.ts               # Central auth state (user, profile, roles)
+└── use-notifications.ts      # Real-time notifications
+
+types/
+└── database.types.ts         # Supabase generated types
+```
+
+---
+
+## 🔐 AUTHENTICATION SYSTEM
+
+### Multi-Channel Auth Flow
+
+**Phone OTP (Primary for Students)**:
+1. User enters phone number on `/login`
+2. 4-digit OTP sent via MSG91 SMS
+3. OTP stored in `otp_codes` table with 5-minute expiry
+4. After verification: Supabase session created via `admin.generateLink()`
+5. Rate limited: 5 requests per 15 minutes per phone
+
+**Google OAuth**:
+- Student login → redirects to `/dashboard`
+- Admin login → redirects to `/admin` (only if admin role verified)
+- Email domain whitelist enforced
+
+**Critical Auth Files**:
+- `/middleware.ts` - Request-level auth guard
+- `/lib/supabase/server.ts` - SSR-safe Supabase client + admin client
+- `/hooks/use-user.ts` - Client-side auth state management
+- `/lib/services/otp-rate-limiter.ts` - Rate limiting logic
+- `/lib/integrations/msg91-otp.ts` - SMS OTP integration
+
+### Admin Access Control Pattern
+
+**CRITICAL**: `/admin` route is ONLY accessible via explicit "Sign in as Administrator" login:
+- NO navigation links to `/admin` from dashboard
+- NO convenience buttons in header/sidebar
+- Admin users can view system-wide data in `/dashboard` by switching to admin role
+- Enforces intentional, secure access
+
+---
+
+## 👥 MULTI-ROLE SYSTEM
+
+### Database Schema
+
+**Legacy Single-Role** (`profiles` table):
+- `role`: student|admin|mentor|company_user (deprecated for new features)
+- `cohort_id`: Single cohort assignment (deprecated)
+
+**New Multi-Role** (`user_role_assignments` table):
+- Users can have multiple roles (e.g., admin + mentor)
+- Roles can be cohort-specific (e.g., mentor for Cohort A, student for Cohort B)
+- Fields: `user_id`, `role`, `cohort_id` (nullable)
+
+### Role Switching in UI
+
+**Implementation** (`/dashboard` route):
+- Role switcher in sidebar (dropdown with all available roles)
+- On switch: Save to localStorage → `window.location.reload()`
+- Different data fetched based on `activeRole`:
+  - Student: Cohort-specific data (their sessions, resources)
+  - Admin: System-wide data (all cohorts, total stats) via `/api/admin/dashboard-stats`
+  - Mentor: Students they mentor + cohort data
+
+**useUser Hook** returns:
+```typescript
+{
+  user, profile, loading,
+  isAdmin, isMentor, isStudent,
+  activeRole,                    // Currently selected role
+  activeRoleAssignment,          // Full role record with cohort_id
+  activeCohortId,                // Cohort for current role
+  hasMultipleRoles,              // Boolean flag
+  availableRoles,                // All user's role assignments
+  switchRole(roleAssignmentId),  // Change active role
+  signOut, refreshProfile
+}
+```
+
+---
+
+## 🗄️ DATABASE PATTERNS
+
+### Key Tables
+
+**Core Tables**:
+- `profiles` - User info (email, phone, name, legacy role/cohort)
+- `user_role_assignments` - Multi-role support (user_id, role, cohort_id)
+- `cohorts` - Learning groups (name, tag, dates, status)
+- `sessions` - Classes (title, zoom_link, scheduled_at, cohort_id)
+- `learning_modules` - Course content (title, week_number, is_global)
+- `module_resources` - Individual content items (videos, slides, documents)
+
+**Relationships**:
+- `session_cohorts` - Multi-cohort session support
+- `cohort_module_links` - Cross-cohort module sharing
+- `resource_progress` - User engagement tracking
+- `attendance` - Session attendance from Zoom webhooks
+- `rsvps` - Session interest (yes/no responses)
+
+### RLS (Row Level Security)
+
+- **Students**: Read-only access to their cohort data
+- **Admins**: Full access via `createAdminClient()` (bypasses RLS)
+- **Mentors**: Access to assigned team members
+
+### Supabase Client Patterns
+
+```typescript
+// Server Component (read data)
+import { createClient } from '@/lib/supabase/server'
+
+export default async function Page() {
+  const supabase = await createClient()
+  const { data } = await supabase.from('users').select()
+  return <div>{/* render */}</div>
+}
+
+// Client Component (interactive)
+'use client'
+import { createClient } from '@/lib/supabase/client'
+
+// Admin operations (server-side only!)
+import { createAdminClient } from '@/lib/supabase/server'
+const adminClient = createAdminClient() // Bypasses RLS
+```
+
+---
+
+## 🎨 UI COMPONENT PATTERNS
+
+### Component Library Stack
+
+- **Radix UI**: 48 accessible, unstyled primitives (dialogs, dropdowns, etc.)
+- **shadcn/ui**: Copy-paste pattern, full control over components
+- **Tailwind CSS 4**: Utility-first styling with OKLCH color space
+- **Framer Motion**: Smooth animations
+- **Lucide React**: Icon library
+
+### Custom Components
+
+**Unique to this project**:
+- `components/ui/otp-input.tsx` - 4-digit OTP input with auto-focus
+- `components/ui/country-code-picker.tsx` - 100+ countries dropdown
+- `components/page-loader.tsx` - Full-page loading state
+
+### Server vs Client Components
+
+**Default to Server Components** unless you need:
+- `useState`, `useEffect` hooks
+- Event handlers (`onClick`, `onChange`)
+- Browser APIs
+- Real-time subscriptions
+
+**Pattern**: Add `'use client'` at top of file only when needed.
+
+---
+
+## 🔌 EXTERNAL INTEGRATIONS
+
+### MSG91 (SMS OTP)
+
+**Configuration**:
+- Template must be pre-approved by MSG91 before production
+- 4-digit codes (balance of security + UX)
+- ~₹0.50-1 per SMS cost
+
+**Implementation**: `/lib/integrations/msg91-otp.ts`
+```typescript
+sendOTP(phone: string) // Send 4-digit code
+verifyOTP(phone: string, otp: string) // Verify code
+resendOTP(phone: string, retryType: 'text'|'voice') // Retry delivery
+```
+
+**Phone Format**: Always store with country code (e.g., `+919876543210`)
+
+### Supabase
+
+- **Auth**: OAuth2, session management, magic links
+- **Database**: PostgreSQL with RLS
+- **Storage**: File uploads (PDFs, videos)
+
+**Admin API** (elevated privileges):
+```typescript
+const adminClient = createAdminClient()
+// Only use server-side for admin operations
+// Bypasses RLS - never expose service role key
+```
+
+### Google Services
+
+- **OAuth2**: Authentication (separate callbacks for student/admin)
+- **Calendar**: Session scheduling sync
+- **Drive**: Educational material hosting
+
+### Zoom
+
+- **Webhooks**: `/api/attendance/webhook` - Automatic attendance tracking
+
+---
+
+## 🧪 TESTING (PLAYWRIGHT)
+
+### Configuration
+
+**File**: `playwright.config.ts`
+- Base URL: `http://localhost:3000`
+- Browsers: Chrome, Firefox, Safari, Mobile Chrome/Safari
+- Test directory: `./tests`
+- Timeout: 30 seconds per test
+
+### Running Tests
+
+```bash
+npx playwright test                    # Run all tests
+npx playwright test --ui              # Interactive mode
+npx playwright test --headed          # Show browser
+npx playwright test tests/auth.spec.ts # Single file
+npx playwright show-report            # View results
+```
+
+### Ralph Plugin
+
+Autonomous AI-driven testing agent integrated with Playwright for comprehensive test coverage.
 
 ---
 
@@ -65,13 +399,7 @@
 **8. CHALLENGE & EXCELLENCE**
 - If you build something mediocre, say: "I can do better. Let me implement the elegant solution."
 
-**9. DATA ANALYSIS**
-- When user mentions analytics/data/metrics, offer to connect and analyze directly
-
-**10. VOICE PROMPT REMINDER**
-- Remind user about voice typing (Fn x2 on Mac) for long requirements
-
-**11. MODEL PREFERENCE FOR COMPLEX TASKS**
+**9. MODEL PREFERENCE FOR COMPLEX TASKS**
 - Use **Opus 4.5** (model: `opus`) for:
   - Authentication system changes
   - Security-critical features
@@ -103,15 +431,7 @@
 - For complex problems, throw more compute at it via subagents
 - One task per subagent for focused execution
 
-### 3. Self-Improvement Loop
-
-**After ANY correction from the user: update `tasks/lessons.md` with the pattern**
-
-- Write rules for yourself that prevent the same mistake
-- Ruthlessly iterate on these lessons until mistake rate drops
-- Review lessons at session start for relevant project
-
-### 4. Verification Before Done
+### 3. Verification Before Done
 
 **Never mark a task complete without proving it works**
 
@@ -119,43 +439,13 @@
 - Ask yourself: "Would a staff engineer approve this?"
 - Run tests, check logs, demonstrate correctness
 
-### 5. Demand Elegance (Balanced)
+### 4. Demand Elegance (Balanced)
 
 **For non-trivial changes: pause and ask "Is there a more elegant way?"**
 
 - If a fix feels hacky: "Knowing everything I know now, implement the elegant solution"
 - Skip this for simple, obvious fixes – don't over-engineer
 - Challenge your own work before presenting it
-
-### 6. Autonomous Bug Fixing
-
-**When given a bug report: just fix it. Don't ask for hand-holding**
-
-- Point at logs, errors, failing tests – then resolve them
-- Zero context switching required from the user
-- Go fix failing CI tests without being told how
-
----
-
-## 📋 TASK MANAGEMENT PROTOCOL
-
-### 1. **Plan First**
-Write plan to `tasks/todo.md` with checkable items
-
-### 2. **Verify Plans**
-Check in before starting implementation
-
-### 3. **Track Progress**
-Mark items complete as you go
-
-### 4. **Explain Changes**
-High-level summary at each step
-
-### 5. **Document Results**
-Add review section to `tasks/todo.md`
-
-### 6. **Capture Lessons**
-Update `tasks/lessons.md` after corrections
 
 ---
 
@@ -177,18 +467,18 @@ Changes should only touch what's necessary. Avoid introducing bugs.
 ### Brand Guidelines
 
 **Colors** (OKLCH Color Space):
-- Primary: oklch(0.55 0.25 280) - Purple/Blue (for CTAs, primary actions)
-- Secondary: oklch(0.96 0.01 260) - Light gray (for secondary elements)
-- Accent: oklch(0.55 0.2 195) - Cyan/Teal (for highlights, links)
-- Destructive: oklch(0.6 0.24 25) - Red/Orange (for errors, delete actions)
+- Primary: oklch(0.55 0.25 280) - Purple/Blue (CTAs, primary actions)
+- Secondary: oklch(0.96 0.01 260) - Light gray (secondary elements)
+- Accent: oklch(0.55 0.2 195) - Cyan/Teal (highlights, links)
+- Destructive: oklch(0.6 0.24 25) - Red/Orange (errors, delete)
 - Background (Light): oklch(0.98 0.005 260) - Near white
 - Background (Dark): oklch(0.1 0.015 260) - Near black
 - Border: oklch(0.92 0.01 260) - Light gray
 
 **Special Effects**:
-- Glow Primary: oklch(0.55 0.25 280 / 0.4) - Use for hover states
-- Glow Accent: oklch(0.65 0.2 195 / 0.4) - Use for active states
-- Gradients: Primary → Via (240) → Accent (for hero sections)
+- Glow Primary: oklch(0.55 0.25 280 / 0.4) - Hover states
+- Glow Accent: oklch(0.65 0.2 195 / 0.4) - Active states
+- Gradients: Primary → Via (240) → Accent for hero sections
 
 **Typography**:
 - Headings: Geist Sans, Bold
@@ -196,11 +486,6 @@ Changes should only touch what's necessary. Avoid introducing bugs.
 - Code/Mono: Geist Mono
 - Minimum font size: 14px
 - Line height: 1.5 for body, 1.2 for headings
-
-**Logo**:
-- Placement: [FILL THIS IN - e.g., Top-left in sidebar]
-- Size: [FILL THIS IN - e.g., 140px width]
-- Spacing: Standard sidebar padding
 
 **Layout**:
 - Max width: Full width with sidebar layout
@@ -232,18 +517,12 @@ Changes should only touch what's necessary. Avoid introducing bugs.
 - Database: Supabase (PostgreSQL)
 - Authentication: Supabase SSR Auth
 - SMS/OTP: MSG91 (India-focused, reliable OTP delivery)
-- SMS Integration: `/lib/integrations/msg91-otp.ts` service
 - API: Server Actions + Route Handlers
 
 **Deployment**:
 - Hosting: Vercel (recommended for Next.js 16)
 - CI/CD: GitHub Actions (if configured)
 - Environment: .env.local for development
-
-**Analytics & Monitoring**:
-- Analytics: [FILL THIS IN - e.g., PostHog, Google Analytics]
-- Error Tracking: [FILL THIS IN - e.g., Sentry]
-- Logging: [FILL THIS IN - e.g., Console in dev, service in prod]
 
 **Testing**:
 - E2E Testing: Playwright 1.57.0
@@ -316,7 +595,7 @@ Changes should only touch what's necessary. Avoid introducing bugs.
 ### Deployment Checklist
 
 **Before Every Deploy**:
-1. [ ] All tests passing (`npm run test` if configured)
+1. [ ] All tests passing (`npx playwright test`)
 2. [ ] No TypeScript errors (`npm run build`)
 3. [ ] Build succeeds locally
 4. [ ] Environment variables updated in Vercel
@@ -326,6 +605,7 @@ Changes should only touch what's necessary. Avoid introducing bugs.
 8. [ ] Cross-browser tested (Chrome, Safari, Firefox)
 9. [ ] SEO meta tags present (metadata in layout.tsx)
 10. [ ] Dark mode tested
+11. [ ] Remove demo login bypass (if present)
 
 **After Deploy**:
 1. [ ] Verify production URL loads
@@ -503,33 +783,6 @@ Show before/after."
 - Dark mode support"
 ```
 
-**OTP Authentication Testing**:
-```bash
-# Test send OTP (phone)
-curl -X POST http://localhost:3000/api/auth/otp/send \
-  -H "Content-Type: application/json" \
-  -d '{"identifier": "+919876543210", "identifierType": "phone"}'
-
-# Test verify OTP
-curl -X POST http://localhost:3000/api/auth/otp/verify \
-  -H "Content-Type: application/json" \
-  -d '{"identifier": "+919876543210", "identifierType": "phone", "otp": "1234", "loginMode": "user"}'
-```
-
----
-
-### Available Custom Skills
-
-[Add your custom skills here as you create them]
-
-**Suggested Skills to Create**:
-- `/new-page [route]` - Create new page with layout, loading, error
-- `/new-component [name]` - Create Radix UI component with variants
-- `/supabase-query [table]` - Generate type-safe Supabase query
-- `/deploy` - Run full deployment checklist
-- `/test-auth` - Test authentication flow
-- `/check-a11y` - Check accessibility compliance
-
 ---
 
 ### Code Patterns to Follow
@@ -596,43 +849,6 @@ export async function updateData(formData: FormData) {
 
 ---
 
-### Weekly Review Checklist
-
-Every Sunday:
-1. [ ] Read "Past Mistakes" - are rules being followed?
-2. [ ] Update brand guidelines if changed
-3. [ ] Add new user feedback
-4. [ ] Review successful patterns
-5. [ ] Check Supabase usage/costs
-6. [ ] Review Vercel analytics
-7. [ ] Suggest improvements to Claude
-8. [ ] Plan next week's features
-
----
-
-## 💡 META: How This File Evolves
-
-**Claude's Responsibilities**:
-- Read this file at session start
-- Follow all rules and principles
-- Update "Past Mistakes" after errors
-- Suggest improvements weekly
-- Remind about Server Component defaults
-- Validate forms with Zod
-- Use Radix UI components
-
-**Your Responsibilities**:
-- Fill in remaining [FILL THIS IN] sections
-- Review updates Claude makes
-- Approve/reject changes
-- Archive old entries monthly
-- Keep tech stack section updated with new dependencies
-
-**Success Indicator**:
-When Claude makes the same mistake twice, this file needs updating.
-
----
-
 ## 🎯 Project-Specific Rules
 
 ### Admin Dashboard
@@ -692,10 +908,9 @@ When Claude makes the same mistake twice, this file needs updating.
 
 ---
 
-**Version**: 2.0 (OTP Auth + Workflow Orchestration)
-**Last Reviewed**: 2026-02-02
-**Last Updated**: 2026-02-02 (Added OTP Authentication + Workflow Orchestration)
-**Next Review**: 2026-02-09
+**Version**: 3.0 (Architecture Documentation + Init Command)
+**Last Reviewed**: 2026-02-03
+**Next Review**: 2026-02-10
 
 ---
 

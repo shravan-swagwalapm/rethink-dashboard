@@ -111,28 +111,74 @@ export default function LearningsPage() {
       const supabase = getClient();
 
       try {
-        let query = supabase
-          .from('learning_modules')
-          .select('*')
-          .order('week_number', { ascending: true })
-          .order('order_index', { ascending: true });
+        let modulesData: LearningModule[] | null = null;
+        let modulesError: any = null;
 
-        // FILTERING LOGIC:
-        // - Admin role: Show ONLY global library (cohort_id IS NULL)
-        // - Student role: Show ONLY modules tagged to active cohort
+        // OVERRIDE MODEL LOGIC:
+        // - Admin role: Show ONLY global library
+        // - Student role: Show modules based on active link type (override logic)
         if (isAdmin) {
           // Admin: only global library
-          query = query.is('cohort_id', null);
+          const { data, error } = await supabase
+            .from('learning_modules')
+            .select('*')
+            .is('cohort_id', null)
+            .order('week_number', { ascending: true })
+            .order('order_index', { ascending: true });
+          modulesData = data;
+          modulesError = error;
         } else {
-          // Student: only active cohort
+          // Student: Use override logic based on cohort link state
           if (!activeCohortId) {
             setLoading(false);
             return;
           }
-          query = query.eq('cohort_id', activeCohortId);
-        }
 
-        const { data: modulesData, error: modulesError } = await query;
+          // Step 1: Fetch cohort state to determine active link
+          const { data: cohort } = await supabase
+            .from('cohorts')
+            .select('id, active_link_type, linked_cohort_id')
+            .eq('id', activeCohortId)
+            .single();
+
+          if (!cohort) {
+            throw new Error('Cohort not found');
+          }
+
+          // Step 2: Query modules based on active link type (OVERRIDE logic)
+          let query = supabase
+            .from('learning_modules')
+            .select('*')
+            .order('week_number', { ascending: true })
+            .order('order_index', { ascending: true });
+
+          switch (cohort.active_link_type) {
+            case 'global':
+              // ONLY global modules (overrides own)
+              query = query.eq('is_global', true);
+              break;
+
+            case 'cohort':
+              // ONLY modules from linked cohort (overrides own)
+              if (cohort.linked_cohort_id) {
+                query = query.eq('cohort_id', cohort.linked_cohort_id);
+              } else {
+                // Fallback if linked_cohort_id is missing
+                query = query.eq('cohort_id', activeCohortId);
+              }
+              break;
+
+            case 'own':
+            default:
+              // ONLY own modules (default)
+              query = query.eq('cohort_id', activeCohortId);
+              break;
+          }
+
+          const result = await query;
+          modulesData = result.data;
+          modulesError = result.error;
+        }
 
         if (modulesError) throw modulesError;
 

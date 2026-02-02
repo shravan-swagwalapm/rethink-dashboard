@@ -1,5 +1,21 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
+
+// Zod validation schemas
+const linkModulesSchema = z.object({
+  source_cohort_id: z.union([z.string().uuid(), z.literal('global')]),
+  module_ids: z.array(z.string().uuid()).optional(),
+});
+
+const unlinkModulesSchema = z.object({
+  module_ids: z.array(z.string().uuid()).min(1).optional(),
+  unlink_all: z.boolean().optional(),
+  unlink_type: z.enum(['cohort', 'global']).optional(),
+}).refine(
+  data => data.module_ids || data.unlink_all || data.unlink_type,
+  { message: 'One of module_ids, unlink_all, or unlink_type is required' }
+);
 
 async function verifyAdmin() {
   const supabase = await createClient();
@@ -46,7 +62,17 @@ export async function POST(
 
   try {
     const body = await req.json();
-    const { source_cohort_id, module_ids } = body;
+
+    // Validate input
+    const validation = linkModulesSchema.safeParse(body);
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: 'Invalid request body', details: validation.error.errors },
+        { status: 400 }
+      );
+    }
+
+    const { source_cohort_id, module_ids } = validation.data;
 
     if (!source_cohort_id) {
       return NextResponse.json(
@@ -78,7 +104,6 @@ export async function POST(
     const { data: modules, error: fetchError } = await query;
 
     if (fetchError) {
-      console.error('Error fetching modules:', fetchError);
       throw fetchError;
     }
 
@@ -89,35 +114,53 @@ export async function POST(
       );
     }
 
-    // Create cohort_module_links
-    const links = modules.map(module => ({
-      cohort_id: cohortId,
-      module_id: module.id,
-      source_cohort_id: source_cohort_id === 'global' ? null : source_cohort_id,
-      linked_by: auth.userId,
-    }));
+    // Determine link type
+    const linkType = source_cohort_id === 'global' ? 'global' : 'cohort';
 
-    const { data: createdLinks, error: linkError } = await adminClient
-      .from('cohort_module_links')
-      .insert(links)
-      .select();
+    // CRITICAL: Prevent circular links (Cohort A → Cohort B → Cohort A)
+    if (linkType === 'cohort') {
+      const { data: sourceCohort } = await adminClient
+        .from('cohorts')
+        .select('id, name, linked_cohort_id')
+        .eq('id', source_cohort_id)
+        .single();
 
-    if (linkError) {
-      // Handle duplicate links gracefully (UNIQUE constraint violation)
-      if (linkError.code === '23505') {
-        return NextResponse.json({
-          message: 'Some modules were already linked',
-          links_created: 0
-        }, { status: 200 });
+      if (sourceCohort?.linked_cohort_id === cohortId) {
+        return NextResponse.json(
+          { error: `Cannot create circular link: ${sourceCohort.name} is already linked to this cohort` },
+          { status: 400 }
+        );
       }
-      console.error('Error creating links:', linkError);
-      throw linkError;
+    }
+
+    // Use atomic PostgreSQL function for transaction safety
+    // DELETE + INSERT in single transaction prevents data loss
+    const { data: result, error: rpcError } = await adminClient.rpc('atomic_update_cohort_link', {
+      p_cohort_id: cohortId,
+      p_source_cohort_id: source_cohort_id === 'global' ? null : source_cohort_id,
+      p_link_type: linkType,
+      p_module_ids: modules.map(m => m.id),
+      p_linked_by: auth.userId,
+    });
+
+    if (rpcError) {
+      throw rpcError;
+    }
+
+    // Check function result
+    if (!result || !result.success) {
+      return NextResponse.json(
+        { error: result?.error || 'Failed to link modules' },
+        { status: 400 }
+      );
     }
 
     return NextResponse.json({
-      message: `Successfully linked ${createdLinks?.length || 0} modules`,
-      links_created: createdLinks?.length || 0,
-      links: createdLinks,
+      message: `Successfully linked ${result.inserted_count} modules from ${linkType === 'global' ? 'Global Library' : 'source cohort'}`,
+      links_created: result.inserted_count,
+      deleted_count: result.deleted_count,
+      active_source: result.active_link_type || 'own',
+      linked_cohort_id: result.linked_cohort_id,
     });
 
   } catch (error) {
@@ -150,33 +193,73 @@ export async function DELETE(
 
   try {
     const body = await req.json();
-    const { module_ids, unlink_all } = body;
+
+    // Validate input
+    const validation = unlinkModulesSchema.safeParse(body);
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: 'Invalid request body', details: validation.error.errors },
+        { status: 400 }
+      );
+    }
+
+    const { module_ids, unlink_all, unlink_type } = validation.data;
 
     const adminClient = await createAdminClient();
 
+    // NEW: Handle unlink by type (cohort or global)
+    if (unlink_type && (unlink_type === 'cohort' || unlink_type === 'global')) {
+      const { data: result, error: rpcError } = await adminClient.rpc('atomic_unlink_by_type', {
+        p_cohort_id: cohortId,
+        p_link_type: unlink_type,
+      });
+
+      if (rpcError) {
+        throw rpcError;
+      }
+
+      if (!result || !result.success) {
+        return NextResponse.json(
+          { error: result?.error || 'Failed to unlink modules' },
+          { status: 400 }
+        );
+      }
+
+      return NextResponse.json({
+        message: `Successfully unlinked all ${unlink_type} modules`,
+        unlinked_count: result.deleted_count,
+        active_source: result.active_link_type || 'own',
+      });
+    }
+
     // Handle bulk unlink - delete ALL links for this cohort
     if (unlink_all === true) {
-      const { data: deletedLinks, error } = await adminClient
-        .from('cohort_module_links')
-        .delete()
-        .eq('cohort_id', cohortId)
-        .select();
+      const { data: result, error: rpcError } = await adminClient.rpc('atomic_unlink_all', {
+        p_cohort_id: cohortId,
+      });
 
-      if (error) {
-        console.error('Error unlinking all modules:', error);
-        throw error;
+      if (rpcError) {
+        throw rpcError;
+      }
+
+      if (!result || !result.success) {
+        return NextResponse.json(
+          { error: result?.error || 'Failed to unlink modules' },
+          { status: 400 }
+        );
       }
 
       return NextResponse.json({
         message: `Successfully unlinked all modules`,
-        unlinked_count: deletedLinks?.length || 0,
+        unlinked_count: result.deleted_count,
+        active_source: result.active_link_type || 'own',
       });
     }
 
     // Handle specific module unlink
     if (!module_ids || !Array.isArray(module_ids) || module_ids.length === 0) {
       return NextResponse.json(
-        { error: 'module_ids array or unlink_all flag required' },
+        { error: 'module_ids array, unlink_all flag, or unlink_type required' },
         { status: 400 }
       );
     }
@@ -188,13 +271,20 @@ export async function DELETE(
       .in('module_id', module_ids);
 
     if (error) {
-      console.error('Error unlinking modules:', error);
       throw error;
     }
 
+    // CRITICAL FIX: Get actual active_link_type from database (not 'linked' which is invalid)
+    const { data: cohort } = await adminClient
+      .from('cohorts')
+      .select('active_link_type')
+      .eq('id', cohortId)
+      .single();
+
     return NextResponse.json({
-      message: `Successfully unlinked ${module_ids.length} modules`,
+      message: `Successfully unlinked ${module_ids.length} module(s)`,
       unlinked_count: module_ids.length,
+      active_source: cohort?.active_link_type || 'own',
     });
 
   } catch (error) {

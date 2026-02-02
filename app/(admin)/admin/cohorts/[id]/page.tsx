@@ -243,7 +243,7 @@ export default function CohortSettingsPage() {
     try {
       setIsUntagging(true);
 
-      // Step 1: Unlink all linked modules
+      // Unlink all linked modules (revert to own modules)
       const unlinkResponse = await fetch(`/api/admin/cohorts/${cohortId}/link-modules`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
@@ -256,23 +256,10 @@ export default function CohortSettingsPage() {
         throw new Error(unlinkResult.error || 'Failed to unlink modules');
       }
 
-      // Step 2: Convert own modules to global
-      const convertResponse = await fetch(`/api/admin/cohorts/${cohortId}/convert-to-global`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ make_global: true }),
-      });
-
-      const convertResult = await convertResponse.json();
-
-      if (!convertResponse.ok) {
-        throw new Error(convertResult.error || 'Failed to convert modules');
-      }
-
       toast.success(
-        `Complete untag successful`,
+        `Successfully unlinked modules`,
         {
-          description: `Unlinked ${unlinkResult.unlinked_count} modules, converted ${convertResult.converted_count} own modules to global`,
+          description: `Removed ${unlinkResult.unlinked_count} linked module${unlinkResult.unlinked_count !== 1 ? 's' : ''}. Students now see ${stats?.own_modules || 0} own module${stats?.own_modules !== 1 ? 's' : ''}.`,
           duration: 5000,
         }
       );
@@ -281,8 +268,8 @@ export default function CohortSettingsPage() {
       setConfirmText('');
       await fetchData();
     } catch (error) {
-      console.error('Error during complete untag:', error);
-      toast.error('Failed to complete untag. Please try again.');
+      console.error('Error during unlink:', error);
+      toast.error('Failed to unlink modules. Please try again.');
     } finally {
       setIsUntagging(false);
     }
@@ -361,17 +348,48 @@ export default function CohortSettingsPage() {
         {/* Statistics Grid - Hero + Secondary Layout */}
         {stats && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Hero Card - Total Modules */}
+            {/* Hero Card - Active Module Source (Override Model) */}
             <Card className="lg:col-span-3 hover:shadow-lg transition-all border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
               <CardHeader className="pb-4">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="text-lg font-medium text-muted-foreground">
-                      Total Modules Available
-                    </CardTitle>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <CardTitle className="text-lg font-medium text-muted-foreground">
+                        Visible Modules
+                      </CardTitle>
+                      {/* Active Source Badge */}
+                      {stats.active_source === 'global' && (
+                        <Badge variant="outline" className="bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-300 dark:border-purple-700">
+                          <Globe className="w-3 h-3 mr-1" />
+                          Global Library
+                        </Badge>
+                      )}
+                      {stats.active_source === 'cohort' && stats.linked_cohort_name && (
+                        <Badge variant="outline" className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-300 dark:border-green-700">
+                          <Link2 className="w-3 h-3 mr-1" />
+                          Linked: {stats.linked_cohort_name}
+                        </Badge>
+                      )}
+                      {stats.active_source === 'own' && (
+                        <Badge variant="outline" className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700">
+                          <BookOpen className="w-3 h-3 mr-1" />
+                          Own Modules
+                        </Badge>
+                      )}
+                    </div>
                     <p className="text-sm text-muted-foreground mt-1">
-                      All learning content accessible to students in this cohort
+                      What students currently see in this cohort
                     </p>
+                    {/* Override Warning */}
+                    {stats.active_source !== 'own' && stats.own_modules > 0 && (
+                      <Alert className="mt-3 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30">
+                        <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                        <AlertDescription className="text-sm text-amber-700 dark:text-amber-300">
+                          {stats.own_modules} own module{stats.own_modules > 1 ? 's' : ''} hidden by active link.
+                          Unlink to restore visibility.
+                        </AlertDescription>
+                      </Alert>
+                    )}
                   </div>
                   <Tooltip>
                     <TooltipTrigger>
@@ -380,29 +398,37 @@ export default function CohortSettingsPage() {
                       </div>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Sum of own, linked, and global modules</p>
+                      <p>Only ONE link active at a time (override model)</p>
                     </TooltipContent>
                   </Tooltip>
                 </div>
               </CardHeader>
               <CardContent>
                 <div className="flex items-end gap-4">
-                  <div className="text-5xl font-bold">{stats.total_modules}</div>
+                  <div className="text-5xl font-bold">{stats.visible_modules}</div>
                   <div className="flex items-center gap-3 mb-2 text-sm text-muted-foreground">
                     <span className="flex items-center gap-1">
                       <BookOpen className="w-4 h-4 text-blue-600" />
                       {stats.own_modules} own
                     </span>
-                    <span>•</span>
-                    <span className="flex items-center gap-1">
-                      <Link2 className="w-4 h-4 text-green-600" />
-                      {stats.linked_modules} linked
-                    </span>
-                    <span>•</span>
-                    <span className="flex items-center gap-1">
-                      <Globe className="w-4 h-4 text-purple-600" />
-                      {stats.global_modules} global
-                    </span>
+                    {stats.linked_modules > 0 && (
+                      <>
+                        <span>•</span>
+                        <span className="flex items-center gap-1">
+                          <Link2 className="w-4 h-4 text-green-600" />
+                          {stats.linked_modules} available
+                        </span>
+                      </>
+                    )}
+                    {stats.global_modules > 0 && (
+                      <>
+                        <span>•</span>
+                        <span className="flex items-center gap-1">
+                          <Globe className="w-4 h-4 text-purple-600" />
+                          {stats.global_modules} global
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -472,15 +498,27 @@ export default function CohortSettingsPage() {
         <Card>
           <CardHeader>
             <div className="flex items-start justify-between">
-              <div>
+              <div className="flex-1">
                 <CardTitle className="flex items-center gap-2">
                   <Link2 className="w-5 h-5" />
-                  Link Resources from Another Cohort
+                  Link Resources (Override Model)
                 </CardTitle>
                 <CardDescription className="mt-1.5">
-                  Link existing modules to this cohort instead of recreating them. Resources are shared,
-                  not duplicated—any updates will sync automatically.
+                  Link existing modules from another cohort or Global Library. <strong className="text-amber-600 dark:text-amber-400">Only ONE link allowed at a time.</strong>
+                  {' '}Linking will override current modules—students will ONLY see the linked source.
                 </CardDescription>
+                {/* Single Link Constraint Alert */}
+                {stats && stats.active_source !== 'own' && (
+                  <Alert className="mt-3 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30">
+                    <InfoIcon className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                    <AlertDescription className="text-sm text-amber-700 dark:text-amber-300">
+                      <strong>Active link detected:</strong> Currently linked to{' '}
+                      {stats.active_source === 'global' ? 'Global Library' : stats.linked_cohort_name}.
+                      {' '}Unlinking will restore {stats.own_modules} own module{stats.own_modules !== 1 ? 's' : ''}.
+                      {' '}Creating a new link will replace the current one.
+                    </AlertDescription>
+                  </Alert>
+                )}
               </div>
             </div>
           </CardHeader>
@@ -532,28 +570,38 @@ export default function CohortSettingsPage() {
 
             {/* Preview what will be copied */}
             {sourceCohortId && sourceModulesCount > 0 && (
-              <Alert className="border-green-200 bg-green-50 animate-in fade-in slide-in-from-top-2 duration-300">
-                <Sparkles className="h-4 w-4 text-green-600" />
-                <AlertTitle className="text-green-900">Ready to Link</AlertTitle>
-                <AlertDescription className="text-green-800 space-y-2">
+              <Alert className="border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/30 animate-in fade-in slide-in-from-top-2 duration-300">
+                <Sparkles className="h-4 w-4 text-green-600 dark:text-green-400" />
+                <AlertTitle className="text-green-900 dark:text-green-100">Ready to Link & Override</AlertTitle>
+                <AlertDescription className="text-green-800 dark:text-green-200 space-y-2">
                   <p>
                     <strong>{sourceModulesCount} module{sourceModulesCount !== 1 ? 's' : ''}</strong> from{' '}
-                    <strong>{sourceCohortName}</strong> will be linked to <strong>{cohort.name}</strong>.
+                    <strong>{sourceCohortName}</strong> will override current modules in <strong>{cohort.name}</strong>.
                   </p>
                   <ul className="list-disc list-inside text-sm space-y-1 mt-2">
-                    <li>Resources will be <strong>shared</strong>, not duplicated</li>
-                    <li>Updates to these modules will appear in both cohorts</li>
-                    <li>Students will see these modules immediately</li>
+                    <li>Students will <strong>ONLY see these {sourceModulesCount} modules</strong></li>
+                    <li>Resources are <strong>shared</strong>, not duplicated</li>
+                    <li>Updates sync automatically across cohorts</li>
+                    {stats && stats.active_source !== 'own' && (
+                      <li className="text-amber-700 dark:text-amber-300 font-medium">
+                        Replaces existing link to {stats.active_source === 'global' ? 'Global Library' : stats.linked_cohort_name}
+                      </li>
+                    )}
+                    {stats && stats.own_modules > 0 && sourceCohortId !== stats.linked_cohort_id && (
+                      <li className="text-amber-700 dark:text-amber-300 font-medium">
+                        Hides {stats.own_modules} own module{stats.own_modules !== 1 ? 's' : ''} (unlink to restore)
+                      </li>
+                    )}
                   </ul>
                 </AlertDescription>
               </Alert>
             )}
 
             {sourceCohortId && sourceModulesCount === 0 && (
-              <Alert className="border-amber-200 bg-amber-50 animate-in fade-in slide-in-from-top-2 duration-300">
-                <AlertTriangle className="h-4 w-4 text-amber-600" />
-                <AlertTitle className="text-amber-900">No Modules Available</AlertTitle>
-                <AlertDescription className="text-amber-800">
+              <Alert className="border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 animate-in fade-in slide-in-from-top-2 duration-300">
+                <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                <AlertTitle className="text-amber-900 dark:text-amber-100">No Modules Available</AlertTitle>
+                <AlertDescription className="text-amber-800 dark:text-amber-200">
                   <strong>{sourceCohortName}</strong> doesn't have any modules to share yet.
                   {sourceCohortId !== 'global' && ' Try selecting a different cohort or create modules in that cohort first.'}
                 </AlertDescription>
@@ -569,79 +617,120 @@ export default function CohortSettingsPage() {
               {isLoading ? (
                 <>
                   <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                  Linking modules to {cohort.name}...
+                  Linking & Overriding...
                 </>
               ) : (
                 <>
                   <Link2 className="w-5 h-5 mr-2" />
-                  Link {sourceModulesCount > 0 ? `${sourceModulesCount} Module${sourceModulesCount !== 1 ? 's' : ''}` : 'Modules'}
-                  to {cohort.name}
+                  Link & Override with {sourceModulesCount > 0 ? `${sourceModulesCount} Module${sourceModulesCount !== 1 ? 's' : ''}` : 'Modules'}
                 </>
               )}
             </Button>
           </CardContent>
         </Card>
 
-        {/* Complete Untag Section */}
+        {/* Untag Section - Only show if there's an active link */}
+        {stats && stats.active_source !== 'own' && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-start justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Trash2 className="w-5 h-5 text-red-600" />
+                    Unlink Active Source
+                  </CardTitle>
+                  <CardDescription className="mt-1.5">
+                    Remove the active link and restore {stats.own_modules} own module{stats.own_modules !== 1 ? 's' : ''}.
+                    Students will see your cohort's original content again.
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Alert className="border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30">
+                <InfoIcon className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                <AlertTitle className="text-amber-900 dark:text-amber-100">Currently Linked</AlertTitle>
+                <AlertDescription className="text-amber-800 dark:text-amber-200 space-y-2">
+                  <p className="font-medium">
+                    Active Source:{' '}
+                    {stats.active_source === 'global' ? (
+                      <span className="text-purple-600 dark:text-purple-400">Global Library</span>
+                    ) : (
+                      <span className="text-green-600 dark:text-green-400">{stats.linked_cohort_name}</span>
+                    )}
+                  </p>
+                  <p className="text-sm mt-2">
+                    Unlinking will hide {linkedModules.length} linked module{linkedModules.length !== 1 ? 's' : ''} and
+                    restore {stats.own_modules} own module{stats.own_modules !== 1 ? 's' : ''} (if any).
+                  </p>
+                </AlertDescription>
+              </Alert>
+
+              <Button
+                variant="destructive"
+                onClick={() => setShowUntagDialog(true)}
+                disabled={isLoading}
+                className="w-full"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Unlinking...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Unlink & Restore Own Modules
+                  </>
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Currently Linked Modules List - Show Active Link */}
         <Card>
           <CardHeader>
-            <div className="flex items-start justify-between">
+            <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="flex items-center gap-2">
-                  <AlertTriangle className="w-5 h-5 text-amber-600" />
-                  Complete Untag
+                  <Link2 className="w-5 h-5" />
+                  Active Link
+                  {linkedModules.length > 0 && (
+                    <Badge variant="secondary" className="ml-2">
+                      {linkedModules.length} modules
+                    </Badge>
+                  )}
+                  {stats && stats.active_source !== 'own' && (
+                    <Badge
+                      variant="outline"
+                      className={
+                        stats.active_source === 'global'
+                          ? "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-300 dark:border-purple-700"
+                          : "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-300 dark:border-green-700"
+                      }
+                    >
+                      {stats.active_source === 'global' ? (
+                        <>
+                          <Globe className="w-3 h-3 mr-1" />
+                          Global Library
+                        </>
+                      ) : (
+                        <>
+                          <Link2 className="w-3 h-3 mr-1" />
+                          {stats.linked_cohort_name}
+                        </>
+                      )}
+                    </Badge>
+                  )}
                 </CardTitle>
-                <CardDescription className="mt-1.5">
-                  Remove all linked modules and convert this cohort's own modules to global library.
-                  This makes the cohort a clean slate while preserving all content.
+                <CardDescription>
+                  {stats?.active_source === 'own'
+                    ? 'No active link. Students see own modules only.'
+                    : 'Modules from active link (override model). Students ONLY see these modules.'}
                 </CardDescription>
               </div>
             </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Alert className="border-amber-200 bg-amber-50">
-              <AlertTriangle className="h-4 w-4 text-amber-600" />
-              <AlertTitle className="text-amber-900">Irreversible Action</AlertTitle>
-              <AlertDescription className="text-amber-800 space-y-2">
-                <p className="font-medium">This action will:</p>
-                <ul className="list-disc list-inside text-sm space-y-1">
-                  <li>Unlink all {stats?.linked_modules || 0} linked modules from other cohorts</li>
-                  <li>Convert {stats?.own_modules || 0} own modules to global library (accessible to all cohorts)</li>
-                  <li>Leave this cohort with 0 modules initially (you can re-link from global library)</li>
-                </ul>
-                <p className="text-sm mt-2">
-                  <strong>Note:</strong> No content will be deleted—modules will be moved to the global library.
-                </p>
-              </AlertDescription>
-            </Alert>
-
-            <Button
-              variant="destructive"
-              onClick={() => setShowUntagDialog(true)}
-              disabled={!stats || (stats.linked_modules === 0 && stats.own_modules === 0)}
-              className="w-full"
-            >
-              <AlertTriangle className="w-4 h-4 mr-2" />
-              Complete Untag {cohort?.name}
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Currently Linked Modules List */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Link2 className="w-5 h-5" />
-              Currently Linked Modules
-              {linkedModules.length > 0 && (
-                <Badge variant="secondary" className="ml-2">
-                  {linkedModules.length}
-                </Badge>
-              )}
-            </CardTitle>
-            <CardDescription>
-              Modules shared from other cohorts or the global library. You can unlink them anytime.
-            </CardDescription>
           </CardHeader>
           <CardContent>
             {linkedModules.length > 0 ? (
@@ -828,43 +917,47 @@ export default function CohortSettingsPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Complete Untag Confirmation Dialog */}
+        {/* Unlink Confirmation Dialog */}
         <Dialog open={showUntagDialog} onOpenChange={setShowUntagDialog}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-amber-600" />
-                Confirm Complete Untag
+                <Trash2 className="w-5 h-5 text-red-600" />
+                Confirm Unlink
               </DialogTitle>
               <DialogDescription className="space-y-3 pt-2">
                 <p>
-                  You are about to perform a <strong>Complete Untag</strong> on <strong>{cohort?.name}</strong>.
+                  You are about to <strong>unlink all modules</strong> from <strong>{cohort?.name}</strong>.
                 </p>
 
-                <div className="bg-red-50 border border-red-200 rounded-lg p-3 space-y-2">
-                  <p className="text-sm font-medium text-red-900">What will happen:</p>
-                  <ol className="list-decimal list-inside text-sm text-red-800 space-y-1">
-                    <li><strong>{stats?.linked_modules || 0} linked modules</strong> will be unlinked from this cohort</li>
-                    <li><strong>{stats?.own_modules || 0} own modules</strong> will be converted to global library</li>
-                    <li>This cohort will have <strong>0 modules</strong> after this operation</li>
-                    <li>Students will temporarily lose access to all learning content</li>
-                  </ol>
+                <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3 space-y-2">
+                  <p className="text-sm font-medium text-amber-900 dark:text-amber-100">What will happen:</p>
+                  <ul className="list-disc list-inside text-sm text-amber-800 dark:text-amber-200 space-y-1">
+                    <li>
+                      <strong>{linkedModules.length} linked module{linkedModules.length !== 1 ? 's' : ''}</strong> from{' '}
+                      {stats?.active_source === 'global' ? 'Global Library' : stats?.linked_cohort_name} will be unlinked
+                    </li>
+                    <li>
+                      Students will see <strong>{stats?.own_modules || 0} own module{stats?.own_modules !== 1 ? 's' : ''}</strong> instead
+                    </li>
+                    <li>Cohort returns to showing its original content</li>
+                  </ul>
                 </div>
 
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <p className="text-sm text-blue-900">
-                    <strong>Good news:</strong> No content will be deleted. All modules will be available in the global library,
-                    and you can re-link them to this cohort anytime.
+                <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                  <p className="text-sm text-blue-900 dark:text-blue-100">
+                    <strong>Note:</strong> No content will be deleted. Linked modules remain available in their source.
+                    You can re-link anytime.
                   </p>
                 </div>
 
                 <p className="text-sm text-muted-foreground">
-                  Type <strong>UNTAG</strong> below to confirm:
+                  Type <strong>UNLINK</strong> below to confirm:
                 </p>
                 <Input
-                  placeholder="Type UNTAG to confirm"
+                  placeholder="Type UNLINK to confirm"
                   value={confirmText}
-                  onChange={(e) => setConfirmText(e.target.value)}
+                  onChange={(e) => setConfirmText(e.target.value.toUpperCase())}
                 />
               </DialogDescription>
             </DialogHeader>
@@ -881,17 +974,17 @@ export default function CohortSettingsPage() {
               <Button
                 variant="destructive"
                 onClick={handleCompleteUntag}
-                disabled={confirmText !== 'UNTAG' || isUntagging}
+                disabled={confirmText !== 'UNLINK' || isUntagging}
               >
                 {isUntagging ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Processing...
+                    Unlinking...
                   </>
                 ) : (
                   <>
-                    <AlertTriangle className="w-4 h-4 mr-2" />
-                    Complete Untag
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Unlink All
                   </>
                 )}
               </Button>
