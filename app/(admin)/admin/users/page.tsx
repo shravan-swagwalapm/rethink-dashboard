@@ -57,6 +57,7 @@ import {
   Trash2,
   Star,
   Pencil,
+  Phone,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import * as XLSX from 'xlsx';
@@ -978,6 +979,7 @@ export default function UsersPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>User</TableHead>
+                  <TableHead>Phone</TableHead>
                   <TableHead>Roles</TableHead>
                   <TableHead>Joined</TableHead>
                   <TableHead className="w-[50px]"></TableHead>
@@ -1005,6 +1007,16 @@ export default function UsersPage() {
                             <p className="text-sm text-muted-foreground">{user.email}</p>
                           </div>
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        {user.phone ? (
+                          <div className="flex items-center gap-2 text-sm">
+                            <Phone className="w-3.5 h-3.5 text-muted-foreground" />
+                            <span className="font-mono">{user.phone}</span>
+                          </div>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">—</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
