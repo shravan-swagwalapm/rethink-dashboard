@@ -67,7 +67,7 @@ export async function POST(
     const validation = linkModulesSchema.safeParse(body);
     if (!validation.success) {
       return NextResponse.json(
-        { error: 'Invalid request body', details: validation.error.errors },
+        { error: 'Invalid request body', details: validation.error.issues },
         { status: 400 }
       );
     }
@@ -198,7 +198,7 @@ export async function DELETE(
     const validation = unlinkModulesSchema.safeParse(body);
     if (!validation.success) {
       return NextResponse.json(
-        { error: 'Invalid request body', details: validation.error.errors },
+        { error: 'Invalid request body', details: validation.error.issues },
         { status: 400 }
       );
     }

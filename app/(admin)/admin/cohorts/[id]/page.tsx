@@ -53,6 +53,11 @@ interface CohortStats {
   own_modules: number;
   linked_modules: number;
   global_modules: number;
+  visible_modules: number;
+  active_source: 'own' | 'cohort' | 'global';
+  active_source_name: string;
+  linked_cohort_id: string | null;
+  linked_cohort_name: string | null;
 }
 
 export default function CohortSettingsPage() {
