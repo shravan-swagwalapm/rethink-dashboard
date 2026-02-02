@@ -32,6 +32,7 @@ import {
   Check,
   Star,
   Loader2,
+  AlertCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -104,6 +105,7 @@ export default function LearningsPage() {
   const [favoriteResources, setFavoriteResources] = useState<Set<string>>(new Set());
   const [recentActivity, setRecentActivity] = useState<ModuleResource[]>([]);
   const [iframeLoading, setIframeLoading] = useState(true);
+  const [iframeError, setIframeError] = useState(false);
   const [weekProgress, setWeekProgress] = useState<Record<number, { completed: number; total: number }>>({});
 
   useEffect(() => {
@@ -492,9 +494,11 @@ export default function LearningsPage() {
         if (currentIndex >= 0 && currentIndex < relatedResources.length - 1) {
           setSelectedResource(relatedResources[currentIndex + 1]);
           setIframeLoading(true);
+          setIframeError(false);
         } else if (relatedResources.length > 0 && currentIndex === -1) {
           setSelectedResource(relatedResources[0]);
           setIframeLoading(true);
+          setIframeError(false);
         }
       } else if (e.key === 'ArrowLeft') {
         // Navigate to previous resource
@@ -502,6 +506,7 @@ export default function LearningsPage() {
         if (currentIndex > 0) {
           setSelectedResource(relatedResources[currentIndex - 1]);
           setIframeLoading(true);
+          setIframeError(false);
         }
       }
     };
@@ -510,12 +515,28 @@ export default function LearningsPage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedResource, relatedResources]);
 
+  // Iframe timeout detection (10 seconds)
+  useEffect(() => {
+    if (!selectedResource || !iframeLoading) return;
+
+    const timeout = setTimeout(() => {
+      if (iframeLoading) {
+        console.error('[Learnings] Iframe loading timeout after 10 seconds');
+        setIframeLoading(false);
+        setIframeError(true);
+      }
+    }, 10000); // 10 second timeout
+
+    return () => clearTimeout(timeout);
+  }, [selectedResource, iframeLoading]);
+
   const handleResourceClick = async (resource: ModuleResource) => {
     if (resource.content_type === 'link' && resource.external_url) {
       window.open(resource.external_url, '_blank');
     } else {
       setSelectedResource(resource);
       setIframeLoading(true);
+      setIframeError(false); // Reset error state
 
       // Track resource view
       try {
@@ -1024,7 +1045,7 @@ export default function LearningsPage() {
             <div className="flex gap-6 flex-1 min-h-0">
               {/* Main content */}
               <div className="flex-1 min-w-0 relative">
-                {iframeLoading && (
+                {iframeLoading && !iframeError && (
                   <div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-900 rounded-lg z-10">
                     <div className="flex flex-col items-center gap-3">
                       <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
@@ -1032,12 +1053,67 @@ export default function LearningsPage() {
                     </div>
                   </div>
                 )}
+                {iframeError && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-red-50 dark:bg-red-950/20 rounded-lg border-2 border-red-200 dark:border-red-800 z-10">
+                    <div className="flex flex-col items-center gap-4 p-6 max-w-md text-center">
+                      <AlertCircle className="w-12 h-12 text-red-500" />
+                      <div>
+                        <h3 className="font-semibold text-lg mb-2 text-gray-900 dark:text-gray-100">Failed to load content</h3>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                          This content couldn't be loaded. This may be due to privacy settings or the file being unavailable.
+                        </p>
+                      </div>
+                      <div className="flex gap-3">
+                        <Button
+                          onClick={() => {
+                            const url = selectedResource.google_drive_id
+                              ? `https://drive.google.com/file/d/${selectedResource.google_drive_id}/view`
+                              : selectedResource.external_url || getEmbedUrl(selectedResource);
+                            window.open(url, '_blank');
+                          }}
+                          variant="outline"
+                          className="gap-2"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                          Open in new tab
+                        </Button>
+                        <Button
+                          onClick={() => {
+                            setIframeError(false);
+                            setIframeLoading(true);
+                          }}
+                          variant="default"
+                        >
+                          Retry
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <iframe
-                  src={selectedResource.google_drive_id
-                    ? `https://drive.google.com/file/d/${selectedResource.google_drive_id}/preview`
-                    : getEmbedUrl(selectedResource)
-                  }
-                  onLoad={() => setIframeLoading(false)}
+                  src={(() => {
+                    const url = selectedResource.google_drive_id
+                      ? `https://drive.google.com/file/d/${selectedResource.google_drive_id}/preview`
+                      : getEmbedUrl(selectedResource);
+                    console.log('[Learnings] Loading iframe:', {
+                      title: selectedResource.title,
+                      google_drive_id: selectedResource.google_drive_id,
+                      external_url: selectedResource.external_url,
+                      content_type: selectedResource.content_type,
+                      iframe_url: url
+                    });
+                    return url;
+                  })()}
+                  onLoad={() => {
+                    console.log('[Learnings] Iframe loaded successfully');
+                    setIframeLoading(false);
+                    setIframeError(false);
+                  }}
+                  onError={(e) => {
+                    console.error('[Learnings] Iframe load error:', e);
+                    setIframeLoading(false);
+                    setIframeError(true);
+                  }}
                   className={cn(
                     "w-full h-full rounded-lg transition-opacity duration-300",
                     iframeLoading ? "opacity-0" : "opacity-100"
@@ -1062,6 +1138,7 @@ export default function LearningsPage() {
                         onClick={() => {
                           setSelectedResource(resource);
                           setIframeLoading(true);
+                          setIframeError(false);
                         }}
                         className={cn(
                           "w-full p-3 rounded-lg border text-left hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors",
