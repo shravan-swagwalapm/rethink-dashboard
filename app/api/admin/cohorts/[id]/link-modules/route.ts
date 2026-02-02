@@ -5,7 +5,7 @@ import { z } from 'zod';
 // Zod validation schemas
 const linkModulesSchema = z.object({
   source_cohort_id: z.union([z.string().uuid(), z.literal('global')]),
-  module_ids: z.array(z.string().uuid()).optional(),
+  module_ids: z.array(z.string().uuid()).optional().nullable(),
 });
 
 const unlinkModulesSchema = z.object({

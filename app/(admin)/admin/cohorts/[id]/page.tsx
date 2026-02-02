@@ -175,13 +175,17 @@ export default function CohortSettingsPage() {
     try {
       setIsLoading(true);
 
+      // Build request body - omit module_ids to link all modules
+      const requestBody: { source_cohort_id: string; module_ids?: string[] } = {
+        source_cohort_id: sourceCohortId,
+      };
+      // Don't include module_ids field at all (undefined = link all)
+      // Sending null would fail Zod validation
+
       const response = await fetch(`/api/admin/cohorts/${cohortId}/link-modules`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          source_cohort_id: sourceCohortId,
-          module_ids: null, // null = copy all
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       const result = await response.json();
