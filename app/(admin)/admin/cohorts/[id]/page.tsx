@@ -147,8 +147,8 @@ export default function CohortSettingsPage() {
         setSourceModulesCount(globalCount);
         setSourceCohortName('Global Library');
       } else {
-        // Count modules in selected cohort
-        const response = await fetch(`/api/admin/learnings?cohort_id=${sourceCohortId}`);
+        // Count OWN modules in selected cohort (bypass override logic)
+        const response = await fetch(`/api/admin/learnings?cohort_id=${sourceCohortId}&show_own=true`);
         const data = await response.json();
         const ownModulesCount = data.modules?.filter((m: any) => m.cohort_id === sourceCohortId).length || 0;
         setSourceModulesCount(ownModulesCount);
