@@ -71,6 +71,105 @@
 **10. VOICE PROMPT REMINDER**
 - Remind user about voice typing (Fn x2 on Mac) for long requirements
 
+**11. MODEL PREFERENCE FOR COMPLEX TASKS**
+- Use **Opus 4.5** (model: `opus`) for:
+  - Authentication system changes
+  - Security-critical features
+  - Complex business logic with multiple edge cases
+  - Database migrations affecting user data
+- Use **Sonnet 4.5** (default) for:
+  - UI components and styling
+  - Simple CRUD operations
+  - Documentation updates
+  - Bug fixes with clear root cause
+
+---
+
+## 🔄 WORKFLOW ORCHESTRATION
+
+### 1. Plan Mode Default
+
+**Enter plan mode for ANY non-trivial task (3+ steps or architectural decisions)**
+
+- If something goes sideways, STOP and re-plan immediately – don't keep pushing
+- Use plan mode for verification steps, not just building
+- Write detailed specs upfront to reduce ambiguity
+
+### 2. Subagent Strategy
+
+**Use subagents liberally to keep main context window clean**
+
+- Offload research, exploration, and parallel analysis to subagents
+- For complex problems, throw more compute at it via subagents
+- One task per subagent for focused execution
+
+### 3. Self-Improvement Loop
+
+**After ANY correction from the user: update `tasks/lessons.md` with the pattern**
+
+- Write rules for yourself that prevent the same mistake
+- Ruthlessly iterate on these lessons until mistake rate drops
+- Review lessons at session start for relevant project
+
+### 4. Verification Before Done
+
+**Never mark a task complete without proving it works**
+
+- Diff behavior between main and your changes when relevant
+- Ask yourself: "Would a staff engineer approve this?"
+- Run tests, check logs, demonstrate correctness
+
+### 5. Demand Elegance (Balanced)
+
+**For non-trivial changes: pause and ask "Is there a more elegant way?"**
+
+- If a fix feels hacky: "Knowing everything I know now, implement the elegant solution"
+- Skip this for simple, obvious fixes – don't over-engineer
+- Challenge your own work before presenting it
+
+### 6. Autonomous Bug Fixing
+
+**When given a bug report: just fix it. Don't ask for hand-holding**
+
+- Point at logs, errors, failing tests – then resolve them
+- Zero context switching required from the user
+- Go fix failing CI tests without being told how
+
+---
+
+## 📋 TASK MANAGEMENT PROTOCOL
+
+### 1. **Plan First**
+Write plan to `tasks/todo.md` with checkable items
+
+### 2. **Verify Plans**
+Check in before starting implementation
+
+### 3. **Track Progress**
+Mark items complete as you go
+
+### 4. **Explain Changes**
+High-level summary at each step
+
+### 5. **Document Results**
+Add review section to `tasks/todo.md`
+
+### 6. **Capture Lessons**
+Update `tasks/lessons.md` after corrections
+
+---
+
+## 🎯 CORE PRINCIPLES
+
+### **Simplicity First**
+Make every change as simple as possible. Impact minimal code.
+
+### **No Laziness**
+Find root causes. No temporary fixes. Senior developer standards.
+
+### **Minimal Impact**
+Changes should only touch what's necessary. Avoid introducing bugs.
+
 ---
 
 ## 🎨 PROJECT CONFIGURATION
@@ -132,6 +231,8 @@
 - Runtime: Next.js Server Actions
 - Database: Supabase (PostgreSQL)
 - Authentication: Supabase SSR Auth
+- SMS/OTP: MSG91 (India-focused, reliable OTP delivery)
+- SMS Integration: `/lib/integrations/msg91-otp.ts` service
 - API: Server Actions + Route Handlers
 
 **Deployment**:
@@ -204,6 +305,11 @@
 - [ ] Environment variables for secrets (.env.local)
 - [ ] Row Level Security (RLS) in Supabase
 - [ ] Authentication required for admin routes
+- [x] OTP rate limiting implemented (5 per 15min window)
+- [x] OTP expiry enforced (5 minutes)
+- [x] Max verification attempts tracked (5 attempts)
+- [x] Phone number validation and formatting
+- [x] 4-digit OTP for balance of security and UX
 
 ---
 
@@ -256,6 +362,13 @@
 - Update 2026-02-02: Had Admin button in header providing quick access to /admin → Strict access control - /admin should ONLY be accessible via explicit admin login, never through convenience links
 - Update 2026-02-02: Dashboard initially redirected based on role instead of showing different views → Same route (/dashboard) should show role-specific views (student view vs admin view) based on activeRole. Better UX than navigation
 
+**OTP Authentication Implementation (2026-02-02)**:
+- Update 2026-02-02: Implementing OTP auth - phone field already exists in schema → Always check existing schema before planning new fields. Avoid duplicate migrations
+- Update 2026-02-02: MSG91 requires template approval → Get OTP template approved BEFORE production deployment. Test with test mode initially
+- Update 2026-02-02: Rate limiting is critical for OTP → Always implement rate limiting from day 1. Never deploy OTP system without abuse protection
+- Update 2026-02-02: Phone numbers need country code → Store phone with country code prefix. Format: `+[code][number]` for international support
+- Update 2026-02-02: Session creation after OTP verification is complex → Use Supabase admin.generateLink() API for creating sessions. More reliable than manual token generation
+
 [Claude: Add new entries here after each mistake]
 
 ---
@@ -289,6 +402,14 @@
 - window.location.reload() for role switching (2026-02-02): Ensures complete component state synchronization when switching roles → More reliable than router.refresh() or router.push() for major state changes
 - Dedicated admin stats API endpoint (2026-02-02): Created /api/admin/dashboard-stats for system-wide data → Clean separation between student (cohort-specific) and admin (system-wide) data sources
 - Explicit access control patterns (2026-02-02): Removed all navigation shortcuts to /admin, enforced login-based access → Clear, intentional access patterns prevent confusion and improve security
+
+**OTP Authentication Patterns (2026-02-02)**:
+- Custom OTP storage with MSG91 delivery: Full control over expiry and attempts → Better than pure MSG91 storage or Supabase phone auth
+- Phone OTP + Google OAuth for students: Flexibility without compromising security → Two authentication methods
+- Google OAuth only for admins: Simpler, more secure admin access → No OTP for administrative accounts
+- Rate limiting with progressive blocking: 5 requests per window, 30-min block → Prevents abuse while allowing legitimate retries
+- Country code picker for phone input: Better UX than requiring manual entry → Always provide dropdown for common countries
+- 4-digit OTP input component: Individual boxes with auto-focus → Better UX than single input field, easier to remember
 
 [Claude: Add new entries when something works really well]
 
@@ -344,6 +465,19 @@ Show before/after."
 - Metadata for SEO
 - Mobile responsive
 - Dark mode support"
+```
+
+**OTP Authentication Testing**:
+```bash
+# Test send OTP (phone)
+curl -X POST http://localhost:3000/api/auth/otp/send \
+  -H "Content-Type: application/json" \
+  -d '{"identifier": "+919876543210", "identifierType": "phone"}'
+
+# Test verify OTP
+curl -X POST http://localhost:3000/api/auth/otp/verify \
+  -H "Content-Type: application/json" \
+  -d '{"identifier": "+919876543210", "identifierType": "phone", "otp": "1234", "loginMode": "user"}'
 ```
 
 ---
@@ -501,10 +635,30 @@ When Claude makes the same mistake twice, this file needs updating.
 - Glow effects on hover for CTAs
 - Smooth transitions (Framer Motion)
 
+### OTP Authentication (MSG91)
+- **Phone Login**: Primary authentication method using MSG91 SMS OTP
+- **Google OAuth**: Alternative login method for students
+- **Admin Login**: Google OAuth ONLY (no OTP for admins)
+- **Rate limiting enforced**: 5 OTP requests per 15-minute window
+- **OTP security**:
+  - 4-digit codes (not 6)
+  - 5-minute expiry
+  - Max 5 verification attempts
+  - Block for 30 minutes after excessive requests
+- **Phone number format**: Always store with country code (e.g., `+919876543210`)
+- **MSG91 integration**:
+  - Never expose AUTH_KEY in client code
+  - Always use server-side API routes for OTP operations
+  - Template must be approved by MSG91 before production use
+  - Monitor delivery rates (should be >95%)
+- **Session management**: Use Supabase Auth admin API for session creation after OTP verification
+- **Admin login**: Support OTP login for admin role via `/login` with "Sign in as Administrator" mode
+
 ---
 
-**Version**: 1.0
+**Version**: 2.0 (OTP Auth + Workflow Orchestration)
 **Last Reviewed**: 2026-02-02
+**Last Updated**: 2026-02-02 (Added OTP Authentication + Workflow Orchestration)
 **Next Review**: 2026-02-09
 
 ---

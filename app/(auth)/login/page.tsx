@@ -10,10 +10,12 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from 'sonner';
-import { Loader2, Mail, KeyRound, ArrowRight, Sparkles, AlertCircle, Shield } from 'lucide-react';
+import { Loader2, Phone, ArrowRight, Sparkles, AlertCircle, Shield, ArrowLeft } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
+import { OTPInput } from '@/components/ui/otp-input';
+import { CountryCodePicker } from '@/components/ui/country-code-picker';
 
-type AuthStep = 'email' | 'otp' | 'password';
+type AuthStep = 'identifier' | 'otp';
 
 const ERROR_MESSAGES: Record<string, string> = {
   auth: 'Authentication failed. Please try again.',
@@ -27,15 +29,16 @@ const ERROR_MESSAGES: Record<string, string> = {
 function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [step, setStep] = useState<AuthStep>('email');
-  const [email, setEmail] = useState('');
-  const [otp, setOtp] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [step, setStep] = useState<AuthStep>('identifier');
+  const [countryCode, setCountryCode] = useState('+91');
+  const [phone, setPhone] = useState('');
+  const [otp, setOtp] = useState(['', '', '', '']);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
-  const [isNewUser, setIsNewUser] = useState(false);
+  const [adminLoading, setAdminLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [otpExpiresIn, setOtpExpiresIn] = useState(300); // 5 minutes
 
   const supabase = getClient();
 
@@ -48,19 +51,22 @@ function LoginContent() {
     }
   }, [searchParams]);
 
-  // Check for existing session and listen for auth state changes (magic link handling)
+  // Check for existing session
   useEffect(() => {
-    // Check if already logged in
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (session) {
         router.push('/dashboard');
       }
     };
     checkSession();
 
-    // Listen for auth state changes (handles magic link tokens in URL hash)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
+    // Listen for auth state changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
       if (event === 'SIGNED_IN' && session) {
         toast.success('Signed in successfully!');
         router.push('/dashboard');
@@ -70,8 +76,27 @@ function LoginContent() {
     return () => subscription.unsubscribe();
   }, [supabase, router]);
 
-  const [adminLoading, setAdminLoading] = useState(false);
+  // OTP expiry countdown
+  useEffect(() => {
+    if (step === 'otp' && otpExpiresIn > 0) {
+      const timer = setInterval(() => {
+        setOtpExpiresIn((prev) => Math.max(0, prev - 1));
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [step, otpExpiresIn]);
 
+  // Resend cooldown
+  useEffect(() => {
+    if (resendCooldown > 0) {
+      const timer = setInterval(() => {
+        setResendCooldown((prev) => Math.max(0, prev - 1));
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [resendCooldown]);
+
+  // Google Sign In
   const handleGoogleSignIn = async (mode: 'user' | 'admin' = 'user') => {
     if (mode === 'admin') {
       setAdminLoading(true);
@@ -81,13 +106,10 @@ function LoginContent() {
     setError(null);
 
     try {
-      // Use PATH-BASED routing for login mode
-      // Query params get stripped by Supabase during OAuth, but paths are preserved
-      // /auth/callback/admin -> admin login
-      // /auth/callback -> user login
-      const redirectUrl = mode === 'admin'
-        ? `${window.location.origin}/auth/callback/admin`
-        : `${window.location.origin}/auth/callback`;
+      const redirectUrl =
+        mode === 'admin'
+          ? `${window.location.origin}/auth/callback/admin`
+          : `${window.location.origin}/auth/callback`;
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -110,146 +132,131 @@ function LoginContent() {
     }
   };
 
-  const handleSendOtp = async (e: React.FormEvent) => {
+  // Send OTP (Phone only)
+  const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) {
-      toast.error('Please enter your email');
+    const identifier = `${countryCode}${phone}`;
+
+    if (!phone || phone.length < 10) {
+      toast.error('Please enter a valid phone number');
       return;
     }
 
     setLoading(true);
     setError(null);
+
     try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          shouldCreateUser: false,
-          emailRedirectTo: `${window.location.origin}/login`,
-        },
+      const response = await fetch('/api/auth/otp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          identifier,
+          identifierType: 'phone',
+        }),
       });
 
-      if (error) {
-        if (error.message.includes('User not found') || error.message.includes('Signups not allowed')) {
-          const errorMsg = 'Account not found. Please contact admin for access.';
-          setError(errorMsg);
-          toast.error(errorMsg);
-          setLoading(false);
-          return;
-        }
-        throw error;
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send OTP');
       }
 
-      toast.success('Check your email for the magic link!');
+      toast.success('OTP sent to your phone!');
       setStep('otp');
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to send magic link';
-      setError(errorMessage);
-      toast.error(errorMessage);
+      setOtpExpiresIn(data.expiresIn || 300);
+    } catch (error: any) {
+      setError(error.message);
+      toast.error(error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (otp.length !== 6) {
-      toast.error('Please enter a valid 6-digit code');
+  // Verify OTP
+  const handleVerifyOTP = async () => {
+    const otpCode = otp.join('');
+    if (otpCode.length !== 4) {
+      toast.error('Please enter a valid 4-digit OTP');
       return;
     }
 
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.auth.verifyOtp({
-        email,
-        token: otp,
-        type: 'email',
-      });
+    const identifier = `${countryCode}${phone}`;
 
-      if (error) throw error;
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', data.user?.id)
-        .single();
-
-      if (profile && !profile.full_name) {
-        setIsNewUser(true);
-        setStep('password');
-        toast.success('Verified! Please set up your password');
-      } else {
-        toast.success('Welcome back!');
-        router.push('/dashboard');
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Invalid verification code';
-      setError(errorMessage);
-      toast.error(errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSetPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (password.length < 8) {
-      toast.error('Password must be at least 8 characters');
-      return;
-    }
-    if (!/[A-Z]/.test(password)) {
-      toast.error('Password must contain at least one uppercase letter');
-      return;
-    }
-    if (!/[0-9]/.test(password)) {
-      toast.error('Password must contain at least one number');
-      return;
-    }
-    if (password !== confirmPassword) {
-      toast.error('Passwords do not match');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const { error } = await supabase.auth.updateUser({
-        password,
-      });
-
-      if (error) throw error;
-
-      toast.success('Password set successfully! Redirecting...');
-      router.push('/dashboard');
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to set password';
-      setError(errorMessage);
-      toast.error(errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleResendOtp = async () => {
     setLoading(true);
     setError(null);
+
     try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          shouldCreateUser: false,
-          emailRedirectTo: `${window.location.origin}/login`,
-        },
+      const response = await fetch('/api/auth/otp/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          identifier,
+          identifierType: 'phone',
+          otp: otpCode,
+          loginMode: 'user',
+        }),
       });
 
-      if (error) throw error;
-      toast.success('New login link sent to your email');
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to resend link';
-      setError(errorMessage);
-      toast.error(errorMessage);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Invalid OTP');
+      }
+
+      // Success! Navigate to auth URL
+      toast.success('OTP verified! Signing you in...');
+      window.location.href = data.authUrl;
+    } catch (error: any) {
+      setError(error.message);
+      toast.error(error.message);
+      // Clear OTP on error
+      setOtp(['', '', '', '']);
     } finally {
       setLoading(false);
     }
+  };
+
+  // Resend OTP
+  const handleResendOTP = async (retryType: 'text' | 'voice' = 'text') => {
+    if (resendCooldown > 0) return;
+
+    const identifier = `${countryCode}${phone}`;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/auth/otp/resend', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          identifier,
+          identifierType: 'phone',
+          retryType,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to resend OTP');
+      }
+
+      toast.success(data.message || 'OTP resent successfully!');
+      setResendCooldown(60); // 60 second cooldown
+      setOtpExpiresIn(300); // Reset expiry
+    } catch (error: any) {
+      setError(error.message);
+      toast.error(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   return (
@@ -267,7 +274,9 @@ function LoginContent() {
             <Sparkles className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-3xl font-bold gradient-text">Rethink Systems</h1>
-          <p className="text-muted-foreground text-base mt-1">Your Learning Journey Starts Here</p>
+          <p className="text-muted-foreground text-base mt-1">
+            Your Learning Journey Starts Here
+          </p>
         </div>
 
         {/* Error Alert */}
@@ -279,261 +288,233 @@ function LoginContent() {
         )}
 
         <Card className="glass-strong animate-in-up stagger-1">
-          <CardHeader className="text-center pb-2">
-            <CardTitle className="text-2xl">
-              {step === 'email' && 'Welcome Back'}
-              {step === 'otp' && 'Check Your Inbox'}
-              {step === 'password' && 'Secure Your Account'}
+          <CardHeader className="text-center pb-4">
+            <CardTitle className="text-4xl font-bold">
+              {step === 'identifier' && 'Sign In to Your Account'}
+              {step === 'otp' && 'Enter Verification Code'}
             </CardTitle>
-            <CardDescription className="text-base">
-              {step === 'email' && 'Sign in to continue your learning'}
-              {step === 'otp' && 'A magic link is on its way!'}
-              {step === 'password' && 'Create a password for quick access'}
+            <CardDescription className="text-lg mt-2">
+              {step === 'identifier' && 'Choose how you\'d like to sign in'}
+              {step === 'otp' && `We sent a code to ${countryCode}${phone}`}
             </CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-4">
-            {step === 'email' && (
+            {step === 'identifier' && (
               <>
-                {/* Email Input Form */}
-                <form onSubmit={handleSendOtp} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="email" className="text-base font-medium">Email address</Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <Input
-                        id="email"
-                        type="email"
-                        placeholder="Enter your registered email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="pl-10 text-base"
-                        required
-                      />
+                {/* Phone OTP Login */}
+                <form onSubmit={handleSendOTP} className="space-y-4">
+                  <div className="space-y-3">
+                    <Label htmlFor="phone" className="text-base font-semibold">
+                      Mobile Number
+                    </Label>
+                    <div className="flex gap-2">
+                      <CountryCodePicker value={countryCode} onChange={setCountryCode} />
+                      <div className="relative flex-1">
+                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                        <Input
+                          id="phone"
+                          type="tel"
+                          placeholder="Enter your number"
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
+                          className="pl-10 h-12 text-base"
+                          maxLength={10}
+                          required
+                        />
+                      </div>
                     </div>
                   </div>
 
-                  {/* Send OTP Button - Always visible */}
                   <Button
                     type="submit"
-                    className="w-full gradient-bg hover:opacity-90 transition-opacity text-base"
-                    disabled={loading || !email}
+                    className="w-full h-12 gradient-bg hover:opacity-90 transition-opacity text-lg font-medium"
+                    disabled={loading || phone.length < 10}
                   >
                     {loading ? (
                       <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Sending link...
+                        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                        Sending code...
                       </>
                     ) : (
                       <>
-                        Get Magic Link
-                        <ArrowRight className="w-4 h-4 ml-2" />
+                        Get Verification Code
+                        <ArrowRight className="w-5 h-5 ml-2" />
                       </>
                     )}
                   </Button>
 
-                  {/* Helper microcopy */}
-                  <p className="text-sm text-muted-foreground text-center">
-                    We&apos;ll send a secure link to your email. No password needed.
+                  <p className="text-base text-muted-foreground text-center">
+                    We&apos;ll text you a 4-digit code
                   </p>
                 </form>
 
-                {/* Google Sign In - Available for all emails (supports Google Workspace) */}
-                {email && (
-                  <>
-                    <div className="relative">
-                      <div className="absolute inset-0 flex items-center">
-                        <Separator className="w-full" />
-                      </div>
-                      <div className="relative flex justify-center text-xs uppercase">
-                        <span className="bg-card px-2 text-muted-foreground">
-                          Or sign in with
-                        </span>
-                      </div>
-                    </div>
-
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full h-11 border-border hover:bg-muted/50 transition-all text-base"
-                      onClick={() => handleGoogleSignIn('user')}
-                      disabled={googleLoading || adminLoading}
-                    >
-                      {googleLoading ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      ) : (
-                        <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
-                          <path
-                            fill="currentColor"
-                            d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                          />
-                          <path
-                            fill="currentColor"
-                            d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                          />
-                          <path
-                            fill="currentColor"
-                            d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                          />
-                          <path
-                            fill="currentColor"
-                            d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                          />
-                        </svg>
-                      )}
-                      Continue with Google
-                    </Button>
-                  </>
-                )}
-
-                {/* Admin Sign In - Always visible at bottom */}
-                <div className="relative pt-2">
+                {/* Google Sign In */}
+                <div className="relative py-2">
                   <div className="absolute inset-0 flex items-center">
                     <Separator className="w-full" />
                   </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-card px-2 text-muted-foreground">
-                      Admin Portal
-                    </span>
+                  <div className="relative flex justify-center text-sm">
+                    <span className="bg-card px-3 text-muted-foreground font-medium">Or</span>
                   </div>
                 </div>
 
                 <Button
                   type="button"
                   variant="outline"
-                  className="w-full h-11 border-primary/30 hover:bg-primary/10 hover:border-primary/50 transition-all text-base"
+                  className="w-full h-12 border-border hover:bg-muted/50 transition-all text-lg font-medium"
+                  onClick={() => handleGoogleSignIn('user')}
+                  disabled={googleLoading || adminLoading}
+                >
+                  {googleLoading ? (
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                  ) : (
+                    <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">
+                      <path
+                        fill="currentColor"
+                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                      />
+                      <path
+                        fill="currentColor"
+                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                      />
+                      <path
+                        fill="currentColor"
+                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                      />
+                      <path
+                        fill="currentColor"
+                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                      />
+                    </svg>
+                  )}
+                  Continue with Google
+                </Button>
+
+                <p className="text-base text-muted-foreground text-center">
+                  Sign in with your registered email
+                </p>
+
+                {/* Admin Portal - Google Only */}
+                <div className="relative pt-4">
+                  <div className="absolute inset-0 flex items-center">
+                    <Separator className="w-full" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase tracking-wider">
+                    <span className="bg-card px-3 text-muted-foreground font-semibold">Admin Portal</span>
+                  </div>
+                </div>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full h-12 border-primary/30 hover:bg-primary/10 hover:border-primary/50 transition-all text-lg font-medium"
                   onClick={() => handleGoogleSignIn('admin')}
                   disabled={googleLoading || adminLoading}
                 >
                   {adminLoading ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                   ) : (
-                    <Shield className="w-4 h-4 mr-2" />
+                    <Shield className="w-5 h-5 mr-2" />
                   )}
                   Sign in as Administrator
                 </Button>
 
-                {/* Admin helper text */}
                 <p className="text-sm text-muted-foreground text-center">
-                  For course managers and instructors
+                  For administrators and team members only
                 </p>
               </>
             )}
 
             {step === 'otp' && (
-              <div className="space-y-4">
-                <div className="text-center py-4">
-                  <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-                    <Mail className="w-8 h-8 text-primary" />
-                  </div>
-                  <p className="text-base text-muted-foreground">
-                    We&apos;ve sent a secure sign-in link to:
-                  </p>
-                  <p className="text-base font-semibold mt-1">{email}</p>
-                  <p className="text-base text-muted-foreground mt-3">
-                    Click the link in your email to access your dashboard instantly.
-                  </p>
-                </div>
-
-                {/* Tips section */}
-                <div className="bg-muted/30 rounded-lg p-4 text-sm">
-                  <p className="font-medium text-foreground mb-2">Didn&apos;t receive it?</p>
-                  <ul className="text-muted-foreground space-y-1">
-                    <li>• Check your spam folder</li>
-                    <li>• Make sure the email is correct</li>
-                  </ul>
-                </div>
-
-                <div className="flex items-center justify-between text-base pt-4">
-                  <button
-                    type="button"
-                    onClick={() => setStep('email')}
-                    className="text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    Use different email
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleResendOtp}
-                    disabled={loading}
-                    className="text-primary hover:underline"
-                  >
-                    {loading ? 'Sending...' : 'Resend link'}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {step === 'password' && (
-              <form onSubmit={handleSetPassword} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="password" className="text-base font-medium">Create password</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="Enter your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="text-base"
-                    autoFocus
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="confirmPassword" className="text-base font-medium">Confirm password</Label>
-                  <Input
-                    id="confirmPassword"
-                    type="password"
-                    placeholder="Re-enter your password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="text-base"
-                    required
-                  />
-                </div>
-
-                {/* Password requirements */}
-                <div className="text-sm space-y-1 text-muted-foreground">
-                  <p className="font-medium text-foreground mb-2">Password requirements:</p>
-                  <p className={password.length >= 8 ? 'text-green-500' : ''}>
-                    {password.length >= 8 ? '✓' : '○'} At least 8 characters
-                  </p>
-                  <p className={/[A-Z]/.test(password) ? 'text-green-500' : ''}>
-                    {/[A-Z]/.test(password) ? '✓' : '○'} One uppercase letter
-                  </p>
-                  <p className={/[0-9]/.test(password) ? 'text-green-500' : ''}>
-                    {/[0-9]/.test(password) ? '✓' : '○'} One number
-                  </p>
-                </div>
-
+              <div className="space-y-6">
+                {/* Back button */}
                 <Button
-                  type="submit"
-                  className="w-full gradient-bg hover:opacity-90 transition-opacity text-base"
-                  disabled={loading}
+                  type="button"
+                  variant="ghost"
+                  className="w-full text-base"
+                  onClick={() => {
+                    setStep('identifier');
+                    setOtp(['', '', '', '']);
+                  }}
+                >
+                  <ArrowLeft className="w-5 h-5 mr-2" />
+                  Try a different method
+                </Button>
+
+                {/* OTP Input */}
+                <div className="space-y-4">
+                  <OTPInput value={otp} onChange={setOtp} length={4} autoFocus disabled={loading} />
+
+                  {/* Expiry timer */}
+                  {otpExpiresIn > 0 ? (
+                    <p className="text-sm text-center text-muted-foreground">
+                      Code expires in {formatTime(otpExpiresIn)}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-center text-destructive">
+                      Code expired. Please request a new one.
+                    </p>
+                  )}
+                </div>
+
+                {/* Verify button */}
+                <Button
+                  type="button"
+                  className="w-full h-12 gradient-bg hover:opacity-90 transition-opacity text-lg font-medium"
+                  onClick={handleVerifyOTP}
+                  disabled={loading || otp.join('').length !== 4 || otpExpiresIn === 0}
                 >
                   {loading ? (
                     <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Setting up...
+                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                      Verifying...
                     </>
                   ) : (
                     <>
-                      Complete Setup
-                      <ArrowRight className="w-4 h-4 ml-2" />
+                      Verify Code
+                      <ArrowRight className="w-5 h-5 ml-2" />
                     </>
                   )}
                 </Button>
-              </form>
+
+                {/* Resend options */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => handleResendOTP('text')}
+                      disabled={loading || resendCooldown > 0}
+                    >
+                      {resendCooldown > 0 ? `Resend SMS (${resendCooldown}s)` : 'Resend SMS'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => handleResendOTP('voice')}
+                      disabled={loading || resendCooldown > 0}
+                    >
+                      Try Voice Call
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground text-center">
+                    Didn&apos;t receive the code?
+                  </p>
+                </div>
+              </div>
             )}
           </CardContent>
         </Card>
 
-        <p className="text-center text-base text-muted-foreground mt-6 animate-in-up stagger-3">
-          Questions? We&apos;re here to help.{' '}
-          <br className="sm:hidden" />
-          Reach out at{' '}
-          <a href="mailto:shravan@naum.systems" className="text-primary hover:underline">
+        <p className="text-center text-base text-muted-foreground mt-8 animate-in-up stagger-3 leading-relaxed">
+          Questions? We&apos;re here to help
+          <br />
+          <a href="mailto:shravan@naum.systems" className="text-primary hover:underline font-medium">
             shravan@naum.systems
           </a>
         </p>
@@ -544,11 +525,13 @@ function LoginContent() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      }
+    >
       <LoginContent />
     </Suspense>
   );
