@@ -10,15 +10,101 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { PageLoader } from '@/components/ui/page-loader';
-import { Calendar, Clock, Video, ChevronRight, BookOpen, FolderOpen, Shield } from 'lucide-react';
+import { Calendar, Clock, Video, ChevronRight, BookOpen, FolderOpen, Shield, Presentation, FileText, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import { format, isToday, isTomorrow, parseISO } from 'date-fns';
 import { InvoiceCard } from '@/components/dashboard/invoice-card';
 import { toast } from 'sonner';
-import type { Session, DashboardStats, LearningModule, Resource, Invoice, Cohort } from '@/types';
+import type { Session, DashboardStats, LearningModule, Resource, Invoice, Cohort, ModuleResource, ModuleResourceType } from '@/types';
 
 interface InvoiceWithCohort extends Invoice {
   cohort?: Cohort;
+}
+
+interface RecentLearningAsset extends ModuleResource {
+  progress?: {
+    is_completed: boolean;
+    progress_seconds: number;
+    last_viewed_at: string | null;
+  };
+}
+
+// Helper function to get icon for content type
+function getContentIcon(type: ModuleResourceType) {
+  switch (type) {
+    case 'video':
+      return Video;
+    case 'slides':
+      return Presentation;
+    case 'document':
+      return FileText;
+    case 'link':
+      return ExternalLink;
+    default:
+      return BookOpen;
+  }
+}
+
+// Helper function to get gradient colors for content type
+function getContentGradient(type: ModuleResourceType): { from: string; to: string; bg: string; hover: string; darkFrom: string; darkTo: string; darkHover: string } {
+  switch (type) {
+    case 'video':
+      return {
+        from: 'from-purple-500',
+        to: 'to-purple-600',
+        bg: 'bg-purple-500/10',
+        hover: 'hover:from-purple-50 hover:to-purple-100',
+        darkFrom: 'dark:from-purple-600',
+        darkTo: 'dark:to-purple-700',
+        darkHover: 'dark:hover:from-purple-950/30 dark:hover:to-purple-950/40',
+      };
+    case 'slides':
+      return {
+        from: 'from-orange-500',
+        to: 'to-orange-600',
+        bg: 'bg-orange-500/10',
+        hover: 'hover:from-orange-50 hover:to-orange-100',
+        darkFrom: 'dark:from-orange-600',
+        darkTo: 'dark:to-orange-700',
+        darkHover: 'dark:hover:from-orange-950/30 dark:hover:to-orange-950/40',
+      };
+    case 'document':
+      return {
+        from: 'from-blue-500',
+        to: 'to-blue-600',
+        bg: 'bg-blue-500/10',
+        hover: 'hover:from-blue-50 hover:to-blue-100',
+        darkFrom: 'dark:from-blue-600',
+        darkTo: 'dark:to-blue-700',
+        darkHover: 'dark:hover:from-blue-950/30 dark:hover:to-blue-950/40',
+      };
+    default:
+      return {
+        from: 'from-gray-500',
+        to: 'to-gray-600',
+        bg: 'bg-gray-500/10',
+        hover: 'hover:from-gray-50 hover:to-gray-100',
+        darkFrom: 'dark:from-gray-600',
+        darkTo: 'dark:to-gray-700',
+        darkHover: 'dark:hover:from-gray-950/30 dark:hover:to-gray-950/40',
+      };
+  }
+}
+
+// Helper function to get content type label
+function getContentTypeLabel(type: ModuleResourceType): string {
+  switch (type) {
+    case 'video':
+      return 'Recording';
+    case 'slides':
+      return 'Presentation';
+    case 'document':
+      return 'Document';
+    case 'link':
+      return 'Link';
+    default:
+      return 'Resource';
+  }
 }
 
 export default function DashboardPage() {
@@ -29,6 +115,7 @@ export default function DashboardPage() {
   const [upcomingSessions, setUpcomingSessions] = useState<Session[]>([]);
   const [recentModules, setRecentModules] = useState<LearningModule[]>([]);
   const [recentResources, setRecentResources] = useState<Resource[]>([]);
+  const [recentLearningAssets, setRecentLearningAssets] = useState<RecentLearningAsset[]>([]);
   const [invoices, setInvoices] = useState<InvoiceWithCohort[]>([]);
   const [pendingInvoiceAmount, setPendingInvoiceAmount] = useState(0);
   const [cohortStartDate, setCohortStartDate] = useState<Date | null>(null);
@@ -217,6 +304,19 @@ export default function DashboardPage() {
           }
         } catch (invoiceError) {
           console.error('Error fetching invoices:', invoiceError);
+        }
+
+        // Fetch recent learning assets (recordings, presentations, etc.)
+        if (activeCohortId) {
+          try {
+            const learningAssetsResponse = await fetch(`/api/learnings/recent?cohort_id=${activeCohortId}&limit=4`);
+            if (learningAssetsResponse.ok) {
+              const learningAssetsData = await learningAssetsResponse.json();
+              setRecentLearningAssets(learningAssetsData.recent || []);
+            }
+          } catch (learningAssetsError) {
+            console.error('Error fetching learning assets:', learningAssetsError);
+          }
         }
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
@@ -520,7 +620,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Recent Learnings */}
+        {/* My Learnings - Shows actual resources (recordings, presentations) */}
         <Card className="relative overflow-hidden border-2 dark:border-gray-700 dark:bg-gray-900/50 hover:shadow-xl hover:shadow-purple-500/10 transition-all duration-500 hover:-translate-y-0.5">
           {/* Top accent gradient */}
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 via-pink-500 to-purple-500" />
@@ -543,45 +643,77 @@ export default function DashboardPage() {
             </Link>
           </CardHeader>
           <CardContent>
-            {recentModules.length === 0 ? (
+            {recentLearningAssets.length === 0 ? (
               <div className="text-center py-12">
                 <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-purple-50 dark:bg-purple-950/30 flex items-center justify-center">
                   <BookOpen className="w-8 h-8 text-purple-500 dark:text-purple-400" />
                 </div>
-                <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">No learning modules yet</p>
-                <p className="text-xs text-muted-foreground dark:text-gray-500">Modules will appear here when available</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">No recent activity</p>
+                <p className="text-xs text-muted-foreground dark:text-gray-500">Start learning to see your progress here</p>
               </div>
             ) : (
               <div className="space-y-3">
-                {recentModules.map((module, index) => (
-                  <Link
-                    key={module.id}
-                    href={`/learnings?module=${module.id}`}
-                    className="group relative flex items-center gap-4 p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-gradient-to-br from-purple-50/50 to-pink-50/50 dark:from-purple-950/20 dark:to-pink-950/20 hover:from-purple-50 hover:to-pink-50 dark:hover:from-purple-950/30 dark:hover:to-pink-950/30 transition-all duration-300 hover:shadow-md hover:scale-[1.02]"
-                    style={{
-                      animationDelay: `${index * 100}ms`,
-                      animationFillMode: 'forwards',
-                    }}
-                  >
-                    {/* Module icon */}
-                    <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600 dark:from-purple-600 dark:to-pink-700 flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
-                      <BookOpen className="w-6 h-6" />
-                    </div>
+                {recentLearningAssets.map((asset, index) => {
+                  const Icon = getContentIcon(asset.content_type);
+                  const gradient = getContentGradient(asset.content_type);
+                  const typeLabel = getContentTypeLabel(asset.content_type);
 
-                    {/* Module info */}
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold truncate text-gray-900 dark:text-white mb-1 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
-                        {module.title}
-                      </p>
-                      <p className="text-sm text-muted-foreground dark:text-gray-400 font-medium">
-                        Week {module.week_number || 'N/A'}
-                      </p>
-                    </div>
+                  return (
+                    <Link
+                      key={asset.id}
+                      href={`/learnings?resource=${asset.id}`}
+                      className={`group relative flex items-center gap-4 p-4 rounded-xl border-2 transition-all duration-300 hover:shadow-md hover:scale-[1.02] ${
+                        asset.content_type === 'video'
+                          ? 'border-purple-200 dark:border-purple-800/50 bg-gradient-to-br from-purple-50/50 to-purple-100/30 dark:from-purple-950/20 dark:to-purple-900/10 hover:border-purple-300 dark:hover:border-purple-700 hover:shadow-purple-500/10'
+                          : asset.content_type === 'slides'
+                          ? 'border-orange-200 dark:border-orange-800/50 bg-gradient-to-br from-orange-50/50 to-orange-100/30 dark:from-orange-950/20 dark:to-orange-900/10 hover:border-orange-300 dark:hover:border-orange-700 hover:shadow-orange-500/10'
+                          : asset.content_type === 'document'
+                          ? 'border-blue-200 dark:border-blue-800/50 bg-gradient-to-br from-blue-50/50 to-blue-100/30 dark:from-blue-950/20 dark:to-blue-900/10 hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-blue-500/10'
+                          : 'border-gray-200 dark:border-gray-700 bg-gradient-to-br from-gray-50/50 to-gray-100/30 dark:from-gray-950/20 dark:to-gray-900/10 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-gray-500/10'
+                      }`}
+                      style={{
+                        animationDelay: `${index * 100}ms`,
+                        animationFillMode: 'forwards',
+                      }}
+                    >
+                      {/* Resource icon with type-specific gradient */}
+                      <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${gradient.from} ${gradient.to} ${gradient.darkFrom} ${gradient.darkTo} flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform duration-300`}>
+                        <Icon className="w-6 h-6" />
+                      </div>
 
-                    {/* Chevron */}
-                    <ChevronRight className="w-5 h-5 text-muted-foreground dark:text-gray-500 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
-                  </Link>
-                ))}
+                      {/* Resource info */}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold truncate text-gray-900 dark:text-white mb-1 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+                          {asset.title}
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <Badge
+                            variant="secondary"
+                            className={`text-xs font-medium ${
+                              asset.content_type === 'video'
+                                ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
+                                : asset.content_type === 'slides'
+                                ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+                                : asset.content_type === 'document'
+                                ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                                : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400'
+                            }`}
+                          >
+                            {typeLabel}
+                          </Badge>
+                          {asset.progress?.is_completed && (
+                            <Badge className="text-xs bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                              Completed
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Chevron */}
+                      <ChevronRight className="w-5 h-5 text-muted-foreground dark:text-gray-500 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                    </Link>
+                  );
+                })}
               </div>
             )}
           </CardContent>
