@@ -321,13 +321,61 @@ export default function CalendarPage() {
 
         <Card className="relative overflow-hidden border-0 rounded-2xl">
           {/* Deep space gradient background */}
-          <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-purple-900/90 to-slate-900">
-            {/* Animated gradient overlay */}
-            <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/10 via-purple-500/10 to-pink-500/10 animate-gradient-x" />
+          <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-purple-900/90 to-slate-900" />
+
+          {/* Abstract wave background SVG */}
+          <div className="absolute inset-0 opacity-50">
+            <svg
+              className="absolute inset-0 w-full h-full"
+              viewBox="0 0 1200 200"
+              preserveAspectRatio="xMidYMid slice"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <defs>
+                <linearGradient id="cal-wave-1" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.6" />
+                  <stop offset="50%" stopColor="#8b5cf6" stopOpacity="0.4" />
+                  <stop offset="100%" stopColor="#ec4899" stopOpacity="0.3" />
+                </linearGradient>
+                <linearGradient id="cal-wave-2" x1="100%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.5" />
+                  <stop offset="100%" stopColor="#06b6d4" stopOpacity="0.2" />
+                </linearGradient>
+                <filter id="cal-glow">
+                  <feGaussianBlur stdDeviation="3" result="coloredBlur" />
+                  <feMerge>
+                    <feMergeNode in="coloredBlur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
+              </defs>
+              {/* Aurora wave 1 */}
+              <path
+                d="M0,100 C150,50 350,150 600,100 C850,50 1050,120 1200,80 L1200,200 L0,200 Z"
+                fill="url(#cal-wave-1)"
+                filter="url(#cal-glow)"
+                className="animate-wave-slow"
+              />
+              {/* Aurora wave 2 */}
+              <path
+                d="M0,130 C200,80 400,180 700,120 C900,80 1100,150 1200,110 L1200,200 L0,200 Z"
+                fill="url(#cal-wave-2)"
+                filter="url(#cal-glow)"
+                className="animate-wave-medium"
+              />
+              {/* Floating particles */}
+              <circle cx="150" cy="40" r="2" fill="#06b6d4" opacity="0.6" className="animate-float-particle" />
+              <circle cx="450" cy="60" r="3" fill="#8b5cf6" opacity="0.5" className="animate-float-particle-delayed" />
+              <circle cx="750" cy="35" r="2" fill="#ec4899" opacity="0.4" className="animate-float-particle" />
+              <circle cx="1050" cy="55" r="3" fill="#06b6d4" opacity="0.5" className="animate-float-particle-delayed" />
+            </svg>
           </div>
 
+          {/* Animated gradient overlay */}
+          <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/10 via-purple-500/10 to-pink-500/10 animate-gradient-x" />
+
           {/* Cyber grid pattern */}
-          <div className="absolute inset-0 opacity-15">
+          <div className="absolute inset-0 opacity-10">
             <div className="absolute inset-0" style={{
               backgroundImage: `
                 linear-gradient(rgba(6, 182, 212, 0.4) 1px, transparent 1px),

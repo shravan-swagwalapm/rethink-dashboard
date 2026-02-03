@@ -37,13 +37,77 @@ export function WelcomeBanner({ cohortStartDate, cohortName }: WelcomeBannerProp
 
       <Card className="relative overflow-hidden border-0 shadow-2xl rounded-2xl">
         {/* Deep space gradient background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-purple-900/90 to-slate-900">
-          {/* Animated gradient overlay */}
-          <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/10 via-purple-500/10 to-pink-500/10 animate-gradient-x" />
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-purple-900/90 to-slate-900" />
+
+        {/* Abstract wave background SVG */}
+        <div className="absolute inset-0 opacity-40">
+          <svg
+            className="absolute inset-0 w-full h-full"
+            viewBox="0 0 1200 400"
+            preserveAspectRatio="xMidYMid slice"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <defs>
+              <linearGradient id="wave-gradient-1" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.6" />
+                <stop offset="50%" stopColor="#8b5cf6" stopOpacity="0.4" />
+                <stop offset="100%" stopColor="#ec4899" stopOpacity="0.3" />
+              </linearGradient>
+              <linearGradient id="wave-gradient-2" x1="100%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.5" />
+                <stop offset="100%" stopColor="#06b6d4" stopOpacity="0.2" />
+              </linearGradient>
+              <linearGradient id="wave-gradient-3" x1="0%" y1="100%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#ec4899" stopOpacity="0.4" />
+                <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0.1" />
+              </linearGradient>
+              <filter id="glow">
+                <feGaussianBlur stdDeviation="4" result="coloredBlur" />
+                <feMerge>
+                  <feMergeNode in="coloredBlur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
+            {/* Aurora wave 1 */}
+            <path
+              d="M0,200 C150,100 350,300 600,200 C850,100 1050,250 1200,150 L1200,400 L0,400 Z"
+              fill="url(#wave-gradient-1)"
+              filter="url(#glow)"
+              className="animate-wave-slow"
+            />
+            {/* Aurora wave 2 */}
+            <path
+              d="M0,250 C200,150 400,350 700,250 C900,180 1100,300 1200,220 L1200,400 L0,400 Z"
+              fill="url(#wave-gradient-2)"
+              filter="url(#glow)"
+              className="animate-wave-medium"
+            />
+            {/* Aurora wave 3 */}
+            <path
+              d="M0,300 C250,220 450,380 750,280 C950,200 1150,320 1200,280 L1200,400 L0,400 Z"
+              fill="url(#wave-gradient-3)"
+              filter="url(#glow)"
+              className="animate-wave-fast"
+            />
+            {/* Floating particles */}
+            <circle cx="100" cy="80" r="3" fill="#06b6d4" opacity="0.6" className="animate-float-particle" />
+            <circle cx="300" cy="120" r="2" fill="#8b5cf6" opacity="0.5" className="animate-float-particle-delayed" />
+            <circle cx="500" cy="60" r="4" fill="#ec4899" opacity="0.4" className="animate-float-particle" />
+            <circle cx="700" cy="140" r="2" fill="#06b6d4" opacity="0.6" className="animate-float-particle-delayed" />
+            <circle cx="900" cy="90" r="3" fill="#8b5cf6" opacity="0.5" className="animate-float-particle" />
+            <circle cx="1100" cy="110" r="2" fill="#ec4899" opacity="0.4" className="animate-float-particle-delayed" />
+            {/* Glowing lines */}
+            <line x1="0" y1="150" x2="400" y2="100" stroke="url(#wave-gradient-1)" strokeWidth="1" opacity="0.3" />
+            <line x1="800" y1="80" x2="1200" y2="130" stroke="url(#wave-gradient-2)" strokeWidth="1" opacity="0.3" />
+          </svg>
         </div>
 
+        {/* Animated gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/10 via-purple-500/10 to-pink-500/10 animate-gradient-x" />
+
         {/* Cyber grid pattern */}
-        <div className="absolute inset-0 opacity-20">
+        <div className="absolute inset-0 opacity-15">
           <div className="absolute inset-0" style={{
             backgroundImage: `
               linear-gradient(rgba(6, 182, 212, 0.3) 1px, transparent 1px),
@@ -55,7 +119,7 @@ export function WelcomeBanner({ cohortStartDate, cohortName }: WelcomeBannerProp
         </div>
 
         {/* Floating neon orbs */}
-        <div className="absolute top-0 left-0 w-full h-full overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
           <div className="absolute top-10 left-10 w-40 h-40 bg-cyan-500/20 rounded-full blur-3xl animate-pulse-slow" />
           <div className="absolute top-20 right-10 w-48 h-48 bg-purple-500/20 rounded-full blur-3xl animate-float-delayed" />
           <div className="absolute bottom-5 left-1/4 w-36 h-36 bg-pink-500/20 rounded-full blur-3xl animate-float-slow" />

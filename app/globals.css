@@ -644,6 +644,91 @@ select:focus-visible {
   animation: breathe 3s ease-in-out infinite;
 }
 
+/* ===========================================================================
+ * Aurora Wave Animations
+ * Smooth flowing wave animations for banner backgrounds
+ * ========================================================================= */
+
+/* Slow wave animation */
+@keyframes wave-slow {
+  0%, 100% {
+    transform: translateX(0) translateY(0);
+  }
+  25% {
+    transform: translateX(-10px) translateY(5px);
+  }
+  50% {
+    transform: translateX(-5px) translateY(-5px);
+  }
+  75% {
+    transform: translateX(5px) translateY(3px);
+  }
+}
+
+.animate-wave-slow {
+  animation: wave-slow 12s ease-in-out infinite;
+}
+
+/* Medium wave animation */
+@keyframes wave-medium {
+  0%, 100% {
+    transform: translateX(0) translateY(0);
+  }
+  33% {
+    transform: translateX(8px) translateY(-8px);
+  }
+  66% {
+    transform: translateX(-8px) translateY(4px);
+  }
+}
+
+.animate-wave-medium {
+  animation: wave-medium 8s ease-in-out infinite;
+}
+
+/* Fast wave animation */
+@keyframes wave-fast {
+  0%, 100% {
+    transform: translateX(0) translateY(0);
+  }
+  50% {
+    transform: translateX(-12px) translateY(6px);
+  }
+}
+
+.animate-wave-fast {
+  animation: wave-fast 5s ease-in-out infinite;
+}
+
+/* Floating particle animation */
+@keyframes float-particle {
+  0%, 100% {
+    transform: translateY(0) translateX(0);
+    opacity: 0.4;
+  }
+  25% {
+    transform: translateY(-15px) translateX(8px);
+    opacity: 0.8;
+  }
+  50% {
+    transform: translateY(-8px) translateX(-5px);
+    opacity: 0.6;
+  }
+  75% {
+    transform: translateY(-20px) translateX(3px);
+    opacity: 0.9;
+  }
+}
+
+.animate-float-particle {
+  animation: float-particle 6s ease-in-out infinite;
+}
+
+.animate-float-particle-delayed {
+  animation: float-particle 6s ease-in-out infinite;
+  animation-delay: 2s;
+}
+
 /* Number input hide arrows */
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {
