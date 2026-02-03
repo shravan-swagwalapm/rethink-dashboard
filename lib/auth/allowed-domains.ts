@@ -1,19 +1,10 @@
-// Allowed email domains for authentication
-// Users can only login if their email domain is in this list
-// Start with Gmail only, extend later for other providers
-
-export const ALLOWED_EMAIL_DOMAINS = [
-  'gmail.com',
-  'naum.systems', // Company domain - bypasses whitelist but NOT auto-admin
-  // Future domains to add:
-  // 'yahoo.com',
-  // 'yahoo.co.in',
-  // 'rediffmail.com',
-  // 'rediff.com',
-  // 'outlook.com',
-  // 'hotmail.com',
-  // 'live.com',
-];
+// Email domain validation for authentication
+//
+// POLICY: Allow all Google-verified emails (GSuite, Gmail, any domain)
+// The whitelist check in /lib/auth/whitelist.ts ensures only registered
+// users can sign in, so domain restriction is not needed for security.
+//
+// This file only blocks obviously invalid emails and provides utility functions.
 
 // Domains that bypass the whitelist/invite check
 // Users from these domains can login without being invited
@@ -22,6 +13,9 @@ export const WHITELIST_BYPASS_DOMAINS = [
   'naum.systems',
 ];
 
+// Check if email is valid and from Google OAuth
+// We allow ALL domains since Google verifies the email
+// The whitelist check handles authorization (only registered users can sign in)
 export function isEmailDomainAllowed(email: string): boolean {
   if (!email || !email.includes('@')) {
     return false;
@@ -32,7 +26,9 @@ export function isEmailDomainAllowed(email: string): boolean {
     return false;
   }
 
-  return ALLOWED_EMAIL_DOMAINS.includes(domain);
+  // Allow all valid email domains
+  // Google OAuth verifies the email, whitelist check handles authorization
+  return true;
 }
 
 export function getEmailDomain(email: string): string | null {

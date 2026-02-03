@@ -73,19 +73,51 @@ export async function POST(request: NextRequest) {
     }
 
     // =====================================================
-    // Step 3: Verify user exists in system
+    // Step 3: Verify user exists and is properly registered
     // =====================================================
 
+    // Check if phone exists in profiles
     const { data: userProfile, error: profileError } = await supabase
       .from('profiles')
-      .select('id, email, phone, full_name, role')
+      .select('id, email, phone, full_name, role, cohort_id')
       .eq('phone', identifier)
       .single();
 
     if (profileError || !userProfile) {
       return NextResponse.json(
         {
-          error: 'Phone number not registered. Please contact your administrator for access.',
+          error: 'Unregistered mobile number. Please contact admin for access.',
+        },
+        { status: 404 }
+      );
+    }
+
+    // Check if user was actually invited (has cohort_id OR role_assignments)
+    // This prevents auto-created profiles from logging in
+    let isProperlyRegistered = false;
+
+    if (userProfile.cohort_id) {
+      // Has cohort_id in profiles (legacy system)
+      isProperlyRegistered = true;
+    } else {
+      // Check for role assignments (new multi-role system)
+      const { data: roleAssignment } = await supabase
+        .from('user_role_assignments')
+        .select('id')
+        .eq('user_id', userProfile.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (roleAssignment) {
+        isProperlyRegistered = true;
+      }
+    }
+
+    if (!isProperlyRegistered) {
+      console.log(`[OTP Send] Phone ${identifier} exists but not properly registered (no cohort/assignments)`);
+      return NextResponse.json(
+        {
+          error: 'Unregistered mobile number. Please contact admin for access.',
         },
         { status: 404 }
       );

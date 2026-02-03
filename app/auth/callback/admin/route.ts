@@ -132,8 +132,10 @@ export async function GET(request: Request) {
       return response;
     } else {
       // User tried admin login but doesn't have admin role
-      console.log('Auth callback: User is not admin, redirecting to /dashboard');
-      return NextResponse.redirect(`${origin}/dashboard`);
+      // Sign them out and redirect with error
+      console.log('Auth callback: User is not admin, signing out and showing error');
+      await supabase.auth.signOut();
+      return NextResponse.redirect(`${origin}/login?error=not_admin`);
     }
   }
 

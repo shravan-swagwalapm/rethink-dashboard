@@ -21,10 +21,10 @@ type AuthStep = 'identifier' | 'otp';
 const ERROR_MESSAGES: Record<string, string> = {
   auth: 'Authentication failed. Please try again.',
   no_email: 'Could not retrieve email from your account.',
-  domain_not_allowed: 'Only Gmail accounts (@gmail.com) are currently supported.',
-  not_invited: 'Your email is not registered. Please contact the admin to get access.',
+  domain_not_allowed: 'Invalid email domain. Please use a valid email address.',
+  not_invited: 'Unregistered email ID. Please login with your registered email or contact admin for access.',
   access_denied: 'Access denied. Please try again.',
-  not_admin: 'You do not have admin privileges. Please contact support.',
+  not_admin: 'You are not an admin. Please login with an admin account or use regular login.',
 };
 
 function LoginContent() {
@@ -50,6 +50,9 @@ function LoginContent() {
     if (errorCode && ERROR_MESSAGES[errorCode]) {
       setError(ERROR_MESSAGES[errorCode]);
       toast.error(ERROR_MESSAGES[errorCode]);
+
+      // Clear the error from URL so refresh doesn't show it again
+      window.history.replaceState({}, '', '/login');
     }
   }, [searchParams]);
 
@@ -170,12 +173,12 @@ function LoginContent() {
 
       toast.success('Code sent! Check your phone');
       setOtpExpiresIn(data.expiresIn || 300);
-      setLoadingMessage('');
     } catch (error: any) {
       setError(error.message);
       toast.error(error.message);
     } finally {
       setLoading(false);
+      setLoadingMessage('');
     }
   };
 
