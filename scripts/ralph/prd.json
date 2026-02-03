@@ -125,16 +125,16 @@
       ]
     },
     {
-      "id": "admin-inv-1",
+      "id": "admin-notif-1",
       "priority": 11,
-      "title": "Admin Invites Page Structure",
+      "title": "Admin Notifications Page Structure",
       "passes": true,
       "acceptanceCriteria": [
-        "Invites page at /admin/invites exists",
-        "File upload area present",
-        "Cohort selector dropdown works",
-        "Download template button exists",
-        "Invites table structure present"
+        "Notifications page at /admin/notifications exists",
+        "Compose notification form present",
+        "Template selector works",
+        "Recipient selection works",
+        "Notification logs table present"
       ]
     },
     {
@@ -192,7 +192,7 @@
       "passes": true,
       "acceptanceCriteria": [
         "RSVP API route at /api/sessions/[id]/rsvp exists",
-        "Bulk invite API at /api/users/bulk-invite exists",
+        "Bulk user create API at /api/admin/users/bulk-create exists",
         "Analytics dashboard API at /api/analytics/dashboard exists",
         "Auth callback route exists"
       ]

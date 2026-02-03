@@ -21,7 +21,7 @@ Project: Rethink Dashboard
 8. team-1: Team Page (Mentor)
 9. att-1: Attendance Page (Mentor)
 10. admin-1: Admin Dashboard
-11. admin-inv-1: Admin Invites
+11. admin-notif-1: Admin Notifications
 12. admin-coh-1: Admin Cohorts
 13. admin-sess-1: Admin Sessions
 14. admin-usr-1: Admin Users
@@ -45,7 +45,6 @@ Project: Rethink Dashboard
   - app/(admin)/admin/cohorts/page.tsx (lines 199, 281)
   - app/api/analytics/dashboard/route.ts (line 76)
   - app/api/sessions/[id]/rsvp/route.ts (lines 63, 100)
-  - app/api/users/bulk-invite/route.ts (lines 79, 99)
 - Fixed impure function in components/ui/sidebar.tsx (Math.random in useMemo)
 - Fixed setState in effect warning in hooks/use-notifications.ts
 
@@ -164,7 +163,7 @@ Project: Rethink Dashboard
 
 **Admin pages verified (11 total)**:
 - /admin - Dashboard with stats
-- /admin/invites - Bulk invite upload
+- /admin/notifications - Notification management (replaces deprecated invites)
 - /admin/cohorts - Cohort management
 - /admin/sessions - Session management
 - /admin/users - User management
@@ -182,7 +181,7 @@ Project: Rethink Dashboard
 
 **Routes verified**:
 - /api/sessions/[id]/rsvp/route.ts
-- /api/users/bulk-invite/route.ts
+- /api/admin/users/bulk-create/route.ts (replaces deprecated bulk-invite)
 - /api/analytics/dashboard/route.ts
 - /auth/callback/route.ts
 
