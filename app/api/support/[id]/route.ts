@@ -34,7 +34,7 @@ export async function GET(
       .from('ticket_responses')
       .select(`
         *,
-        user:profiles!ticket_responses_user_id_fkey(id, name, email)
+        user:profiles!ticket_responses_user_id_fkey(id, full_name, email)
       `)
       .eq('ticket_id', id)
       .order('created_at', { ascending: true });
@@ -111,7 +111,7 @@ export async function POST(
       })
       .select(`
         *,
-        user:profiles!ticket_responses_user_id_fkey(id, name, email)
+        user:profiles!ticket_responses_user_id_fkey(id, full_name, email)
       `)
       .single();
 

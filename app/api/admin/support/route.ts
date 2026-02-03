@@ -153,7 +153,7 @@ export async function POST(request: NextRequest) {
       })
       .select(`
         *,
-        user:profiles!ticket_responses_user_id_fkey(id, name, email)
+        user:profiles!ticket_responses_user_id_fkey(id, full_name, email)
       `)
       .single();
 
