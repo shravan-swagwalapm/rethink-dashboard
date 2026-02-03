@@ -357,8 +357,8 @@ export default function DashboardPage() {
     }
   };
 
-  // Show explicit loader while checking if user is logged in
-  if (userLoading) {
+  // Show loader until ALL data is loaded (including learning assets)
+  if (userLoading || loading) {
     return <StudentPageLoader message="Loading your dashboard..." />;
   }
 
