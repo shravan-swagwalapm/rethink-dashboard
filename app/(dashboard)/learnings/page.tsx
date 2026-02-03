@@ -1251,19 +1251,31 @@ export default function LearningsPage() {
                     <div className="flex flex-col items-center gap-3">
                       <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
                       <p className="text-sm text-gray-600 dark:text-gray-400">Loading content...</p>
+                      <button
+                        onClick={() => {
+                          const url = getDirectViewUrl(selectedResource);
+                          window.open(url, '_blank');
+                        }}
+                        className="mt-2 text-xs text-purple-500 hover:text-purple-400 underline transition-colors"
+                      >
+                        Taking too long? Open in Google Drive
+                      </button>
                     </div>
                   </div>
                 )}
                 {iframeError && (
                   <div className="absolute inset-0 flex items-center justify-center bg-gray-900/95 rounded-lg border-2 border-purple-500/30 z-10">
-                    <div className="flex flex-col items-center gap-4 p-6 max-w-md text-center">
+                    <div className="flex flex-col items-center gap-4 p-6 max-w-lg text-center">
                       <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-lg shadow-purple-500/25">
                         <Video className="w-8 h-8 text-white" />
                       </div>
                       <div>
-                        <h3 className="font-semibold text-lg mb-2 text-white">Open in Google Drive</h3>
-                        <p className="text-sm text-gray-400 mb-4">
-                          This video is best viewed directly in Google Drive. Click below to watch it in a new tab.
+                        <h3 className="font-semibold text-lg mb-2 text-white">Video couldn't load here</h3>
+                        <p className="text-sm text-gray-400 mb-2">
+                          This can happen due to browser extensions (ad blockers) or Google account conflicts.
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Try opening in Google Drive, or use an incognito window.
                         </p>
                       </div>
                       <div className="flex gap-3">
@@ -1275,7 +1287,7 @@ export default function LearningsPage() {
                           className="gap-2 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
                         >
                           <ExternalLink className="w-4 h-4" />
-                          Open in Google Drive
+                          Watch in Google Drive
                         </Button>
                         <Button
                           onClick={() => {
@@ -1319,8 +1331,6 @@ export default function LearningsPage() {
                   )}
                   allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
                   allowFullScreen
-                  referrerPolicy="no-referrer-when-downgrade"
-                  sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-presentation"
                   title={selectedResource.title}
                 />
               </div>
