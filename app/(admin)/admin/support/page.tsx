@@ -29,8 +29,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
-import { HelpCircle, Eye, Clock, CheckCircle, Send } from 'lucide-react';
+import { HelpCircle, Eye, Clock, CheckCircle, Send, Trash2, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import type { SupportTicket, Profile } from '@/types';
 
@@ -58,6 +68,8 @@ export default function AdminSupportPage() {
   const [loadingResponses, setLoadingResponses] = useState(false);
   const [replyMessage, setReplyMessage] = useState('');
   const [sendingReply, setSendingReply] = useState(false);
+  const [ticketToDelete, setTicketToDelete] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const fetchTickets = useCallback(async () => {
@@ -163,6 +175,31 @@ export default function AdminSupportPage() {
       fetchTickets();
     } catch (error) {
       toast.error('Failed to update status');
+    }
+  };
+
+  const handleDeleteTicket = async () => {
+    if (!ticketToDelete) return;
+
+    setDeleting(true);
+    try {
+      const response = await fetch(`/api/admin/support?id=${ticketToDelete}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to delete ticket');
+      }
+
+      toast.success('Ticket deleted successfully');
+      setTicketToDelete(null);
+      setSelectedTicket(null);
+      fetchTickets();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to delete ticket');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -324,17 +361,30 @@ export default function AdminSupportPage() {
                         {format(new Date(ticket.created_at), 'MMM d, yyyy')}
                       </TableCell>
                       <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-primary hover:text-primary-foreground"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleViewTicket(ticket);
-                          }}
-                        >
-                          <Eye className="w-4 h-4" />
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-primary hover:text-primary-foreground"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleViewTicket(ticket);
+                            }}
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-destructive hover:text-destructive-foreground"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setTicketToDelete(ticket.id);
+                            }}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -366,6 +416,14 @@ export default function AdminSupportPage() {
                     </span>
                   </DialogDescription>
                 </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="shrink-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                  onClick={() => selectedTicket && setTicketToDelete(selectedTicket.id)}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
               </div>
             </DialogHeader>
           </div>
@@ -508,6 +566,38 @@ export default function AdminSupportPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!ticketToDelete} onOpenChange={(open) => !open && setTicketToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Do you really want to delete this ticket?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the ticket and all associated messages.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteTicket}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete Ticket
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

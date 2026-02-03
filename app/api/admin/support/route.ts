@@ -103,6 +103,44 @@ export async function PUT(request: NextRequest) {
   }
 }
 
+// DELETE - Admin deletes a ticket
+export async function DELETE(request: NextRequest) {
+  const auth = await verifyAdmin();
+  if (!auth.authorized) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
+
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json({ error: 'Ticket ID is required' }, { status: 400 });
+    }
+
+    const adminClient = await createAdminClient();
+
+    // First delete all responses for this ticket
+    await adminClient
+      .from('ticket_responses')
+      .delete()
+      .eq('ticket_id', id);
+
+    // Then delete the ticket
+    const { error } = await adminClient
+      .from('support_tickets')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting ticket:', error);
+    return NextResponse.json({ error: 'Failed to delete ticket' }, { status: 500 });
+  }
+}
+
 // POST - Admin responds to a ticket
 export async function POST(request: NextRequest) {
   const auth = await verifyAdmin();
