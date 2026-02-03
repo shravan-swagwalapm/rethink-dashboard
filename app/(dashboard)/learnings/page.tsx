@@ -62,6 +62,31 @@ function getContentIcon(type: ModuleResourceType, className?: string) {
   }
 }
 
+// Get content type label
+function getContentTypeLabel(type: ModuleResourceType): string {
+  switch (type) {
+    case 'video': return 'Recording';
+    case 'slides': return 'Presentation';
+    case 'document': return 'Document';
+    case 'link': return 'Link';
+    default: return 'Resource';
+  }
+}
+
+// Get gradient colors for content type
+function getContentGradient(type: ModuleResourceType): { from: string; to: string; bg: string } {
+  switch (type) {
+    case 'video':
+      return { from: 'from-purple-500', to: 'to-purple-600', bg: 'bg-purple-500/10' };
+    case 'slides':
+      return { from: 'from-orange-500', to: 'to-orange-600', bg: 'bg-orange-500/10' };
+    case 'document':
+      return { from: 'from-blue-500', to: 'to-blue-600', bg: 'bg-blue-500/10' };
+    default:
+      return { from: 'from-gray-500', to: 'to-gray-600', bg: 'bg-gray-500/10' };
+  }
+}
+
 // Get embed URL for Google Drive content
 function getEmbedUrl(resource: ModuleResource): string {
   const id = resource.google_drive_id;
@@ -565,7 +590,7 @@ export default function LearningsPage() {
 
   const currentWeekContent = activeWeek ? weekContent[parseInt(activeWeek)] : null;
 
-  // Content section component with elevated cards
+  // Content section component with clean, readable cards
   const ContentSection = ({
     title,
     icon: Icon,
@@ -588,17 +613,26 @@ export default function LearningsPage() {
 
     return (
       <div className="space-y-3">
-        <div className="flex items-center gap-2">
-          <Icon className={cn('w-5 h-5', iconColor)} />
+        {/* Section header */}
+        <div className="flex items-center gap-3 pb-2 border-b border-gray-200 dark:border-gray-800">
+          <div className={cn(
+            "w-8 h-8 rounded-lg flex items-center justify-center",
+            iconColor === 'text-purple-500' && "bg-purple-100 dark:bg-purple-900/30",
+            iconColor === 'text-orange-500' && "bg-orange-100 dark:bg-orange-900/30",
+            iconColor === 'text-blue-500' && "bg-blue-100 dark:bg-blue-900/30"
+          )}>
+            <Icon className={cn('w-4 h-4', iconColor)} />
+          </div>
           <h3 className="font-semibold text-gray-900 dark:text-gray-100">{title}</h3>
-          <Badge variant="secondary" className="ml-auto">
-            {filtered.length}
+          <Badge variant="secondary" className="ml-auto bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
+            {filtered.length} {filtered.length === 1 ? 'item' : 'items'}
           </Badge>
         </div>
+
         {filtered.length === 0 ? (
-          <p className="text-sm text-gray-600 dark:text-gray-400 pl-7">{emptyMessage}</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 py-4 text-center">{emptyMessage}</p>
         ) : (
-          <div className="space-y-3">
+          <div className="grid gap-2">
             {filtered.map((resource) => {
               const isCompleted = completedResources.has(resource.id);
               const isFavorite = favoriteResources.has(resource.id);
@@ -607,83 +641,108 @@ export default function LearningsPage() {
                 <button
                   key={resource.id}
                   onClick={() => handleResourceClick(resource)}
-                  className="relative w-full flex items-center gap-4 p-4 rounded-xl border-2 border-gray-200/50 dark:border-gray-700/50 bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-800/50 hover:shadow-lg hover:shadow-purple-500/10 dark:hover:shadow-purple-500/20 hover:-translate-y-0.5 transition-all duration-300 group"
+                  className={cn(
+                    "relative w-full flex items-center gap-4 p-3 rounded-lg border bg-white dark:bg-gray-900 text-left transition-all duration-200 group",
+                    isCompleted
+                      ? "border-green-200 dark:border-green-800/50 bg-green-50/50 dark:bg-green-900/10"
+                      : "border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700",
+                    "hover:shadow-md hover:-translate-y-px"
+                  )}
                 >
-                  {/* Favorite button */}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleToggleFavorite(resource.id);
-                    }}
-                    className="absolute top-3 left-3 w-7 h-7 rounded-full bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-all hover:scale-110 z-10"
-                  >
-                    <Star className={cn(
-                      "w-3.5 h-3.5",
-                      isFavorite ? "fill-yellow-400 text-yellow-400" : "text-gray-400"
-                    )} />
-                  </button>
-
-                  {/* Completion checkbox */}
-                  <div className="absolute top-3 right-3 z-10">
-                    {isCompleted ? (
-                      <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center shadow-lg">
-                        <Check className="w-3.5 h-3.5 text-white" />
-                      </div>
-                    ) : (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleMarkComplete(resource.id);
-                        }}
-                        className="w-6 h-6 rounded-full border-2 border-gray-300 dark:border-gray-600 hover:border-green-500 dark:hover:border-green-400 transition-colors opacity-0 group-hover:opacity-100"
-                      />
-                    )}
-                  </div>
-
                   {/* Icon container */}
                   <div className={cn(
-                    "relative w-12 h-12 rounded-xl bg-gradient-to-br flex items-center justify-center flex-shrink-0 shadow-md group-hover:scale-110 group-hover:shadow-lg transition-all duration-300",
+                    "w-10 h-10 rounded-lg bg-gradient-to-br flex items-center justify-center flex-shrink-0 shadow-sm group-hover:scale-105 transition-transform",
                     gradientFrom, gradientTo
                   )}>
-                    {getContentIcon(resource.content_type, 'text-white')}
+                    {getContentIcon(resource.content_type, 'w-5 h-5 text-white')}
                   </div>
 
                   {/* Content */}
-                  <div className="flex-1 text-left min-w-0">
-                    <p className="font-medium text-gray-900 dark:text-gray-100 truncate group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors mb-1">
-                      {resource.title}
-                    </p>
-
-                    {/* Metadata row */}
-                    <div className="flex flex-wrap items-center gap-2 mb-1">
-                      {resource.session_number && (
-                        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-gray-100 dark:bg-gray-800">
-                          <Video className="w-3 h-3 text-gray-600 dark:text-gray-400" />
-                          <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Session {resource.session_number}</span>
-                        </div>
-                      )}
-
-                      {resource.duration_seconds && (
-                        <Badge className="bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 font-semibold">
-                          <Clock className="w-3 h-3 mr-1" />
-                          {formatDuration(resource.duration_seconds)}
-                        </Badge>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <p className="font-medium text-gray-900 dark:text-gray-100 truncate group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+                        {resource.title}
+                      </p>
+                      {isFavorite && (
+                        <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400 flex-shrink-0" />
                       )}
                     </div>
 
-                    {/* Description preview */}
-                    {resource.description && (
-                      <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-1">
-                        {resource.description}
-                      </p>
-                    )}
+                    {/* Metadata row */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      {resource.session_number && (
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          Session {resource.session_number}
+                        </span>
+                      )}
+                      {resource.session_number && resource.duration_seconds && (
+                        <span className="text-gray-300 dark:text-gray-600">•</span>
+                      )}
+                      {resource.duration_seconds && (
+                        <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {formatDuration(resource.duration_seconds)}
+                        </span>
+                      )}
+                      {resource.description && (
+                        <>
+                          <span className="text-gray-300 dark:text-gray-600">•</span>
+                          <span className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-[200px]">
+                            {resource.description}
+                          </span>
+                        </>
+                      )}
+                    </div>
                   </div>
 
-                  {/* Chevron/external link icon */}
-                  {resource.content_type === 'link' ? (
-                    <ExternalLink className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                  ) : (
-                    <ChevronRight className="w-5 h-5 text-gray-400 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all flex-shrink-0" />
+                  {/* Action buttons - visible on hover */}
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggleFavorite(resource.id);
+                      }}
+                      className={cn(
+                        "w-8 h-8 rounded-md flex items-center justify-center transition-colors",
+                        isFavorite
+                          ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600"
+                          : "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                      )}
+                      title={isFavorite ? "Remove from favorites" : "Add to favorites"}
+                    >
+                      <Star className={cn("w-4 h-4", isFavorite && "fill-current")} />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleMarkComplete(resource.id);
+                      }}
+                      className={cn(
+                        "w-8 h-8 rounded-md flex items-center justify-center transition-colors",
+                        isCompleted
+                          ? "bg-green-100 dark:bg-green-900/30 text-green-600"
+                          : "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                      )}
+                      title={isCompleted ? "Mark as incomplete" : "Mark as complete"}
+                    >
+                      <CheckCircle2 className={cn("w-4 h-4", isCompleted && "fill-green-500 text-white")} />
+                    </button>
+                  </div>
+
+                  {/* Completion indicator (always visible if completed) */}
+                  {isCompleted && (
+                    <div className="absolute top-1/2 -translate-y-1/2 right-3 w-5 h-5 rounded-full bg-green-500 flex items-center justify-center group-hover:hidden">
+                      <Check className="w-3 h-3 text-white" />
+                    </div>
+                  )}
+
+                  {/* Chevron/external link icon (hidden when completed indicator shown) */}
+                  {!isCompleted && (
+                    resource.content_type === 'link' ? (
+                      <ExternalLink className="w-4 h-4 text-gray-400 flex-shrink-0 group-hover:hidden" />
+                    ) : (
+                      <ChevronRight className="w-4 h-4 text-gray-400 group-hover:translate-x-0.5 transition-transform flex-shrink-0 group-hover:hidden" />
+                    )
                   )}
                 </button>
               );
@@ -701,35 +760,49 @@ export default function LearningsPage() {
 
     return (
       <div className="space-y-3">
-        <div className="flex items-center gap-2">
-          <FileQuestion className="w-5 h-5 text-emerald-500" />
-          <h3 className="font-semibold">Case Studies</h3>
-          <Badge variant="secondary" className="ml-auto">
-            {filtered.length}
+        {/* Section header */}
+        <div className="flex items-center gap-3 pb-2 border-b border-gray-200 dark:border-gray-800">
+          <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+            <FileQuestion className="w-4 h-4 text-emerald-500" />
+          </div>
+          <h3 className="font-semibold text-gray-900 dark:text-gray-100">Case Studies</h3>
+          <Badge variant="secondary" className="ml-auto bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
+            {filtered.length} {filtered.length === 1 ? 'study' : 'studies'}
           </Badge>
         </div>
+
         {filtered.length === 0 ? (
-          <p className="text-sm text-muted-foreground pl-7">No case studies found</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 py-4 text-center">No case studies found</p>
         ) : (
-          <div className="space-y-3">
+          <div className="grid gap-3">
             {filtered.map((cs) => (
-              <Card key={cs.id} className="overflow-hidden">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">{cs.title}</CardTitle>
-                  {cs.description && (
-                    <CardDescription>{cs.description}</CardDescription>
-                  )}
-                </CardHeader>
-                <CardContent className="space-y-3">
+              <div
+                key={cs.id}
+                className="p-4 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-gray-300 dark:hover:border-gray-700 transition-colors"
+              >
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                  <div className="space-y-1">
+                    <h4 className="font-medium text-gray-900 dark:text-gray-100">{cs.title}</h4>
+                    {cs.description && (
+                      <p className="text-sm text-gray-600 dark:text-gray-400">{cs.description}</p>
+                    )}
+                    {cs.due_date && (
+                      <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 pt-1">
+                        <Calendar className="w-3.5 h-3.5" />
+                        <span>Due: {formatDate(cs.due_date)}</span>
+                      </div>
+                    )}
+                  </div>
                   <div className="flex flex-wrap gap-2">
                     {cs.problem_doc_url && (
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => handleCaseStudyClick(cs, 'problem')}
+                        className="h-8 text-xs border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
                       >
-                        <FileQuestion className="w-4 h-4 mr-2" />
-                        View Problem
+                        <FileQuestion className="w-3.5 h-3.5 mr-1.5" />
+                        Problem
                       </Button>
                     )}
                     {cs.solution_visible && cs.solution_doc_url ? (
@@ -737,25 +810,19 @@ export default function LearningsPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => handleCaseStudyClick(cs, 'solution')}
-                        className="text-emerald-600 border-emerald-200 hover:bg-emerald-50"
+                        className="h-8 text-xs text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
                       >
-                        <CheckCircle2 className="w-4 h-4 mr-2" />
-                        View Solution
+                        <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
+                        Solution
                       </Button>
                     ) : cs.solution_doc_url && (
-                      <Badge variant="secondary" className="text-muted-foreground">
-                        Solution not yet available
+                      <Badge variant="secondary" className="h-8 text-xs bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400">
+                        Solution pending
                       </Badge>
                     )}
                   </div>
-                  {cs.due_date && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Calendar className="w-4 h-4" />
-                      <span>Due: {formatDate(cs.due_date)}</span>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             ))}
           </div>
         )}
@@ -766,100 +833,156 @@ export default function LearningsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">My Learnings</h1>
-          <p className="text-muted-foreground">
-            Access course materials, recordings, and presentations
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-4 border-b border-gray-200 dark:border-gray-800">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">My Learnings</h1>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Access your course materials, recordings, and presentations
           </p>
         </div>
-        <div className="relative w-full sm:w-64">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <div className="relative w-full sm:w-72">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <Input
-            placeholder="Search content..."
+            placeholder="Search by title..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+            className="pl-10 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 focus:border-purple-500 dark:focus:border-purple-400 transition-colors"
           />
         </div>
       </div>
 
       {weeks.length === 0 ? (
-        <Card>
+        <Card className="border-gray-200 dark:border-gray-800">
           <CardContent className="flex flex-col items-center justify-center py-16">
-            <BookOpen className="w-12 h-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium mb-2">No content yet</h3>
-            <p className="text-muted-foreground text-center max-w-sm">
+            <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4">
+              <BookOpen className="w-8 h-8 text-gray-400" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">No content yet</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 text-center max-w-sm">
               Learning content will appear here once your cohort begins. Stay tuned!
             </p>
           </CardContent>
         </Card>
       ) : (
         <div className="space-y-6">
-          {/* Recent Activity Section */}
+          {/* Continue Where You Left Off - Shows actual assets */}
           {recentActivity.length > 0 && (
-            <Card className="overflow-hidden border-2 border-purple-200 dark:border-purple-800 bg-gradient-to-br from-purple-50 to-white dark:from-purple-950/20 dark:to-gray-900 shadow-lg">
-              <CardHeader className="pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-lg">
-                    <Clock className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-xl text-gray-900 dark:text-gray-100">Continue Learning</CardTitle>
-                    <CardDescription className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">
-                      Pick up where you left off • {recentActivity.length} {recentActivity.length === 1 ? 'resource' : 'resources'}
-                    </CardDescription>
+            <Card className="overflow-hidden border border-gray-200 dark:border-gray-800 bg-gradient-to-br from-gray-50 to-white dark:from-gray-900 dark:to-gray-950 shadow-sm">
+              <CardHeader className="pb-4 border-b border-gray-100 dark:border-gray-800">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-md">
+                      <Clock className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg font-semibold text-gray-900 dark:text-gray-100">Continue where you left off</CardTitle>
+                      <CardDescription className="text-sm text-gray-500 dark:text-gray-400">
+                        {recentActivity.length} recent {recentActivity.length === 1 ? 'asset' : 'assets'}
+                      </CardDescription>
+                    </div>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="pt-0">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <CardContent className="pt-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                   {recentActivity.map((resource: any) => {
                     const isFavorite = favoriteResources.has(resource.id);
+                    const isCompleted = completedResources.has(resource.id);
+                    const gradient = getContentGradient(resource.content_type);
+                    const typeLabel = getContentTypeLabel(resource.content_type);
+
                     return (
                       <button
                         key={resource.id}
                         onClick={() => handleResourceClick(resource)}
-                        className="relative p-5 rounded-xl border-2 border-purple-200/50 dark:border-purple-700/50 bg-white dark:bg-gray-900 hover:shadow-xl hover:shadow-purple-500/25 hover:-translate-y-1 hover:border-purple-400 dark:hover:border-purple-500 transition-all duration-300 group text-left"
-                      >
-                        <div className="flex items-start gap-3 mb-3">
-                          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-md flex-shrink-0 group-hover:scale-105 transition-transform duration-300">
-                            {getContentIcon(resource.content_type, 'w-5 h-5 text-white')}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-gray-900 dark:text-gray-100 text-sm line-clamp-2 mb-1.5 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
-                              {resource.title}
-                            </p>
-                            {resource.duration_seconds && (
-                              <div className="flex items-center gap-1.5">
-                                <Clock className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
-                                <p className="text-xs text-gray-600 dark:text-gray-400 font-medium">
-                                  {formatDuration(resource.duration_seconds)}
-                                </p>
-                              </div>
-                            )}
-                          </div>
-                          {isFavorite && (
-                            <Star className="w-4 h-4 fill-yellow-400 text-yellow-400 flex-shrink-0 animate-pulse" />
-                          )}
-                        </div>
-                        {resource.progress?.progress_seconds > 0 && resource.duration_seconds && (
-                          <div className="space-y-1.5">
-                            <div className="flex items-center justify-between text-xs">
-                              <span className="text-gray-600 dark:text-gray-400 font-medium">Progress</span>
-                              <span className="text-purple-600 dark:text-purple-400 font-semibold">
-                                {Math.min(Math.round((resource.progress.progress_seconds / resource.duration_seconds) * 100), 100)}%
-                              </span>
-                            </div>
-                            <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-gradient-to-r from-purple-500 to-purple-600 rounded-full transition-all duration-500 shadow-sm"
-                                style={{ width: `${Math.min((resource.progress.progress_seconds / resource.duration_seconds) * 100, 100)}%` }}
-                              />
-                            </div>
-                          </div>
+                        className={cn(
+                          "relative p-4 rounded-xl border bg-white dark:bg-gray-900 text-left transition-all duration-200",
+                          "hover:shadow-lg hover:-translate-y-0.5 group",
+                          "border-gray-200 dark:border-gray-800",
+                          "hover:border-gray-300 dark:hover:border-gray-700"
                         )}
-                        <ChevronRight className="absolute top-5 right-5 w-5 h-5 text-gray-400 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                      >
+                        {/* Content type badge - top left */}
+                        <div className={cn(
+                          "absolute top-3 left-3 flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium",
+                          resource.content_type === 'video' && "bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300",
+                          resource.content_type === 'slides' && "bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300",
+                          resource.content_type === 'document' && "bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300",
+                          !['video', 'slides', 'document'].includes(resource.content_type) && "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+                        )}>
+                          {getContentIcon(resource.content_type, 'w-3.5 h-3.5')}
+                          <span>{typeLabel}</span>
+                        </div>
+
+                        {/* Favorite indicator - top right */}
+                        {isFavorite && (
+                          <Star className="absolute top-3 right-3 w-4 h-4 fill-yellow-400 text-yellow-400" />
+                        )}
+
+                        {/* Main content */}
+                        <div className="pt-8 space-y-3">
+                          {/* Icon and title */}
+                          <div className="flex items-start gap-3">
+                            <div className={cn(
+                              "w-12 h-12 rounded-xl bg-gradient-to-br flex items-center justify-center shadow-sm flex-shrink-0 group-hover:scale-105 transition-transform",
+                              gradient.from, gradient.to
+                            )}>
+                              {getContentIcon(resource.content_type, 'w-6 h-6 text-white')}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-gray-900 dark:text-gray-100 text-sm line-clamp-2 leading-tight group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+                                {resource.title}
+                              </p>
+                              {/* Duration / metadata */}
+                              <div className="flex items-center gap-2 mt-1.5">
+                                {resource.duration_seconds && (
+                                  <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+                                    <Clock className="w-3 h-3" />
+                                    <span>{formatDuration(resource.duration_seconds)}</span>
+                                  </div>
+                                )}
+                                {isCompleted && (
+                                  <div className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+                                    <CheckCircle2 className="w-3 h-3" />
+                                    <span>Completed</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Progress bar (for videos with progress) */}
+                          {resource.progress?.progress_seconds > 0 && resource.duration_seconds && !isCompleted && (
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-gray-500 dark:text-gray-400">Progress</span>
+                                <span className="font-medium text-gray-700 dark:text-gray-300">
+                                  {Math.min(Math.round((resource.progress.progress_seconds / resource.duration_seconds) * 100), 100)}%
+                                </span>
+                              </div>
+                              <div className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                <div
+                                  className={cn(
+                                    "h-full rounded-full transition-all duration-500",
+                                    resource.content_type === 'video' && "bg-purple-500",
+                                    resource.content_type === 'slides' && "bg-orange-500",
+                                    resource.content_type === 'document' && "bg-blue-500",
+                                    !['video', 'slides', 'document'].includes(resource.content_type) && "bg-gray-500"
+                                  )}
+                                  style={{ width: `${Math.min((resource.progress.progress_seconds / resource.duration_seconds) * 100, 100)}%` }}
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Click to open hint */}
+                          <div className="flex items-center justify-between pt-1 border-t border-gray-100 dark:border-gray-800">
+                            <span className="text-xs text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-400 transition-colors">
+                              Click to {resource.content_type === 'video' ? 'watch' : resource.content_type === 'slides' ? 'view slides' : 'open'}
+                            </span>
+                            <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-400 group-hover:translate-x-0.5 transition-all" />
+                          </div>
+                        </div>
                       </button>
                     );
                   })}
@@ -870,57 +993,91 @@ export default function LearningsPage() {
 
           {/* Week Tabs with Progress */}
           <Tabs value={activeWeek} onValueChange={setActiveWeek}>
-            <ScrollArea className="w-full">
-              <TabsList className="inline-flex h-auto items-center justify-start rounded-xl bg-gray-100 dark:bg-gray-800 p-1.5 w-auto gap-1">
-                {weeks.map((week) => {
-                  const progress = weekProgress[week];
-                  const progressPercent = progress ? Math.round((progress.completed / progress.total) * 100) : 0;
+            <div className="border-b border-gray-200 dark:border-gray-800">
+              <ScrollArea className="w-full pb-px">
+                <TabsList className="inline-flex h-auto items-center justify-start bg-transparent p-0 gap-0">
+                  {weeks.map((week) => {
+                    const progress = weekProgress[week];
+                    const progressPercent = progress ? Math.round((progress.completed / progress.total) * 100) : 0;
+                    const isComplete = progress && progress.completed === progress.total && progress.total > 0;
 
-                  return (
-                    <TabsTrigger
-                      key={week}
-                      value={week.toString()}
-                      className="px-5 py-3 rounded-lg data-[state=active]:bg-gradient-to-br data-[state=active]:from-purple-500 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-purple-500/40 transition-all duration-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-                    >
-                      <div className="flex flex-col items-center gap-1.5">
-                        <span className="font-semibold text-sm">Week {week}</span>
-                        {progress && progress.total > 0 && (
-                          <>
-                            <div className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                              <div
-                                className="h-full data-[state=active]:bg-white bg-purple-500 rounded-full transition-all duration-500"
-                                style={{ width: `${progressPercent}%` }}
-                              />
-                            </div>
-                            <span className="text-xs font-medium opacity-80">
-                              {progress.completed}/{progress.total}
-                            </span>
-                          </>
+                    return (
+                      <TabsTrigger
+                        key={week}
+                        value={week.toString()}
+                        className={cn(
+                          "relative px-6 py-3 rounded-none border-b-2 border-transparent bg-transparent",
+                          "data-[state=active]:border-purple-500 data-[state=active]:text-purple-600 dark:data-[state=active]:text-purple-400",
+                          "hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-800/50",
+                          "transition-all duration-200"
                         )}
-                      </div>
-                    </TabsTrigger>
-                  );
-                })}
-              </TabsList>
-            </ScrollArea>
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-sm">Week {week}</span>
+                          {progress && progress.total > 0 && (
+                            <Badge
+                              variant="secondary"
+                              className={cn(
+                                "text-xs px-1.5 py-0 h-5",
+                                isComplete
+                                  ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
+                                  : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
+                              )}
+                            >
+                              {isComplete ? (
+                                <Check className="w-3 h-3" />
+                              ) : (
+                                `${progress.completed}/${progress.total}`
+                              )}
+                            </Badge>
+                          )}
+                        </div>
+                      </TabsTrigger>
+                    );
+                  })}
+                </TabsList>
+              </ScrollArea>
+            </div>
 
             {weeks.map((week) => {
               const content = weekContent[week];
+              const progress = weekProgress[week];
+              const progressPercent = progress ? Math.round((progress.completed / progress.total) * 100) : 0;
+
               return (
                 <TabsContent key={week} value={week.toString()} className="space-y-6 mt-6">
-                  {/* Week Title */}
-                  {content.modules[0]?.title && (
-                    <div>
-                      <h2 className="text-xl font-semibold">
-                        Week {week}: {content.modules[0].title}
+                  {/* Week Title with Progress */}
+                  <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 p-4 rounded-xl bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800">
+                    <div className="space-y-1">
+                      <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                        Week {week}{content.modules[0]?.title ? `: ${content.modules[0].title}` : ''}
                       </h2>
                       {content.modules[0]?.description && (
-                        <p className="text-muted-foreground mt-1">
+                        <p className="text-sm text-gray-600 dark:text-gray-400 max-w-2xl">
                           {content.modules[0].description}
                         </p>
                       )}
                     </div>
-                  )}
+                    {progress && progress.total > 0 && (
+                      <div className="flex items-center gap-4 px-4 py-2 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 min-w-[180px]">
+                        <div className="flex-1 space-y-1">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-gray-500 dark:text-gray-400">Progress</span>
+                            <span className="font-semibold text-gray-700 dark:text-gray-300">{progressPercent}%</span>
+                          </div>
+                          <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-purple-500 rounded-full transition-all duration-500"
+                              style={{ width: `${progressPercent}%` }}
+                            />
+                          </div>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            {progress.completed} of {progress.total} completed
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
 
                   {/* Content Sections */}
                   <div className="grid gap-6">
@@ -962,14 +1119,14 @@ export default function LearningsPage() {
                    content.presentations.length === 0 &&
                    content.notes.length === 0 &&
                    content.caseStudies.length === 0 && (
-                    <Card>
-                      <CardContent className="flex flex-col items-center justify-center py-12">
-                        <BookOpen className="w-10 h-10 text-muted-foreground mb-3" />
-                        <p className="text-muted-foreground text-center">
-                          No content available for this week yet
-                        </p>
-                      </CardContent>
-                    </Card>
+                    <div className="flex flex-col items-center justify-center py-12 rounded-lg border border-dashed border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50">
+                      <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-3">
+                        <BookOpen className="w-6 h-6 text-gray-400" />
+                      </div>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
+                        No content available for this week yet
+                      </p>
+                    </div>
                   )}
                 </TabsContent>
               );
