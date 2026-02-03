@@ -346,9 +346,9 @@ export default function AdminSupportPage() {
       </Card>
 
       <Dialog open={!!selectedTicket} onOpenChange={(open) => !open && setSelectedTicket(null)}>
-        <DialogContent className="sm:max-w-[650px] max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden">
+        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden border border-border shadow-xl">
           {/* Header Section */}
-          <div className="p-6 border-b bg-gradient-to-br from-muted/30 to-background">
+          <div className="p-6 border-b border-border bg-gradient-to-br from-muted/30 to-background">
             <DialogHeader className="space-y-3">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
@@ -368,9 +368,11 @@ export default function AdminSupportPage() {
                 </div>
               </div>
             </DialogHeader>
+          </div>
 
-            {/* User Info Section */}
-            <div className="mt-4 p-4 bg-muted/50 rounded-xl border border-muted">
+          {/* User Info Section */}
+          <div className="p-6 border-b border-border">
+            <div className="bg-muted/30 border border-border rounded-lg p-4">
               <p className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wide">
                 Submitted By
               </p>
@@ -395,84 +397,88 @@ export default function AdminSupportPage() {
                 </div>
               </div>
             </div>
+          </div>
 
-            {/* Initial Description */}
-            {selectedTicket?.description && (
-              <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-950/20 rounded-xl border border-blue-200 dark:border-blue-900">
-                <p className="text-xs font-medium text-blue-600 dark:text-blue-400 mb-2 uppercase tracking-wide">
+          {/* Description Section */}
+          {selectedTicket?.description && (
+            <div className="p-6 border-b border-border">
+              <div className="bg-muted/30 border border-border rounded-lg p-4">
+                <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">
                   Initial Description
                 </p>
-                <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
+                <p className="text-base text-foreground whitespace-pre-wrap leading-relaxed">
                   {selectedTicket.description}
                 </p>
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Conversation Thread */}
-          <ScrollArea className="flex-1 min-h-[200px] max-h-[300px]">
-            {loadingResponses ? (
-              <div className="p-6 space-y-4">
-                {/* Loading Skeleton */}
-                <div className="flex justify-start">
-                  <div className="h-16 w-2/3 bg-muted animate-pulse rounded-2xl" />
-                </div>
-                <div className="flex justify-end">
-                  <div className="h-16 w-2/3 bg-muted animate-pulse rounded-2xl" />
-                </div>
-                <div className="flex justify-start">
-                  <div className="h-12 w-1/2 bg-muted animate-pulse rounded-2xl" />
-                </div>
-              </div>
-            ) : (
-              <div className="p-6 space-y-4">
-                {selectedTicket?.responses.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12 text-center">
-                    <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
-                      <HelpCircle className="w-8 h-8 text-muted-foreground/50" />
-                    </div>
-                    <p className="text-sm font-medium text-muted-foreground">No messages yet</p>
-                    <p className="text-xs text-muted-foreground/70 mt-1">Start the conversation below</p>
+          <div className="p-6 border-b border-border">
+            <ScrollArea className="min-h-[200px] max-h-[300px]">
+              {loadingResponses ? (
+                <div className="space-y-4">
+                  {/* Loading Skeleton */}
+                  <div className="flex justify-start">
+                    <div className="h-16 w-2/3 bg-muted animate-pulse rounded-2xl" />
                   </div>
-                ) : (
-                  selectedTicket?.responses.map(response => (
-                    <div
-                      key={response.id}
-                      className={`flex ${response.is_admin ? 'justify-end' : 'justify-start'} transition-all duration-200`}
-                    >
-                      <div
-                        className={`max-w-[80%] p-4 rounded-2xl transition-all duration-200 hover:shadow-md ${
-                          response.is_admin
-                            ? 'bg-primary text-primary-foreground rounded-br-md'
-                            : 'bg-muted rounded-bl-md'
-                        }`}
-                      >
-                        <p className="text-sm whitespace-pre-wrap leading-relaxed">{response.message}</p>
-                        <p className={`text-xs mt-2 flex items-center gap-1.5 ${
-                          response.is_admin ? 'text-primary-foreground/70' : 'text-muted-foreground'
-                        }`}>
-                          <span className="font-medium">{response.is_admin ? 'Admin' : 'Student'}</span>
-                          <span className="opacity-50">|</span>
-                          <span>{format(new Date(response.created_at), 'MMM d, h:mm a')}</span>
-                        </p>
+                  <div className="flex justify-end">
+                    <div className="h-16 w-2/3 bg-muted animate-pulse rounded-2xl" />
+                  </div>
+                  <div className="flex justify-start">
+                    <div className="h-12 w-1/2 bg-muted animate-pulse rounded-2xl" />
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {selectedTicket?.responses.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-center border border-border rounded-lg bg-muted/20">
+                      <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+                        <HelpCircle className="w-8 h-8 text-muted-foreground/50" />
                       </div>
+                      <p className="text-sm font-medium text-muted-foreground">No messages yet</p>
+                      <p className="text-xs text-muted-foreground/70 mt-1">Start the conversation below</p>
                     </div>
-                  ))
-                )}
-                <div ref={messagesEndRef} />
-              </div>
-            )}
-          </ScrollArea>
+                  ) : (
+                    selectedTicket?.responses.map(response => (
+                      <div
+                        key={response.id}
+                        className={`flex ${response.is_admin ? 'justify-end' : 'justify-start'} transition-all duration-200`}
+                      >
+                        <div
+                          className={`max-w-[80%] p-4 rounded-2xl transition-all duration-200 hover:shadow-md ${
+                            response.is_admin
+                              ? 'bg-primary border border-primary/30 text-primary-foreground rounded-br-md'
+                              : 'bg-muted/50 border border-border rounded-bl-md'
+                          }`}
+                        >
+                          <p className="text-base whitespace-pre-wrap leading-relaxed">{response.message}</p>
+                          <div className={`flex items-center gap-2 mt-2 text-xs ${
+                            response.is_admin ? 'text-primary-foreground/70' : 'text-muted-foreground'
+                          }`}>
+                            <span className="font-medium">{response.is_admin ? 'Admin' : 'Student'}</span>
+                            <span>|</span>
+                            <span>{format(new Date(response.created_at), 'MMM d, h:mm a')}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                  <div ref={messagesEndRef} />
+                </div>
+              )}
+            </ScrollArea>
+          </div>
 
-          {/* Reply Input */}
+          {/* Reply Section */}
           {selectedTicket?.status !== 'resolved' ? (
-            <div className="p-4 border-t bg-muted/20">
+            <div className="p-6">
               <div className="flex gap-3">
                 <Textarea
                   placeholder="Type your reply..."
                   value={replyMessage}
                   onChange={e => setReplyMessage(e.target.value)}
-                  className="min-h-[80px] resize-none rounded-xl border-muted focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200"
+                  className="min-h-[80px] resize-none rounded-xl border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200"
                   maxLength={2000}
                 />
                 <Button
@@ -493,7 +499,7 @@ export default function AdminSupportPage() {
               </p>
             </div>
           ) : (
-            <div className="p-4 border-t bg-green-50 dark:bg-green-950/20">
+            <div className="p-6 bg-green-50 dark:bg-green-950/20">
               <div className="flex items-center justify-center gap-2 text-green-600 dark:text-green-400">
                 <CheckCircle className="w-4 h-4" />
                 <span className="text-sm font-medium">This ticket has been resolved</span>

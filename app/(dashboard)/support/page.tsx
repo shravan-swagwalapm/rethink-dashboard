@@ -27,8 +27,19 @@ import {
   CheckCircle,
   AlertCircle,
   Send,
-  X,
+  XCircle,
+  Loader2,
 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface SupportTicket {
   id: string;
@@ -83,6 +94,7 @@ export default function SupportPage() {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [sendingReply, setSendingReply] = useState(false);
   const [closingTicket, setClosingTicket] = useState(false);
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const [replyMessage, setReplyMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -215,11 +227,17 @@ export default function SupportPage() {
     }
   };
 
-  // Close ticket
+  // Close ticket - show confirmation first
+  const handleCloseTicketConfirm = () => {
+    setShowCloseConfirm(true);
+  };
+
+  // Actually close the ticket after confirmation
   const handleCloseTicket = async () => {
     if (!selectedTicket) return;
 
     setClosingTicket(true);
+    setShowCloseConfirm(false);
     try {
       const response = await fetch(`/api/support/${selectedTicket.id}`, {
         method: 'PATCH',
@@ -419,7 +437,7 @@ export default function SupportPage() {
                   <button
                     key={ticket.id}
                     onClick={() => handleOpenTicket(ticket)}
-                    className="w-full group relative flex items-center gap-4 p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-gradient-to-br from-gray-50/50 to-white dark:from-gray-900/50 dark:to-gray-800/50 hover:from-purple-50/50 hover:to-pink-50/50 dark:hover:from-purple-950/20 dark:hover:to-pink-950/20 transition-all duration-300 hover:shadow-md text-left"
+                    className="w-full group relative flex items-center gap-4 p-4 rounded-xl border-2 border-border bg-gradient-to-br from-gray-50/50 to-white dark:from-gray-900/50 dark:to-gray-800/50 hover:from-purple-50/50 hover:to-pink-50/50 dark:hover:from-purple-950/20 dark:hover:to-pink-950/20 hover:border-primary/50 transition-all duration-300 hover:shadow-lg text-left"
                   >
                     {/* Category Icon */}
                     <div className={`w-12 h-12 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center ${categoryConfig.color}`}>
@@ -462,7 +480,7 @@ export default function SupportPage() {
 
       {/* Ticket Detail Dialog */}
       <Dialog open={ticketDetailOpen} onOpenChange={setTicketDetailOpen}>
-        <DialogContent className="sm:max-w-[650px] max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden">
+        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden border border-border shadow-xl">
           {loadingDetail ? (
             <div className="p-6 space-y-4">
               {/* Header Skeleton */}
@@ -491,7 +509,7 @@ export default function SupportPage() {
           ) : selectedTicket ? (
             <>
               {/* Header Section */}
-              <div className="p-6 border-b bg-gradient-to-br from-muted/30 to-background">
+              <div className="p-6 border-b border-border bg-gradient-to-br from-muted/30 to-background">
                 <DialogHeader className="space-y-3">
                   <div className="flex items-start gap-3">
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
@@ -523,106 +541,112 @@ export default function SupportPage() {
                     </div>
                   </div>
                 </DialogHeader>
+              </div>
 
-                {/* Initial Description */}
-                {selectedTicket.description && (
-                  <div className="mt-4 p-4 bg-muted/50 rounded-xl border border-muted">
+              {/* Description Section */}
+              {selectedTicket.description && (
+                <div className="p-6 border-b border-border">
+                  <div className="bg-muted/30 border border-border rounded-lg p-4">
                     <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">
                       Initial Description
                     </p>
-                    <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
+                    <p className="text-base text-foreground whitespace-pre-wrap leading-relaxed">
                       {selectedTicket.description}
                     </p>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
 
               {/* Conversation Thread */}
-              <ScrollArea className="flex-1 min-h-[200px] max-h-[350px]">
-                <div className="p-6 space-y-4">
-                  {selectedTicket.responses.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-12 text-center">
-                      <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
-                        <MessageSquare className="w-8 h-8 text-muted-foreground/50" />
-                      </div>
-                      <p className="text-sm font-medium text-muted-foreground">No responses yet</p>
-                      <p className="text-xs text-muted-foreground/70 mt-1">An admin will respond soon</p>
-                    </div>
-                  ) : (
-                    selectedTicket.responses.map(response => (
-                      <div
-                        key={response.id}
-                        className={`flex ${response.is_admin ? 'justify-end' : 'justify-start'} transition-all duration-200`}
-                      >
-                        <div
-                          className={`max-w-[80%] p-4 rounded-2xl transition-all duration-200 hover:shadow-md ${
-                            response.is_admin
-                              ? 'bg-primary text-primary-foreground rounded-br-md'
-                              : 'bg-muted rounded-bl-md'
-                          }`}
-                        >
-                          <p className="text-sm whitespace-pre-wrap leading-relaxed">{response.message}</p>
-                          <p className={`text-xs mt-2 flex items-center gap-1.5 ${
-                            response.is_admin ? 'text-primary-foreground/70' : 'text-muted-foreground'
-                          }`}>
-                            <span className="font-medium">{response.is_admin ? 'Admin' : 'You'}</span>
-                            <span className="opacity-50">|</span>
-                            <span>{format(new Date(response.created_at), 'MMM d, h:mm a')}</span>
-                          </p>
+              <div className="p-6 border-b border-border">
+                <ScrollArea className="min-h-[200px] max-h-[350px]">
+                  <div className="space-y-4">
+                    {selectedTicket.responses.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-12 text-center border border-border rounded-lg bg-muted/20">
+                        <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+                          <MessageSquare className="w-8 h-8 text-muted-foreground/50" />
                         </div>
+                        <p className="text-sm font-medium text-muted-foreground">No responses yet</p>
+                        <p className="text-xs text-muted-foreground/70 mt-1">An admin will respond soon</p>
                       </div>
-                    ))
-                  )}
-                  <div ref={messagesEndRef} />
-                </div>
-              </ScrollArea>
+                    ) : (
+                      selectedTicket.responses.map(response => (
+                        <div
+                          key={response.id}
+                          className={`flex ${response.is_admin ? 'justify-end' : 'justify-start'} transition-all duration-200`}
+                        >
+                          <div
+                            className={`max-w-[80%] p-4 rounded-2xl transition-all duration-200 hover:shadow-md ${
+                              response.is_admin
+                                ? 'bg-primary border border-primary/30 text-primary-foreground rounded-br-md'
+                                : 'bg-muted/50 border border-border rounded-bl-md'
+                            }`}
+                          >
+                            <p className="text-base whitespace-pre-wrap leading-relaxed">{response.message}</p>
+                            <div className={`flex items-center gap-2 mt-2 text-xs ${
+                              response.is_admin ? 'text-primary-foreground/70' : 'text-muted-foreground'
+                            }`}>
+                              <span className="font-medium">{response.is_admin ? 'Admin' : 'You'}</span>
+                              <span>|</span>
+                              <span>{format(new Date(response.created_at), 'MMM d, h:mm a')}</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                    <div ref={messagesEndRef} />
+                  </div>
+                </ScrollArea>
+              </div>
 
-              {/* Reply Input */}
+              {/* Reply Section */}
               {selectedTicket.status !== 'resolved' ? (
-                <div className="p-4 border-t bg-muted/20">
+                <div className="p-6">
                   <div className="flex gap-3">
                     <Textarea
                       placeholder="Type your reply..."
                       value={replyMessage}
                       onChange={e => setReplyMessage(e.target.value)}
-                      className="min-h-[80px] resize-none rounded-xl border-muted focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200"
+                      className="min-h-[80px] resize-none rounded-xl border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200"
                       maxLength={2000}
                     />
-                    <div className="flex flex-col gap-2">
-                      <Button
-                        onClick={handleSendReply}
-                        disabled={sendingReply || !replyMessage.trim()}
-                        size="icon"
-                        className="h-10 w-10 rounded-xl shrink-0 transition-all duration-200 hover:scale-105"
-                      >
-                        {sendingReply ? (
-                          <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
-                        ) : (
-                          <Send className="w-4 h-4" />
-                        )}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={handleCloseTicket}
-                        disabled={closingTicket}
-                        size="icon"
-                        className="h-10 w-10 rounded-xl shrink-0 transition-all duration-200 hover:scale-105 hover:border-destructive hover:text-destructive"
-                        title="Close Ticket"
-                      >
-                        {closingTicket ? (
-                          <div className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" />
-                        ) : (
-                          <X className="w-4 h-4" />
-                        )}
-                      </Button>
-                    </div>
+                    <Button
+                      onClick={handleSendReply}
+                      disabled={sendingReply || !replyMessage.trim()}
+                      size="icon"
+                      className="h-10 w-10 rounded-xl shrink-0 self-end transition-all duration-200 hover:scale-105"
+                    >
+                      {sendingReply ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Send className="w-4 h-4" />
+                      )}
+                    </Button>
                   </div>
                   <p className="text-xs text-muted-foreground mt-2">
                     {replyMessage.length}/2000 characters
                   </p>
+
+                  {/* Close Ticket Button */}
+                  <div className="flex items-center justify-between pt-4 mt-4 border-t border-border">
+                    <Button
+                      variant="outline"
+                      onClick={handleCloseTicketConfirm}
+                      disabled={closingTicket}
+                      className="text-muted-foreground hover:text-destructive hover:border-destructive"
+                    >
+                      {closingTicket ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : (
+                        <XCircle className="h-4 w-4 mr-2" />
+                      )}
+                      Close Ticket
+                    </Button>
+                    <p className="text-xs text-muted-foreground">Close if your issue is resolved</p>
+                  </div>
                 </div>
               ) : (
-                <div className="p-4 border-t bg-green-50 dark:bg-green-950/20">
+                <div className="p-6 bg-green-50 dark:bg-green-950/20">
                   <div className="flex items-center justify-center gap-2 text-green-600 dark:text-green-400">
                     <CheckCircle className="w-4 h-4" />
                     <span className="text-sm font-medium">This ticket has been resolved</span>
@@ -633,6 +657,25 @@ export default function SupportPage() {
           ) : null}
         </DialogContent>
       </Dialog>
+
+      {/* Close Ticket Confirmation Dialog */}
+      <AlertDialog open={showCloseConfirm} onOpenChange={setShowCloseConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Close this ticket?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to close this support ticket? This will mark it as resolved.
+              You can still view it in your ticket history.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleCloseTicket}>
+              Close Ticket
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
