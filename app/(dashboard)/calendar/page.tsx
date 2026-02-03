@@ -326,19 +326,19 @@ export default function CalendarPage() {
               <p className="text-white/80 mt-1">View and RSVP to your upcoming sessions</p>
             </div>
             {/* Timezone Mode Selector */}
-            <div className="flex items-center gap-2 bg-white/10 rounded-lg p-1">
+            <div className="flex items-center rounded-xl border-2 border-white/30 bg-white/10 backdrop-blur-sm p-1 gap-1">
               <Button
                 size="sm"
                 variant="ghost"
                 onClick={() => setTimezoneMode('ist')}
                 className={cn(
-                  'h-8 px-3 text-xs font-medium transition-all',
+                  'h-9 px-4 text-sm font-semibold transition-all rounded-lg border-2',
                   timezoneMode === 'ist'
-                    ? 'bg-white text-purple-700 hover:bg-white hover:text-purple-700 shadow-md'
-                    : 'text-white/80 hover:text-white hover:bg-white/20'
+                    ? 'bg-white text-purple-700 border-white shadow-lg hover:bg-white hover:text-purple-700'
+                    : 'text-white border-white/30 hover:text-white hover:bg-white/20 hover:border-white/50'
                 )}
               >
-                <Globe className="w-3 h-3 mr-1.5" />
+                <Globe className="w-4 h-4 mr-2" />
                 IST
               </Button>
               <Button
@@ -346,13 +346,13 @@ export default function CalendarPage() {
                 variant="ghost"
                 onClick={() => setTimezoneMode('utc')}
                 className={cn(
-                  'h-8 px-3 text-xs font-medium transition-all',
+                  'h-9 px-4 text-sm font-semibold transition-all rounded-lg border-2',
                   timezoneMode === 'utc'
-                    ? 'bg-white text-purple-700 hover:bg-white hover:text-purple-700 shadow-md'
-                    : 'text-white/80 hover:text-white hover:bg-white/20'
+                    ? 'bg-white text-purple-700 border-white shadow-lg hover:bg-white hover:text-purple-700'
+                    : 'text-white border-white/30 hover:text-white hover:bg-white/20 hover:border-white/50'
                 )}
               >
-                <Clock className="w-3 h-3 mr-1.5" />
+                <Clock className="w-4 h-4 mr-2" />
                 UTC
               </Button>
               <Button
@@ -360,13 +360,13 @@ export default function CalendarPage() {
                 variant="ghost"
                 onClick={() => setTimezoneMode('local')}
                 className={cn(
-                  'h-8 px-3 text-xs font-medium transition-all',
+                  'h-9 px-4 text-sm font-semibold transition-all rounded-lg border-2',
                   timezoneMode === 'local'
-                    ? 'bg-white text-purple-700 hover:bg-white hover:text-purple-700 shadow-md'
-                    : 'text-white/80 hover:text-white hover:bg-white/20'
+                    ? 'bg-white text-purple-700 border-white shadow-lg hover:bg-white hover:text-purple-700'
+                    : 'text-white border-white/30 hover:text-white hover:bg-white/20 hover:border-white/50'
                 )}
               >
-                <CalendarIcon className="w-3 h-3 mr-1.5" />
+                <CalendarIcon className="w-4 h-4 mr-2" />
                 Local
               </Button>
             </div>
@@ -468,7 +468,7 @@ export default function CalendarPage() {
                             : 'bg-primary text-primary-foreground hover:bg-primary/90'
                         )}
                       >
-                        <span className="opacity-90">{format(parseISO(session.scheduled_at), 'h:mm a')}</span>
+                        <span className="opacity-90">{formatTime(session.scheduled_at).replace(' IST', '').replace(' UTC', '')}</span>
                         <span className="mx-1">·</span>
                         <span>{session.title}</span>
                       </button>
