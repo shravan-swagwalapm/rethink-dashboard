@@ -590,7 +590,7 @@ export default function LearningsPage() {
 
   const currentWeekContent = activeWeek ? weekContent[parseInt(activeWeek)] : null;
 
-  // Content section component with clean, readable cards
+  // Content section component with futuristic cards
   const ContentSection = ({
     title,
     icon: Icon,
@@ -611,28 +611,51 @@ export default function LearningsPage() {
     const filtered = filterResources(resources);
     if (resources.length === 0 && !searchQuery) return null;
 
+    // Get border color based on section type
+    const getBorderColor = () => {
+      if (iconColor === 'text-purple-500') return 'border-purple-500/20 hover:border-purple-500/40';
+      if (iconColor === 'text-orange-500') return 'border-orange-500/20 hover:border-orange-500/40';
+      if (iconColor === 'text-blue-500') return 'border-blue-500/20 hover:border-blue-500/40';
+      return 'border-gray-500/20 hover:border-gray-500/40';
+    };
+
+    const getGlowColor = () => {
+      if (iconColor === 'text-purple-500') return 'hover:shadow-purple-500/10';
+      if (iconColor === 'text-orange-500') return 'hover:shadow-orange-500/10';
+      if (iconColor === 'text-blue-500') return 'hover:shadow-blue-500/10';
+      return 'hover:shadow-gray-500/10';
+    };
+
     return (
-      <div className="space-y-3">
+      <div className="space-y-4">
         {/* Section header */}
-        <div className="flex items-center gap-3 pb-2 border-b border-gray-200 dark:border-gray-800">
+        <div className="flex items-center gap-3">
           <div className={cn(
-            "w-8 h-8 rounded-lg flex items-center justify-center",
-            iconColor === 'text-purple-500' && "bg-purple-100 dark:bg-purple-900/30",
-            iconColor === 'text-orange-500' && "bg-orange-100 dark:bg-orange-900/30",
-            iconColor === 'text-blue-500' && "bg-blue-100 dark:bg-blue-900/30"
+            "w-9 h-9 rounded-xl bg-gradient-to-br flex items-center justify-center shadow-md",
+            gradientFrom, gradientTo,
+            iconColor === 'text-purple-500' && "shadow-purple-500/20",
+            iconColor === 'text-orange-500' && "shadow-orange-500/20",
+            iconColor === 'text-blue-500' && "shadow-blue-500/20"
           )}>
-            <Icon className={cn('w-4 h-4', iconColor)} />
+            <Icon className="w-5 h-5 text-white" />
           </div>
-          <h3 className="font-semibold text-gray-900 dark:text-gray-100">{title}</h3>
-          <Badge variant="secondary" className="ml-auto bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
+          <h3 className="font-bold text-gray-900 dark:text-white text-lg">{title}</h3>
+          <Badge variant="secondary" className={cn(
+            "ml-auto border",
+            iconColor === 'text-purple-500' && "bg-purple-500/10 border-purple-500/20 text-purple-400",
+            iconColor === 'text-orange-500' && "bg-orange-500/10 border-orange-500/20 text-orange-400",
+            iconColor === 'text-blue-500' && "bg-blue-500/10 border-blue-500/20 text-blue-400"
+          )}>
             {filtered.length} {filtered.length === 1 ? 'item' : 'items'}
           </Badge>
         </div>
 
         {filtered.length === 0 ? (
-          <p className="text-sm text-gray-500 dark:text-gray-400 py-4 text-center">{emptyMessage}</p>
+          <div className="rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-700 py-8">
+            <p className="text-sm text-gray-500 dark:text-gray-400 text-center">{emptyMessage}</p>
+          </div>
         ) : (
-          <div className="grid gap-2">
+          <div className="grid gap-3">
             {filtered.map((resource) => {
               const isCompleted = completedResources.has(resource.id);
               const isFavorite = favoriteResources.has(resource.id);
@@ -642,71 +665,71 @@ export default function LearningsPage() {
                   key={resource.id}
                   onClick={() => handleResourceClick(resource)}
                   className={cn(
-                    "relative w-full flex items-center gap-4 p-3 rounded-lg border bg-white dark:bg-gray-900 text-left transition-all duration-200 group",
+                    "relative w-full flex items-center gap-4 p-4 rounded-xl text-left transition-all duration-300 group",
+                    "border-2 bg-white dark:bg-gray-900/80 backdrop-blur-sm",
                     isCompleted
-                      ? "border-green-200 dark:border-green-800/50 bg-green-50/50 dark:bg-green-900/10"
-                      : "border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700",
-                    "hover:shadow-md hover:-translate-y-px"
+                      ? "border-green-500/30 bg-green-50/50 dark:bg-green-900/10"
+                      : getBorderColor(),
+                    "hover:shadow-lg hover:-translate-y-0.5",
+                    getGlowColor()
                   )}
                 >
                   {/* Icon container */}
                   <div className={cn(
-                    "w-10 h-10 rounded-lg bg-gradient-to-br flex items-center justify-center flex-shrink-0 shadow-sm group-hover:scale-105 transition-transform",
-                    gradientFrom, gradientTo
+                    "w-11 h-11 rounded-xl bg-gradient-to-br flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform duration-300",
+                    gradientFrom, gradientTo,
+                    iconColor === 'text-purple-500' && "shadow-lg shadow-purple-500/25",
+                    iconColor === 'text-orange-500' && "shadow-lg shadow-orange-500/25",
+                    iconColor === 'text-blue-500' && "shadow-lg shadow-blue-500/25"
                   )}>
                     {getContentIcon(resource.content_type, 'w-5 h-5 text-white')}
                   </div>
 
                   {/* Content */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <p className="font-medium text-gray-900 dark:text-gray-100 truncate group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="font-semibold text-gray-900 dark:text-white truncate group-hover:text-purple-500 dark:group-hover:text-purple-400 transition-colors">
                         {resource.title}
                       </p>
                       {isFavorite && (
-                        <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400 flex-shrink-0" />
+                        <Star className="w-4 h-4 fill-yellow-400 text-yellow-400 flex-shrink-0 drop-shadow-sm" />
+                      )}
+                      {isCompleted && (
+                        <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-500/10 border border-green-500/20">
+                          <CheckCircle2 className="w-3 h-3 text-green-500" />
+                          <span className="text-xs font-medium text-green-500">Done</span>
+                        </div>
                       )}
                     </div>
 
                     {/* Metadata row */}
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-3 text-sm">
                       {resource.session_number && (
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                        <span className="text-gray-500 dark:text-gray-400">
                           Session {resource.session_number}
                         </span>
                       )}
-                      {resource.session_number && resource.duration_seconds && (
-                        <span className="text-gray-300 dark:text-gray-600">•</span>
-                      )}
                       {resource.duration_seconds && (
-                        <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
+                        <span className="text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5" />
                           {formatDuration(resource.duration_seconds)}
                         </span>
-                      )}
-                      {resource.description && (
-                        <>
-                          <span className="text-gray-300 dark:text-gray-600">•</span>
-                          <span className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-[200px]">
-                            {resource.description}
-                          </span>
-                        </>
                       )}
                     </div>
                   </div>
 
                   {/* Action buttons - visible on hover */}
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         handleToggleFavorite(resource.id);
                       }}
                       className={cn(
-                        "w-8 h-8 rounded-md flex items-center justify-center transition-colors",
+                        "w-9 h-9 rounded-lg flex items-center justify-center transition-all border",
                         isFavorite
-                          ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600"
-                          : "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                          ? "bg-yellow-500/10 border-yellow-500/30 text-yellow-500"
+                          : "hover:bg-gray-100 dark:hover:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-400 hover:text-gray-600"
                       )}
                       title={isFavorite ? "Remove from favorites" : "Add to favorites"}
                     >
@@ -718,32 +741,19 @@ export default function LearningsPage() {
                         handleMarkComplete(resource.id);
                       }}
                       className={cn(
-                        "w-8 h-8 rounded-md flex items-center justify-center transition-colors",
+                        "w-9 h-9 rounded-lg flex items-center justify-center transition-all border",
                         isCompleted
-                          ? "bg-green-100 dark:bg-green-900/30 text-green-600"
-                          : "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                          ? "bg-green-500/10 border-green-500/30 text-green-500"
+                          : "hover:bg-gray-100 dark:hover:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-400 hover:text-gray-600"
                       )}
                       title={isCompleted ? "Mark as incomplete" : "Mark as complete"}
                     >
-                      <CheckCircle2 className={cn("w-4 h-4", isCompleted && "fill-green-500 text-white")} />
+                      <CheckCircle2 className={cn("w-4 h-4", isCompleted && "fill-current")} />
                     </button>
                   </div>
 
-                  {/* Completion indicator (always visible if completed) */}
-                  {isCompleted && (
-                    <div className="absolute top-1/2 -translate-y-1/2 right-3 w-5 h-5 rounded-full bg-green-500 flex items-center justify-center group-hover:hidden">
-                      <Check className="w-3 h-3 text-white" />
-                    </div>
-                  )}
-
-                  {/* Chevron/external link icon (hidden when completed indicator shown) */}
-                  {!isCompleted && (
-                    resource.content_type === 'link' ? (
-                      <ExternalLink className="w-4 h-4 text-gray-400 flex-shrink-0 group-hover:hidden" />
-                    ) : (
-                      <ChevronRight className="w-4 h-4 text-gray-400 group-hover:translate-x-0.5 transition-transform flex-shrink-0 group-hover:hidden" />
-                    )
-                  )}
+                  {/* Chevron */}
+                  <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-purple-500 group-hover:translate-x-1 transition-all flex-shrink-0" />
                 </button>
               );
             })}
@@ -759,35 +769,37 @@ export default function LearningsPage() {
     if (studies.length === 0 && !searchQuery) return null;
 
     return (
-      <div className="space-y-3">
+      <div className="space-y-4">
         {/* Section header */}
-        <div className="flex items-center gap-3 pb-2 border-b border-gray-200 dark:border-gray-800">
-          <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
-            <FileQuestion className="w-4 h-4 text-emerald-500" />
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+            <FileQuestion className="w-5 h-5 text-white" />
           </div>
-          <h3 className="font-semibold text-gray-900 dark:text-gray-100">Case Studies</h3>
-          <Badge variant="secondary" className="ml-auto bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
+          <h3 className="font-bold text-gray-900 dark:text-white text-lg">Case Studies</h3>
+          <Badge variant="secondary" className="ml-auto bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
             {filtered.length} {filtered.length === 1 ? 'study' : 'studies'}
           </Badge>
         </div>
 
         {filtered.length === 0 ? (
-          <p className="text-sm text-gray-500 dark:text-gray-400 py-4 text-center">No case studies found</p>
+          <div className="rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-700 py-8">
+            <p className="text-sm text-gray-500 dark:text-gray-400 text-center">No case studies found</p>
+          </div>
         ) : (
           <div className="grid gap-3">
             {filtered.map((cs) => (
               <div
                 key={cs.id}
-                className="p-4 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-gray-300 dark:hover:border-gray-700 transition-colors"
+                className="p-4 rounded-xl border-2 border-emerald-500/20 bg-white dark:bg-gray-900/80 hover:border-emerald-500/40 hover:shadow-lg hover:shadow-emerald-500/10 transition-all duration-300"
               >
-                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                  <div className="space-y-1">
-                    <h4 className="font-medium text-gray-900 dark:text-gray-100">{cs.title}</h4>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="space-y-1.5">
+                    <h4 className="font-semibold text-gray-900 dark:text-white">{cs.title}</h4>
                     {cs.description && (
                       <p className="text-sm text-gray-600 dark:text-gray-400">{cs.description}</p>
                     )}
                     {cs.due_date && (
-                      <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 pt-1">
+                      <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
                         <Calendar className="w-3.5 h-3.5" />
                         <span>Due: {formatDate(cs.due_date)}</span>
                       </div>
@@ -799,9 +811,9 @@ export default function LearningsPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => handleCaseStudyClick(cs, 'problem')}
-                        className="h-8 text-xs border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
+                        className="h-9 text-xs border-2 border-gray-300 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800"
                       >
-                        <FileQuestion className="w-3.5 h-3.5 mr-1.5" />
+                        <FileQuestion className="w-4 h-4 mr-1.5" />
                         Problem
                       </Button>
                     )}
@@ -810,13 +822,13 @@ export default function LearningsPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => handleCaseStudyClick(cs, 'solution')}
-                        className="h-8 text-xs text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+                        className="h-9 text-xs text-emerald-500 border-2 border-emerald-500/30 hover:border-emerald-500/50 hover:bg-emerald-500/10"
                       >
-                        <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
+                        <CheckCircle2 className="w-4 h-4 mr-1.5" />
                         Solution
                       </Button>
                     ) : cs.solution_doc_url && (
-                      <Badge variant="secondary" className="h-8 text-xs bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400">
+                      <Badge variant="secondary" className="h-9 text-xs bg-gray-500/10 border border-gray-500/20 text-gray-400 flex items-center">
                         Solution pending
                       </Badge>
                     )}
@@ -833,172 +845,180 @@ export default function LearningsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-4 border-b border-gray-200 dark:border-gray-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="space-y-1">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">My Learnings</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">My Learnings</h1>
           <p className="text-sm text-gray-600 dark:text-gray-400">
             Access your course materials, recordings, and presentations
           </p>
         </div>
-        <div className="relative w-full sm:w-72">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <div className="relative w-full sm:w-80">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <Input
             placeholder="Search by title..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 focus:border-purple-500 dark:focus:border-purple-400 transition-colors"
+            className="pl-11 h-11 bg-white dark:bg-gray-900/80 border-2 border-gray-200 dark:border-gray-800 rounded-xl focus:border-purple-500 dark:focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
           />
         </div>
       </div>
 
       {weeks.length === 0 ? (
-        <Card className="border-gray-200 dark:border-gray-800">
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4">
-              <BookOpen className="w-8 h-8 text-gray-400" />
+        <div className="rounded-2xl border-2 border-dashed border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50 py-20">
+          <div className="flex flex-col items-center justify-center">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center mb-4 shadow-lg shadow-purple-500/25">
+              <BookOpen className="w-8 h-8 text-white" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">No content yet</h3>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">No content yet</h3>
             <p className="text-sm text-gray-600 dark:text-gray-400 text-center max-w-sm">
               Learning content will appear here once your cohort begins. Stay tuned!
             </p>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       ) : (
         <div className="space-y-6">
           {/* Continue Where You Left Off - Shows actual assets */}
           {recentActivity.length > 0 && (
-            <Card className="overflow-hidden border border-gray-200 dark:border-gray-800 bg-gradient-to-br from-gray-50 to-white dark:from-gray-900 dark:to-gray-950 shadow-sm">
-              <CardHeader className="pb-4 border-b border-gray-100 dark:border-gray-800">
-                <div className="flex items-center justify-between">
+            <div className="relative rounded-2xl border border-purple-500/30 dark:border-purple-500/20 bg-gradient-to-br from-gray-900/50 to-gray-950 p-[1px] shadow-lg shadow-purple-500/5">
+              <div className="rounded-2xl bg-gradient-to-br from-gray-50 to-white dark:from-gray-900 dark:to-gray-950 overflow-hidden">
+                {/* Header */}
+                <div className="px-6 py-4 border-b border-gray-200/50 dark:border-gray-800/50 bg-gradient-to-r from-purple-500/5 to-transparent">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-md">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-lg shadow-purple-500/25">
                       <Clock className="w-5 h-5 text-white" />
                     </div>
                     <div>
-                      <CardTitle className="text-lg font-semibold text-gray-900 dark:text-gray-100">Continue where you left off</CardTitle>
-                      <CardDescription className="text-sm text-gray-500 dark:text-gray-400">
+                      <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Continue where you left off</h2>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
                         {recentActivity.length} recent {recentActivity.length === 1 ? 'asset' : 'assets'}
-                      </CardDescription>
+                      </p>
                     </div>
                   </div>
                 </div>
-              </CardHeader>
-              <CardContent className="pt-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {recentActivity.map((resource: any) => {
-                    const isFavorite = favoriteResources.has(resource.id);
-                    const isCompleted = completedResources.has(resource.id);
-                    const gradient = getContentGradient(resource.content_type);
-                    const typeLabel = getContentTypeLabel(resource.content_type);
 
-                    return (
-                      <button
-                        key={resource.id}
-                        onClick={() => handleResourceClick(resource)}
-                        className={cn(
-                          "relative p-4 rounded-xl border bg-white dark:bg-gray-900 text-left transition-all duration-200",
-                          "hover:shadow-lg hover:-translate-y-0.5 group",
-                          "border-gray-200 dark:border-gray-800",
-                          "hover:border-gray-300 dark:hover:border-gray-700"
-                        )}
-                      >
-                        {/* Content type badge - top left */}
-                        <div className={cn(
-                          "absolute top-3 left-3 flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium",
-                          resource.content_type === 'video' && "bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300",
-                          resource.content_type === 'slides' && "bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300",
-                          resource.content_type === 'document' && "bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300",
-                          !['video', 'slides', 'document'].includes(resource.content_type) && "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300"
-                        )}>
-                          {getContentIcon(resource.content_type, 'w-3.5 h-3.5')}
-                          <span>{typeLabel}</span>
-                        </div>
+                {/* Content */}
+                <div className="p-5">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {recentActivity.map((resource: any) => {
+                      const isFavorite = favoriteResources.has(resource.id);
+                      const isCompleted = completedResources.has(resource.id);
+                      const gradient = getContentGradient(resource.content_type);
+                      const typeLabel = getContentTypeLabel(resource.content_type);
 
-                        {/* Favorite indicator - top right */}
-                        {isFavorite && (
-                          <Star className="absolute top-3 right-3 w-4 h-4 fill-yellow-400 text-yellow-400" />
-                        )}
-
-                        {/* Main content */}
-                        <div className="pt-8 space-y-3">
-                          {/* Icon and title */}
-                          <div className="flex items-start gap-3">
-                            <div className={cn(
-                              "w-12 h-12 rounded-xl bg-gradient-to-br flex items-center justify-center shadow-sm flex-shrink-0 group-hover:scale-105 transition-transform",
-                              gradient.from, gradient.to
-                            )}>
-                              {getContentIcon(resource.content_type, 'w-6 h-6 text-white')}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-semibold text-gray-900 dark:text-gray-100 text-sm line-clamp-2 leading-tight group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
-                                {resource.title}
-                              </p>
-                              {/* Duration / metadata */}
-                              <div className="flex items-center gap-2 mt-1.5">
-                                {resource.duration_seconds && (
-                                  <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-                                    <Clock className="w-3 h-3" />
-                                    <span>{formatDuration(resource.duration_seconds)}</span>
-                                  </div>
-                                )}
-                                {isCompleted && (
-                                  <div className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
-                                    <CheckCircle2 className="w-3 h-3" />
-                                    <span>Completed</span>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
+                      return (
+                        <button
+                          key={resource.id}
+                          onClick={() => handleResourceClick(resource)}
+                          className={cn(
+                            "relative p-4 rounded-xl text-left transition-all duration-300 group",
+                            "border-2 bg-white dark:bg-gray-900/80 backdrop-blur-sm",
+                            resource.content_type === 'video' && "border-purple-500/20 hover:border-purple-500/50 hover:shadow-lg hover:shadow-purple-500/10",
+                            resource.content_type === 'slides' && "border-orange-500/20 hover:border-orange-500/50 hover:shadow-lg hover:shadow-orange-500/10",
+                            resource.content_type === 'document' && "border-blue-500/20 hover:border-blue-500/50 hover:shadow-lg hover:shadow-blue-500/10",
+                            !['video', 'slides', 'document'].includes(resource.content_type) && "border-gray-500/20 hover:border-gray-500/50",
+                            "hover:-translate-y-1"
+                          )}
+                        >
+                          {/* Content type badge - top left */}
+                          <div className={cn(
+                            "absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border",
+                            resource.content_type === 'video' && "bg-purple-500/10 border-purple-500/30 text-purple-400",
+                            resource.content_type === 'slides' && "bg-orange-500/10 border-orange-500/30 text-orange-400",
+                            resource.content_type === 'document' && "bg-blue-500/10 border-blue-500/30 text-blue-400",
+                            !['video', 'slides', 'document'].includes(resource.content_type) && "bg-gray-500/10 border-gray-500/30 text-gray-400"
+                          )}>
+                            {getContentIcon(resource.content_type, 'w-3.5 h-3.5')}
+                            <span>{typeLabel}</span>
                           </div>
 
-                          {/* Progress bar (for videos with progress) */}
-                          {resource.progress?.progress_seconds > 0 && resource.duration_seconds && !isCompleted && (
-                            <div className="space-y-1">
-                              <div className="flex items-center justify-between text-xs">
-                                <span className="text-gray-500 dark:text-gray-400">Progress</span>
-                                <span className="font-medium text-gray-700 dark:text-gray-300">
-                                  {Math.min(Math.round((resource.progress.progress_seconds / resource.duration_seconds) * 100), 100)}%
-                                </span>
-                              </div>
-                              <div className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                                <div
-                                  className={cn(
-                                    "h-full rounded-full transition-all duration-500",
-                                    resource.content_type === 'video' && "bg-purple-500",
-                                    resource.content_type === 'slides' && "bg-orange-500",
-                                    resource.content_type === 'document' && "bg-blue-500",
-                                    !['video', 'slides', 'document'].includes(resource.content_type) && "bg-gray-500"
-                                  )}
-                                  style={{ width: `${Math.min((resource.progress.progress_seconds / resource.duration_seconds) * 100, 100)}%` }}
-                                />
-                              </div>
-                            </div>
+                          {/* Favorite indicator - top right */}
+                          {isFavorite && (
+                            <Star className="absolute top-3 right-3 w-4 h-4 fill-yellow-400 text-yellow-400 drop-shadow-sm" />
                           )}
 
-                          {/* Click to open hint */}
-                          <div className="flex items-center justify-between pt-1 border-t border-gray-100 dark:border-gray-800">
-                            <span className="text-xs text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-400 transition-colors">
-                              Click to {resource.content_type === 'video' ? 'watch' : resource.content_type === 'slides' ? 'view slides' : 'open'}
-                            </span>
-                            <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-400 group-hover:translate-x-0.5 transition-all" />
+                          {/* Main content */}
+                          <div className="pt-10 space-y-3">
+                            {/* Icon and title */}
+                            <div className="flex items-start gap-3">
+                              <div className={cn(
+                                "w-12 h-12 rounded-xl bg-gradient-to-br flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform duration-300",
+                                gradient.from, gradient.to,
+                                resource.content_type === 'video' && "shadow-lg shadow-purple-500/30",
+                                resource.content_type === 'slides' && "shadow-lg shadow-orange-500/30",
+                                resource.content_type === 'document' && "shadow-lg shadow-blue-500/30"
+                              )}>
+                                {getContentIcon(resource.content_type, 'w-6 h-6 text-white')}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-semibold text-gray-900 dark:text-white text-sm line-clamp-2 leading-tight group-hover:text-purple-500 dark:group-hover:text-purple-400 transition-colors">
+                                  {resource.title}
+                                </p>
+                                {/* Duration / metadata */}
+                                <div className="flex items-center gap-2 mt-1.5">
+                                  {resource.duration_seconds && (
+                                    <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+                                      <Clock className="w-3 h-3" />
+                                      <span>{formatDuration(resource.duration_seconds)}</span>
+                                    </div>
+                                  )}
+                                  {isCompleted && (
+                                    <div className="flex items-center gap-1 text-xs text-green-500">
+                                      <CheckCircle2 className="w-3 h-3" />
+                                      <span>Completed</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Progress bar (for videos with progress) */}
+                            {resource.progress?.progress_seconds > 0 && resource.duration_seconds && !isCompleted && (
+                              <div className="space-y-1.5">
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="text-gray-500 dark:text-gray-400">Progress</span>
+                                  <span className="font-semibold text-gray-700 dark:text-gray-300">
+                                    {Math.min(Math.round((resource.progress.progress_seconds / resource.duration_seconds) * 100), 100)}%
+                                  </span>
+                                </div>
+                                <div className="w-full h-1.5 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
+                                  <div
+                                    className={cn(
+                                      "h-full rounded-full transition-all duration-500",
+                                      resource.content_type === 'video' && "bg-gradient-to-r from-purple-500 to-purple-400",
+                                      resource.content_type === 'slides' && "bg-gradient-to-r from-orange-500 to-orange-400",
+                                      resource.content_type === 'document' && "bg-gradient-to-r from-blue-500 to-blue-400",
+                                      !['video', 'slides', 'document'].includes(resource.content_type) && "bg-gray-500"
+                                    )}
+                                    style={{ width: `${Math.min((resource.progress.progress_seconds / resource.duration_seconds) * 100, 100)}%` }}
+                                  />
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Click to open hint */}
+                            <div className="flex items-center justify-between pt-2 border-t border-gray-200/50 dark:border-gray-800/50">
+                              <span className="text-xs text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-400 transition-colors">
+                                Click to {resource.content_type === 'video' ? 'watch' : resource.content_type === 'slides' ? 'view slides' : 'open'}
+                              </span>
+                              <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-purple-500 group-hover:translate-x-1 transition-all" />
+                            </div>
                           </div>
-                        </div>
-                      </button>
-                    );
-                  })}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           )}
 
           {/* Week Tabs with Progress */}
           <Tabs value={activeWeek} onValueChange={setActiveWeek}>
-            <div className="border-b border-gray-200 dark:border-gray-800">
-              <ScrollArea className="w-full pb-px">
-                <TabsList className="inline-flex h-auto items-center justify-start bg-transparent p-0 gap-0">
+            <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50 p-1.5">
+              <ScrollArea className="w-full">
+                <TabsList className="inline-flex h-auto items-center justify-start bg-transparent p-0 gap-1">
                   {weeks.map((week) => {
                     const progress = weekProgress[week];
-                    const progressPercent = progress ? Math.round((progress.completed / progress.total) * 100) : 0;
                     const isComplete = progress && progress.completed === progress.total && progress.total > 0;
 
                     return (
@@ -1006,9 +1026,9 @@ export default function LearningsPage() {
                         key={week}
                         value={week.toString()}
                         className={cn(
-                          "relative px-6 py-3 rounded-none border-b-2 border-transparent bg-transparent",
-                          "data-[state=active]:border-purple-500 data-[state=active]:text-purple-600 dark:data-[state=active]:text-purple-400",
-                          "hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-800/50",
+                          "relative px-4 py-2.5 rounded-lg bg-transparent",
+                          "data-[state=active]:bg-gradient-to-br data-[state=active]:from-purple-500 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-purple-500/25",
+                          "hover:bg-gray-100 dark:hover:bg-gray-800",
                           "transition-all duration-200"
                         )}
                       >
@@ -1018,10 +1038,10 @@ export default function LearningsPage() {
                             <Badge
                               variant="secondary"
                               className={cn(
-                                "text-xs px-1.5 py-0 h-5",
+                                "text-xs px-1.5 py-0 h-5 border",
                                 isComplete
-                                  ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
-                                  : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
+                                  ? "bg-green-500/20 border-green-500/30 text-green-400"
+                                  : "bg-gray-500/10 border-gray-500/20 text-gray-400 dark:text-gray-500"
                               )}
                             >
                               {isComplete ? (
@@ -1047,9 +1067,9 @@ export default function LearningsPage() {
               return (
                 <TabsContent key={week} value={week.toString()} className="space-y-6 mt-6">
                   {/* Week Title with Progress */}
-                  <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 p-4 rounded-xl bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800">
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-5 rounded-xl border-2 border-gray-200 dark:border-gray-800 bg-gradient-to-r from-gray-50 to-white dark:from-gray-900/80 dark:to-gray-900/40">
                     <div className="space-y-1">
-                      <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                      <h2 className="text-xl font-bold text-gray-900 dark:text-white">
                         Week {week}{content.modules[0]?.title ? `: ${content.modules[0].title}` : ''}
                       </h2>
                       {content.modules[0]?.description && (
@@ -1059,15 +1079,15 @@ export default function LearningsPage() {
                       )}
                     </div>
                     {progress && progress.total > 0 && (
-                      <div className="flex items-center gap-4 px-4 py-2 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 min-w-[180px]">
-                        <div className="flex-1 space-y-1">
+                      <div className="flex items-center gap-4 px-4 py-3 rounded-xl bg-white dark:bg-gray-900/80 border-2 border-purple-500/20 shadow-sm min-w-[200px]">
+                        <div className="flex-1 space-y-2">
                           <div className="flex items-center justify-between text-xs">
-                            <span className="text-gray-500 dark:text-gray-400">Progress</span>
-                            <span className="font-semibold text-gray-700 dark:text-gray-300">{progressPercent}%</span>
+                            <span className="text-gray-500 dark:text-gray-400 font-medium">Progress</span>
+                            <span className="font-bold text-purple-600 dark:text-purple-400">{progressPercent}%</span>
                           </div>
-                          <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                          <div className="w-full h-2 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
                             <div
-                              className="h-full bg-purple-500 rounded-full transition-all duration-500"
+                              className="h-full bg-gradient-to-r from-purple-500 to-purple-400 rounded-full transition-all duration-500"
                               style={{ width: `${progressPercent}%` }}
                             />
                           </div>
@@ -1119,11 +1139,11 @@ export default function LearningsPage() {
                    content.presentations.length === 0 &&
                    content.notes.length === 0 &&
                    content.caseStudies.length === 0 && (
-                    <div className="flex flex-col items-center justify-center py-12 rounded-lg border border-dashed border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50">
-                      <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-3">
-                        <BookOpen className="w-6 h-6 text-gray-400" />
+                    <div className="flex flex-col items-center justify-center py-16 rounded-2xl border-2 border-dashed border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/30">
+                      <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-gray-400 to-gray-500 flex items-center justify-center mb-4 shadow-lg shadow-gray-500/20">
+                        <BookOpen className="w-7 h-7 text-white" />
                       </div>
-                      <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
+                      <p className="text-sm text-gray-500 dark:text-gray-400 text-center font-medium">
                         No content available for this week yet
                       </p>
                     </div>
