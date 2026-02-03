@@ -492,6 +492,158 @@ select:focus-visible {
   animation: loader-pulse-glow 2s ease-in-out infinite;
 }
 
+/* ===========================================================================
+ * Futuristic Banner Animations
+ * Cyber-themed animations for welcome banners and headers
+ * ========================================================================= */
+
+/* Animated border glow */
+@keyframes border-glow {
+  0%, 100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.animate-border-glow {
+  animation: border-glow 3s ease-in-out infinite;
+}
+
+/* Horizontal gradient animation */
+@keyframes gradient-x {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.animate-gradient-x {
+  background-size: 200% 200%;
+  animation: gradient-x 8s ease infinite;
+}
+
+/* Slow pulse for orbs */
+@keyframes pulse-slow {
+  0%, 100% {
+    opacity: 0.2;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(1.1);
+  }
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 4s ease-in-out infinite;
+}
+
+/* Floating animations with different speeds */
+@keyframes float-banner {
+  0%, 100% {
+    transform: translateY(0) translateX(0);
+  }
+  25% {
+    transform: translateY(-10px) translateX(5px);
+  }
+  50% {
+    transform: translateY(-5px) translateX(-5px);
+  }
+  75% {
+    transform: translateY(-15px) translateX(3px);
+  }
+}
+
+.animate-float {
+  animation: float-banner 6s ease-in-out infinite;
+}
+
+.animate-float-delayed {
+  animation: float-banner 7s ease-in-out infinite;
+  animation-delay: 1s;
+}
+
+.animate-float-slow {
+  animation: float-banner 8s ease-in-out infinite;
+  animation-delay: 2s;
+}
+
+/* Scan line effect */
+@keyframes scan-line {
+  0% {
+    top: -20%;
+  }
+  100% {
+    top: 120%;
+  }
+}
+
+.animate-scan-line {
+  animation: scan-line 4s linear infinite;
+}
+
+/* Shimmer effect for cards */
+@keyframes shimmer-card {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(200%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer-card 3s ease-in-out infinite;
+}
+
+/* Cyber glow pulse */
+@keyframes cyber-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px oklch(0.65 0.2 195 / 0.3), 0 0 40px oklch(0.65 0.2 195 / 0.1);
+  }
+  50% {
+    box-shadow: 0 0 30px oklch(0.65 0.2 195 / 0.5), 0 0 60px oklch(0.65 0.2 195 / 0.2);
+  }
+}
+
+.animate-cyber-glow {
+  animation: cyber-glow 2s ease-in-out infinite;
+}
+
+/* Data stream effect */
+@keyframes data-stream {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 0 -100px;
+  }
+}
+
+.animate-data-stream {
+  animation: data-stream 2s linear infinite;
+}
+
+/* Breathing effect for icons */
+@keyframes breathe {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+}
+
+.animate-breathe {
+  animation: breathe 3s ease-in-out infinite;
+}
+
 /* Number input hide arrows */
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {

@@ -314,65 +314,109 @@ export default function CalendarPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header Card */}
-      <Card className="gradient-bg border-0">
-        <CardContent className="p-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="text-white">
-              <h1 className="text-2xl font-bold flex items-center gap-2">
-                <CalendarIcon className="w-6 h-6" />
-                Session Calendar
-              </h1>
-              <p className="text-white/80 mt-1">View and RSVP to your upcoming sessions</p>
-            </div>
-            {/* Timezone Mode Selector */}
-            <div className="flex items-center rounded-xl border-2 border-white/30 bg-white/10 backdrop-blur-sm p-1 gap-1">
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setTimezoneMode('ist')}
-                className={cn(
-                  'h-9 px-4 text-sm font-semibold transition-all rounded-lg border-2',
-                  timezoneMode === 'ist'
-                    ? 'bg-white text-purple-700 border-white shadow-lg hover:bg-white hover:text-purple-700'
-                    : 'text-white border-white/30 hover:text-white hover:bg-white/20 hover:border-white/50'
-                )}
-              >
-                <Globe className="w-4 h-4 mr-2" />
-                IST
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setTimezoneMode('utc')}
-                className={cn(
-                  'h-9 px-4 text-sm font-semibold transition-all rounded-lg border-2',
-                  timezoneMode === 'utc'
-                    ? 'bg-white text-purple-700 border-white shadow-lg hover:bg-white hover:text-purple-700'
-                    : 'text-white border-white/30 hover:text-white hover:bg-white/20 hover:border-white/50'
-                )}
-              >
-                <Clock className="w-4 h-4 mr-2" />
-                UTC
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setTimezoneMode('local')}
-                className={cn(
-                  'h-9 px-4 text-sm font-semibold transition-all rounded-lg border-2',
-                  timezoneMode === 'local'
-                    ? 'bg-white text-purple-700 border-white shadow-lg hover:bg-white hover:text-purple-700'
-                    : 'text-white border-white/30 hover:text-white hover:bg-white/20 hover:border-white/50'
-                )}
-              >
-                <CalendarIcon className="w-4 h-4 mr-2" />
-                Local
-              </Button>
-            </div>
+      {/* Futuristic Header Card */}
+      <div className="relative group">
+        {/* Animated border glow effect */}
+        <div className="absolute -inset-0.5 bg-gradient-to-r from-cyan-500 via-purple-500 to-pink-500 rounded-2xl blur-sm opacity-60 group-hover:opacity-80 transition duration-500 animate-border-glow" />
+
+        <Card className="relative overflow-hidden border-0 rounded-2xl">
+          {/* Deep space gradient background */}
+          <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-purple-900/90 to-slate-900">
+            {/* Animated gradient overlay */}
+            <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/10 via-purple-500/10 to-pink-500/10 animate-gradient-x" />
           </div>
-        </CardContent>
-      </Card>
+
+          {/* Cyber grid pattern */}
+          <div className="absolute inset-0 opacity-15">
+            <div className="absolute inset-0" style={{
+              backgroundImage: `
+                linear-gradient(rgba(6, 182, 212, 0.4) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(6, 182, 212, 0.4) 1px, transparent 1px)
+              `,
+              backgroundSize: '30px 30px',
+              maskImage: 'linear-gradient(to bottom, transparent, black 20%, black 80%, transparent)'
+            }} />
+          </div>
+
+          {/* Floating neon orbs */}
+          <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
+            <div className="absolute -top-10 -left-10 w-40 h-40 bg-cyan-500/20 rounded-full blur-3xl animate-pulse-slow" />
+            <div className="absolute -bottom-10 -right-10 w-48 h-48 bg-purple-500/20 rounded-full blur-3xl animate-float-delayed" />
+          </div>
+
+          <CardContent className="relative p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                {/* Glowing icon container */}
+                <div className="relative">
+                  <div className="absolute inset-0 bg-cyan-400 rounded-xl blur-md opacity-40 animate-pulse" />
+                  <div className="relative w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-400 to-purple-500 flex items-center justify-center shadow-lg shadow-cyan-500/30">
+                    <CalendarIcon className="w-6 h-6 text-white" />
+                  </div>
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold bg-gradient-to-r from-white via-cyan-100 to-purple-200 bg-clip-text text-transparent">
+                    Session Calendar
+                  </h1>
+                  <p className="text-cyan-200/70 text-sm mt-0.5">View and RSVP to your upcoming sessions</p>
+                </div>
+              </div>
+
+              {/* Futuristic Timezone Mode Selector */}
+              <div className="relative">
+                <div className="absolute -inset-0.5 bg-gradient-to-r from-cyan-500/50 to-purple-500/50 rounded-xl blur opacity-50" />
+                <div className="relative flex items-center rounded-xl border border-cyan-500/30 bg-slate-900/80 backdrop-blur-xl p-1 gap-1">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setTimezoneMode('ist')}
+                    className={cn(
+                      'h-9 px-4 text-sm font-semibold transition-all rounded-lg border',
+                      timezoneMode === 'ist'
+                        ? 'bg-gradient-to-r from-cyan-500 to-purple-500 text-white border-transparent shadow-lg shadow-cyan-500/30 hover:from-cyan-400 hover:to-purple-400'
+                        : 'text-cyan-300 border-cyan-500/30 hover:text-white hover:bg-cyan-500/20 hover:border-cyan-400/50'
+                    )}
+                  >
+                    <Globe className="w-4 h-4 mr-2" />
+                    IST
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setTimezoneMode('utc')}
+                    className={cn(
+                      'h-9 px-4 text-sm font-semibold transition-all rounded-lg border',
+                      timezoneMode === 'utc'
+                        ? 'bg-gradient-to-r from-cyan-500 to-purple-500 text-white border-transparent shadow-lg shadow-cyan-500/30 hover:from-cyan-400 hover:to-purple-400'
+                        : 'text-cyan-300 border-cyan-500/30 hover:text-white hover:bg-cyan-500/20 hover:border-cyan-400/50'
+                    )}
+                  >
+                    <Clock className="w-4 h-4 mr-2" />
+                    UTC
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setTimezoneMode('local')}
+                    className={cn(
+                      'h-9 px-4 text-sm font-semibold transition-all rounded-lg border',
+                      timezoneMode === 'local'
+                        ? 'bg-gradient-to-r from-cyan-500 to-purple-500 text-white border-transparent shadow-lg shadow-cyan-500/30 hover:from-cyan-400 hover:to-purple-400'
+                        : 'text-cyan-300 border-cyan-500/30 hover:text-white hover:bg-cyan-500/20 hover:border-cyan-400/50'
+                    )}
+                  >
+                    <CalendarIcon className="w-4 h-4 mr-2" />
+                    Local
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+
+          {/* Bottom neon line */}
+          <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-500 to-transparent" />
+        </Card>
+      </div>
 
       {/* Calendar */}
       <Card className="overflow-hidden shadow-lg">
