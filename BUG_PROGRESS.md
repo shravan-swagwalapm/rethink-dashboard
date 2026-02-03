@@ -1,0 +1,236 @@
+# Bug Fixing Progress Tracker
+
+**Project**: Rethink Dashboard
+**Started**: 2026-02-03
+**Workflow**: PM (Coordinator) + Builder Agent (Opus) + Verifier Agent (Opus)
+
+---
+
+## Summary Statistics
+
+| Metric | Count |
+|--------|-------|
+| Total Bugs Reported | 3 |
+| Fixed & Verified | 3 |
+| Features Completed | 1 |
+| In Progress | 0 |
+| Pending | 0 |
+
+---
+
+## Bug Log
+
+### Template for Each Bug:
+
+```
+### BUG-XXX: [Bug Title]
+
+**Status**: 🔴 Pending | 🟡 In Progress | 🟢 Fixed & Verified | ⚪ Won't Fix
+
+**Reported**: [Date]
+**Fixed**: [Date]
+
+**Description**:
+[What's the bug?]
+
+**Root Cause**:
+[Why did it happen?]
+
+**Builder Agent Notes**:
+- [Implementation details]
+- [Files changed]
+
+**Verifier Agent Notes**:
+- [Verification steps]
+- [Test results]
+- [Approval status]
+
+**Prevention**:
+[How to prevent this in future - added to CLAUDE.md]
+
+---
+```
+
+---
+
+## Bugs
+
+### BUG-001: Enhanced Country Code Picker with Search
+
+**Status**: :green_circle: Fixed & Verified
+
+**Reported**: 2026-02-03
+**Fixed**: 2026-02-03
+
+**Description**:
+Login page country code picker only had 10 hardcoded countries with no search functionality. Users from other countries couldn't easily find their dial code.
+
+**Root Cause**:
+Initial implementation used basic Select dropdown with hardcoded array of 10 countries. No search capability built in.
+
+**Builder Agent Notes**:
+- Created `/lib/data/countries.ts` with 243 countries (Afghanistan to Zimbabwe)
+- Defined `Country` interface: `{ code, name, flag, iso2 }`
+- Created `POPULAR_COUNTRIES` (15) and `ALL_COUNTRIES` (243) arrays
+- Added `getCountryByCode()` and `getCountryByIso2()` helper functions
+- Rewrote `/components/ui/country-code-picker.tsx` using Popover+Command pattern
+- Search filters by name (partial match) OR dial code (startsWith)
+- Two groups: "Popular" and "All Countries"
+- Responsive: mobile-friendly width handling
+- Backward compatible: same props interface
+
+**Verifier Agent Notes**:
+- All 21 verification checklist items: PASS
+- Build: `npm run build` - SUCCESS (70 pages generated)
+- Data integrity: 243 unique countries, no duplicates
+- All dial codes have + prefix
+- All flags are valid Unicode emojis
+- Spot checks passed: India, USA, Germany, Afghanistan, Zimbabwe
+- Edge cases handled: shared dial codes (+1 US/Canada), multi-digit codes
+- **Final Verdict: APPROVED**
+
+**Prevention**:
+- When building international phone inputs, always use comprehensive country list
+- Include search functionality for lists > 10 items
+
+---
+
+### BUG-002: Unregistered Users Can Sign In
+
+**Status**: :green_circle: Fixed & Verified
+
+**Reported**: 2026-02-03
+**Fixed**: 2026-02-03
+
+**Description**:
+Unregistered users could sign in with Google OAuth and see "no cohort assigned" instead of being blocked entirely. Should show "Unregistered email ID" error.
+
+**Root Cause**:
+Database trigger `on_auth_user_created` auto-creates profiles when users sign in with Google. This happened BEFORE the whitelist check ran, so `isEmailWhitelisted()` found the auto-created profile and returned `allowed: true`.
+
+**Builder Agent Notes**:
+- Modified `/lib/auth/whitelist.ts` to check if user was **actually invited**:
+  - Must have `cohort_id` set in profiles table (legacy), OR
+  - Must have entry in `user_role_assignments` table (new multi-role)
+- Just having a profile (auto-created by trigger) is NOT enough anymore
+- Updated error message: "Unregistered email ID. Please login with your registered email or contact admin for access."
+
+**Verifier Agent Notes**:
+- All 3 scenarios verified: PASS
+  - Scenario A (Registered with cohort_id): Allowed ✅
+  - Scenario B (Unregistered, no assignments): Blocked ✅
+  - Scenario C (Multi-role with assignments): Allowed ✅
+- Edge cases analyzed: All handled safely
+- Security assessment: No vulnerabilities
+- **Final Verdict: APPROVED**
+
+**Prevention**:
+- Profile existence ≠ invitation. Always check for admin-assigned data
+- Database triggers can create records before validation runs - account for this
+
+---
+
+### BUG-003: Non-Admin Can Login as Administrator
+
+**Status**: :green_circle: Fixed & Verified
+
+**Reported**: 2026-02-03
+**Fixed**: 2026-02-03
+
+**Description**:
+Students could click "Sign in as Administrator" and login successfully, getting redirected to /dashboard instead of being blocked. Should show error "You are not an admin".
+
+**Root Cause**:
+In `/app/auth/callback/admin/route.ts`, when a non-admin user tried admin login, they were just redirected to `/dashboard` instead of being signed out and shown an error.
+
+**Fix Applied**:
+- Modified admin callback to sign out non-admin users: `await supabase.auth.signOut()`
+- Redirect to `/login?error=not_admin` with clear error message
+- Updated error message: "You are not an admin. Please login with an admin account or use regular login."
+
+**Files Changed**:
+- `/app/auth/callback/admin/route.ts` - Sign out + redirect with error
+- `/app/(auth)/login/page.tsx` - Updated error message
+
+**Verification**:
+- Non-admin clicks "Sign in as Administrator" → Blocked with error ✅
+- Admin clicks "Sign in as Administrator" → Allowed to /admin ✅
+
+---
+
+## Features
+
+### FEATURE-001: Support Ticket System for Students
+
+**Status**: 🟢 Completed & Verified
+
+**Requested**: 2026-02-03
+**Completed**: 2026-02-03
+
+**Description**:
+Build a complete support ticket system where students can create tickets, have conversations with admins, and track their issues via a dedicated `/support` page.
+
+**Builder Agent Notes**:
+- Created `/app/(dashboard)/support/page.tsx` - Full student support page with:
+  - Stats cards (Total, Open, In Progress, Resolved)
+  - Create ticket form (category dropdown, summary, description)
+  - Tickets list with status badges
+  - Ticket detail dialog with conversation thread
+  - Reply functionality
+  - Close ticket option
+- Created `/app/api/support/route.ts` - Student API (GET tickets, POST new ticket)
+- Created `/app/api/support/[id]/route.ts` - Single ticket ops (GET, POST reply, PATCH close)
+- Created `/app/api/admin/support/[id]/responses/route.ts` - Admin fetch responses
+- Modified `/app/api/admin/support/route.ts` - Added admin reply functionality
+- Modified `/app/(admin)/admin/support/page.tsx` - Added conversation view & reply UI
+- Created `/supabase/migrations/014_support_ticket_responses.sql` - Database migration
+- Categories: Technical, Payment, Content, Schedule, Other
+
+**Verifier Agent Notes**:
+- Build: PASS
+- Code Quality: GOOD (proper validation, error handling)
+- Security: SECURE (auth checks, RLS policies, input validation)
+- UX: GOOD (loading states, proper alignment, mobile responsive)
+- Student UI: COMPLETE
+- Admin UI: COMPLETE (after fix round)
+- **Final Verdict: APPROVED**
+
+**Files Created**:
+- `/app/(dashboard)/support/page.tsx`
+- `/app/api/support/route.ts`
+- `/app/api/support/[id]/route.ts`
+- `/app/api/admin/support/[id]/responses/route.ts`
+- `/supabase/migrations/014_support_ticket_responses.sql`
+
+**Files Modified**:
+- `/app/api/admin/support/route.ts`
+- `/app/(admin)/admin/support/page.tsx`
+
+---
+
+## Session Log
+
+### Session 1 - 2026-02-03
+
+**Time Started**: 10:15 PM
+**Bugs Fixed This Session**: 3
+
+| Bug ID | Title | Status | Time to Fix |
+|--------|-------|--------|-------------|
+| BUG-001 | Enhanced Country Code Picker with Search | Fixed & Verified | ~10 min |
+| BUG-002 | Unregistered Users Can Sign In | Fixed & Verified | ~8 min |
+| BUG-003 | Non-Admin Can Login as Administrator | Fixed & Verified | ~3 min |
+| FEATURE-001 | Support Ticket System for Students | Completed | ~15 min |
+
+---
+
+## Notes
+
+- All fixes are implemented by **Builder Agent (Opus)** acting as Staff Engineer
+- All fixes are verified by **Verifier Agent (Opus)** acting as Staff Engineer
+- PM coordinates the workflow and updates this progress file
+- After each fix, learnings are added to CLAUDE.md's "Past Mistakes" section
+
+---
+
+*Last Updated: 2026-02-03 11:45 PM - FEATURE-001 Support Ticket System completed*
