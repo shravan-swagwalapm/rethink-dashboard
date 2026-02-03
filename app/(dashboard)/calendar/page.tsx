@@ -132,7 +132,11 @@ export default function CalendarPage() {
           user_id: profile.id,
           response,
           reminder_enabled: selectedSession.user_rsvp?.reminder_enabled ?? true,
-        });
+        }, {
+          onConflict: 'session_id,user_id',
+        })
+        .select()
+        .single();
 
       if (error) throw error;
 
@@ -182,26 +186,72 @@ export default function CalendarPage() {
   };
 
   const handleToggleReminder = async () => {
-    if (!selectedSession?.user_rsvp || !profile) return;
+    if (!selectedSession || !profile) return;
 
     const supabase = getClient();
-    const newValue = !selectedSession.user_rsvp.reminder_enabled;
+    const newReminderEnabled = !(selectedSession.user_rsvp?.reminder_enabled ?? false);
 
     try {
-      const { error } = await supabase
-        .from('rsvps')
-        .update({ reminder_enabled: newValue })
-        .eq('id', selectedSession.user_rsvp.id);
+      // If enabling reminder and no RSVP exists, create one with 'yes'
+      if (newReminderEnabled && !selectedSession.user_rsvp) {
+        const { error } = await supabase
+          .from('rsvps')
+          .upsert({
+            session_id: selectedSession.id,
+            user_id: profile.id,
+            response: 'yes',
+            reminder_enabled: true,
+          }, {
+            onConflict: 'session_id,user_id',
+          })
+          .select()
+          .single();
 
-      if (error) throw error;
+        if (error) throw error;
 
-      setSelectedSession(prev =>
-        prev?.user_rsvp
-          ? { ...prev, user_rsvp: { ...prev.user_rsvp, reminder_enabled: newValue } }
-          : prev
-      );
+        // Update local state with new RSVP
+        const newRsvp = {
+          id: '',
+          session_id: selectedSession.id,
+          user_id: profile.id,
+          response: 'yes' as const,
+          reminder_enabled: true,
+          created_at: new Date().toISOString(),
+        };
 
-      toast.success(newValue ? 'Reminder enabled' : 'Reminder disabled');
+        setSessions(prev =>
+          prev.map(s =>
+            s.id === selectedSession.id
+              ? { ...s, user_rsvp: newRsvp }
+              : s
+          )
+        );
+
+        setSelectedSession(prev =>
+          prev ? { ...prev, user_rsvp: newRsvp } : null
+        );
+
+        toast.success("Reminder enabled - You're marked as attending!");
+        return;
+      }
+
+      // Existing logic for toggling reminder when RSVP exists
+      if (selectedSession.user_rsvp) {
+        const { error } = await supabase
+          .from('rsvps')
+          .update({ reminder_enabled: newReminderEnabled })
+          .eq('id', selectedSession.user_rsvp.id);
+
+        if (error) throw error;
+
+        setSelectedSession(prev =>
+          prev?.user_rsvp
+            ? { ...prev, user_rsvp: { ...prev.user_rsvp, reminder_enabled: newReminderEnabled } }
+            : prev
+        );
+
+        toast.success(newReminderEnabled ? 'Reminder enabled' : 'Reminder disabled');
+      }
     } catch (error) {
       console.error('Error toggling reminder:', error);
       toast.error('Failed to update reminder');
@@ -481,23 +531,26 @@ export default function CalendarPage() {
                 </div>
               </div>
 
-              {/* Reminder Toggle */}
-              {selectedSession.user_rsvp?.response === 'yes' && (
-                <div className="flex items-center justify-between p-3 rounded-lg bg-muted">
-                  <div className="flex items-center gap-2">
-                    {selectedSession.user_rsvp.reminder_enabled ? (
-                      <Bell className="w-4 h-4 text-primary" />
-                    ) : (
-                      <BellOff className="w-4 h-4 text-muted-foreground" />
-                    )}
+              {/* Reminder Toggle - always visible, auto-RSVPs when enabled without existing RSVP */}
+              <div className="flex items-center justify-between p-3 rounded-lg bg-muted">
+                <div className="flex items-center gap-2">
+                  {selectedSession.user_rsvp?.reminder_enabled ? (
+                    <Bell className="w-4 h-4 text-primary" />
+                  ) : (
+                    <BellOff className="w-4 h-4 text-muted-foreground" />
+                  )}
+                  <div className="flex flex-col">
                     <span className="text-sm font-medium">Session reminder</span>
+                    {!selectedSession.user_rsvp && (
+                      <span className="text-xs text-muted-foreground">Enabling will also RSVP you as attending</span>
+                    )}
                   </div>
-                  <Switch
-                    checked={selectedSession.user_rsvp.reminder_enabled}
-                    onCheckedChange={handleToggleReminder}
-                  />
                 </div>
-              )}
+                <Switch
+                  checked={selectedSession.user_rsvp?.reminder_enabled ?? false}
+                  onCheckedChange={handleToggleReminder}
+                />
+              </div>
 
               {/* Timezone Note */}
               <p className="text-xs text-muted-foreground text-center pt-2">

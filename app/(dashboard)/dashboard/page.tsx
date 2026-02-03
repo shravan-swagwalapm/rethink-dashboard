@@ -482,8 +482,9 @@ export default function DashboardPage() {
             ) : (
               <div className="space-y-3">
                 {upcomingSessions.map((session, index) => (
-                  <div
+                  <Link
                     key={session.id}
+                    href="/calendar"
                     className="group relative flex items-center gap-4 p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-gradient-to-br from-blue-50/50 to-cyan-50/50 dark:from-blue-950/20 dark:to-cyan-950/20 hover:from-blue-50 hover:to-cyan-50 dark:hover:from-blue-950/30 dark:hover:to-cyan-950/30 transition-all duration-300 hover:shadow-md hover:scale-[1.02]"
                     style={{
                       animationDelay: `${index * 100}ms`,
@@ -512,7 +513,7 @@ export default function DashboardPage() {
                     <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800 font-medium">
                       {getSessionTimeLabel(session.scheduled_at)}
                     </Badge>
-                  </div>
+                  </Link>
                 ))}
               </div>
             )}
