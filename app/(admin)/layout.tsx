@@ -12,7 +12,6 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   LayoutDashboard,
   Users,
-  UserPlus,
   CalendarDays,
   Video,
   FolderOpen,
@@ -29,7 +28,6 @@ import { FullPageLoader } from '@/components/ui/page-loader';
 
 const adminNavItems = [
   { label: 'Overview', href: '/admin', icon: LayoutDashboard },
-  { label: 'Invites', href: '/admin/invites', icon: UserPlus },
   { label: 'Cohorts', href: '/admin/cohorts', icon: CalendarDays },
   { label: 'Users', href: '/admin/users', icon: Users },
   { label: 'Sessions', href: '/admin/sessions', icon: Video },

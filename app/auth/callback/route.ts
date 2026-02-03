@@ -1,7 +1,7 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { isEmailDomainAllowed, bypassesWhitelist } from '@/lib/auth/allowed-domains';
-import { isEmailWhitelisted, markInviteAsAccepted } from '@/lib/auth/whitelist';
+import { isEmailWhitelisted } from '@/lib/auth/whitelist';
 
 // This route handles USER login mode (default)
 // Path: /auth/callback
@@ -92,7 +92,7 @@ export async function GET(request: Request) {
         console.error('Error creating whitelist-bypass profile:', upsertError);
       }
     } else {
-      // Step 3: Check if email is whitelisted (exists in invites or profiles)
+      // Step 3: Check if email is whitelisted (exists in profiles)
       const whitelist = await isEmailWhitelisted(userEmail);
 
       if (!whitelist.allowed) {
@@ -100,12 +100,7 @@ export async function GET(request: Request) {
         return NextResponse.redirect(`${origin}/login?error=not_invited`);
       }
 
-      // Step 4: If user is from invites table (first login), update invite status
-      if (whitelist.existsInInvites && whitelist.inviteId) {
-        await markInviteAsAccepted(whitelist.inviteId);
-      }
-
-      // Step 5: Check if there's an existing profile with the same email (different auth provider)
+      // Step 4: Check if there's an existing profile with the same email (different auth provider)
       // and copy cohort_id to the new profile
       const { data: existingProfiles } = await adminClient
         .from('profiles')

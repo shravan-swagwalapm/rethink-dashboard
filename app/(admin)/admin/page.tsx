@@ -8,7 +8,6 @@ import { PageLoader } from '@/components/ui/page-loader';
 import Link from 'next/link';
 import {
   Users,
-  UserPlus,
   CalendarDays,
   Video,
   TrendingUp,
@@ -24,7 +23,6 @@ interface AdminStats {
   totalMentors: number;
   activeCohorts: number;
   upcomingSessions: number;
-  pendingInvites: number;
   openTickets: number;
   avgAttendance: number;
 }
@@ -83,7 +81,7 @@ export default function AdminPage() {
   }, []);
 
   const quickActions = [
-    { label: 'Send Invites', href: '/admin/invites', icon: UserPlus, color: 'bg-blue-500' },
+    { label: 'Manage Users', href: '/admin/users', icon: Users, color: 'bg-blue-500' },
     { label: 'Create Session', href: '/admin/sessions', icon: Video, color: 'bg-purple-500' },
     { label: 'Manage Cohorts', href: '/admin/cohorts', icon: CalendarDays, color: 'bg-green-500' },
     { label: 'View Support', href: '/admin/support', icon: HelpCircle, color: 'bg-amber-500' },
@@ -163,10 +161,10 @@ export default function AdminPage() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Pending Actions</p>
-                <p className="text-3xl font-bold">{(stats?.pendingInvites || 0) + (stats?.openTickets || 0)}</p>
+                <p className="text-sm text-muted-foreground">Open Tickets</p>
+                <p className="text-3xl font-bold">{stats?.openTickets || 0}</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {stats?.pendingInvites} invites, {stats?.openTickets} tickets
+                  Support requests pending
                 </p>
               </div>
               <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center">
@@ -238,7 +236,7 @@ export default function AdminPage() {
       </div>
 
       {/* Pending Items */}
-      {((stats?.pendingInvites || 0) > 0 || (stats?.openTickets || 0) > 0) && (
+      {(stats?.openTickets || 0) > 0 && (
         <Card className="border-amber-500/50 bg-amber-500/5">
           <CardHeader>
             <CardTitle className="text-amber-600 dark:text-amber-400">
@@ -250,24 +248,13 @@ export default function AdminPage() {
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-4">
-              {(stats?.pendingInvites || 0) > 0 && (
-                <Link href="/admin/invites">
-                  <Button variant="outline" className="gap-2">
-                    <Badge variant="secondary">{stats?.pendingInvites}</Badge>
-                    Pending Invites
-                    <ArrowRight className="w-4 h-4" />
-                  </Button>
-                </Link>
-              )}
-              {(stats?.openTickets || 0) > 0 && (
-                <Link href="/admin/support">
-                  <Button variant="outline" className="gap-2">
-                    <Badge variant="secondary">{stats?.openTickets}</Badge>
-                    Open Tickets
-                    <ArrowRight className="w-4 h-4" />
-                  </Button>
-                </Link>
-              )}
+              <Link href="/admin/support">
+                <Button variant="outline" className="gap-2">
+                  <Badge variant="secondary">{stats?.openTickets}</Badge>
+                  Open Tickets
+                  <ArrowRight className="w-4 h-4" />
+                </Button>
+              </Link>
             </div>
           </CardContent>
         </Card>

@@ -33,7 +33,6 @@ export async function GET() {
       { count: totalMentors },
       { count: activeCohorts },
       { count: upcomingSessions },
-      { count: pendingInvites },
       { count: openTickets },
       { data: attendance },
     ] = await Promise.all([
@@ -42,7 +41,6 @@ export async function GET() {
       adminClient.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'mentor'),
       adminClient.from('cohorts').select('*', { count: 'exact', head: true }).eq('status', 'active'),
       adminClient.from('sessions').select('*', { count: 'exact', head: true }).gte('scheduled_at', new Date().toISOString()),
-      adminClient.from('invites').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
       adminClient.from('support_tickets').select('*', { count: 'exact', head: true }).eq('status', 'open'),
       adminClient.from('attendance').select('attendance_percentage'),
     ]);
@@ -59,7 +57,6 @@ export async function GET() {
       totalMentors: totalMentors || 0,
       activeCohorts: activeCohorts || 0,
       upcomingSessions: upcomingSessions || 0,
-      pendingInvites: pendingInvites || 0,
       openTickets: openTickets || 0,
       avgAttendance,
     });

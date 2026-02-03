@@ -1,7 +1,7 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { isEmailDomainAllowed, bypassesWhitelist } from '@/lib/auth/allowed-domains';
-import { isEmailWhitelisted, markInviteAsAccepted } from '@/lib/auth/whitelist';
+import { isEmailWhitelisted } from '@/lib/auth/whitelist';
 
 // This route handles ADMIN login mode
 // Path: /auth/callback/admin
@@ -71,17 +71,12 @@ export async function GET(request: Request) {
       }
       userRole = existingRole;
     } else {
-      // Step 3: Check if email is whitelisted (exists in invites or profiles)
+      // Step 3: Check if email is whitelisted (exists in profiles)
       const whitelist = await isEmailWhitelisted(userEmail);
 
       if (!whitelist.allowed) {
         await supabase.auth.signOut();
         return NextResponse.redirect(`${origin}/login?error=not_invited`);
-      }
-
-      // Step 4: If user is from invites table (first login), update invite status
-      if (whitelist.existsInInvites && whitelist.inviteId) {
-        await markInviteAsAccepted(whitelist.inviteId);
       }
 
       // Fetch existing profile to get role
