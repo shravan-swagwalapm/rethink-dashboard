@@ -462,62 +462,112 @@ export default function SupportPage() {
 
       {/* Ticket Detail Dialog */}
       <Dialog open={ticketDetailOpen} onOpenChange={setTicketDetailOpen}>
-        <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
+        <DialogContent className="sm:max-w-[650px] max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden">
           {loadingDetail ? (
-            <div className="py-12 text-center">
-              <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mx-auto mb-4" />
-              <p className="text-sm text-muted-foreground">Loading ticket...</p>
+            <div className="p-6 space-y-4">
+              {/* Header Skeleton */}
+              <div className="space-y-3">
+                <div className="h-6 w-3/4 bg-muted animate-pulse rounded" />
+                <div className="flex gap-2">
+                  <div className="h-5 w-20 bg-muted animate-pulse rounded-full" />
+                  <div className="h-5 w-32 bg-muted animate-pulse rounded" />
+                </div>
+              </div>
+              {/* Description Skeleton */}
+              <div className="p-4 bg-muted/30 rounded-xl space-y-2">
+                <div className="h-4 w-full bg-muted animate-pulse rounded" />
+                <div className="h-4 w-2/3 bg-muted animate-pulse rounded" />
+              </div>
+              {/* Messages Skeleton */}
+              <div className="space-y-3 py-4">
+                <div className="flex justify-start">
+                  <div className="h-16 w-2/3 bg-muted animate-pulse rounded-2xl" />
+                </div>
+                <div className="flex justify-end">
+                  <div className="h-16 w-2/3 bg-muted animate-pulse rounded-2xl" />
+                </div>
+              </div>
             </div>
           ) : selectedTicket ? (
             <>
-              <DialogHeader>
-                <div className="flex items-center gap-2">
-                  {(() => {
-                    const categoryConfig = getCategoryConfig(selectedTicket.category);
-                    const CategoryIcon = categoryConfig.icon;
-                    return <CategoryIcon className={`w-5 h-5 ${categoryConfig.color}`} />;
-                  })()}
-                  <DialogTitle className="line-clamp-1">{selectedTicket.summary}</DialogTitle>
-                </div>
-                <DialogDescription className="flex items-center gap-2 flex-wrap">
-                  <Badge className={`${STATUS_CONFIG[selectedTicket.status].color} border-0`}>
-                    {STATUS_CONFIG[selectedTicket.status].label}
-                  </Badge>
-                  <span>|</span>
-                  <span>{format(new Date(selectedTicket.created_at), 'MMM d, yyyy h:mm a')}</span>
-                </DialogDescription>
-              </DialogHeader>
+              {/* Header Section */}
+              <div className="p-6 border-b bg-gradient-to-br from-muted/30 to-background">
+                <DialogHeader className="space-y-3">
+                  <div className="flex items-start gap-3">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                      getCategoryConfig(selectedTicket.category).color
+                    } bg-muted`}>
+                      {(() => {
+                        const categoryConfig = getCategoryConfig(selectedTicket.category);
+                        const CategoryIcon = categoryConfig.icon;
+                        return <CategoryIcon className="w-5 h-5" />;
+                      })()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <DialogTitle className="text-lg font-semibold leading-tight">
+                        {selectedTicket.summary}
+                      </DialogTitle>
+                      <DialogDescription className="flex items-center gap-2 flex-wrap mt-2">
+                        <Badge className={`${STATUS_CONFIG[selectedTicket.status].color} border-0`}>
+                          {(() => {
+                            const StatusIcon = STATUS_CONFIG[selectedTicket.status].icon;
+                            return <StatusIcon className="w-3 h-3 mr-1" />;
+                          })()}
+                          {STATUS_CONFIG[selectedTicket.status].label}
+                        </Badge>
+                        <span className="text-muted-foreground">|</span>
+                        <span className="text-muted-foreground text-sm">
+                          {format(new Date(selectedTicket.created_at), 'MMM d, yyyy h:mm a')}
+                        </span>
+                      </DialogDescription>
+                    </div>
+                  </div>
+                </DialogHeader>
 
-              {/* Initial Description */}
-              {selectedTicket.description && (
-                <div className="p-3 bg-muted/50 rounded-lg text-sm">
-                  <p className="text-muted-foreground whitespace-pre-wrap">{selectedTicket.description}</p>
-                </div>
-              )}
+                {/* Initial Description */}
+                {selectedTicket.description && (
+                  <div className="mt-4 p-4 bg-muted/50 rounded-xl border border-muted">
+                    <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">
+                      Initial Description
+                    </p>
+                    <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
+                      {selectedTicket.description}
+                    </p>
+                  </div>
+                )}
+              </div>
 
               {/* Conversation Thread */}
-              <ScrollArea className="flex-1 max-h-[300px] pr-4">
-                <div className="space-y-4 py-2">
+              <ScrollArea className="flex-1 min-h-[200px] max-h-[350px]">
+                <div className="p-6 space-y-4">
                   {selectedTicket.responses.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground text-sm">
-                      No responses yet. An admin will respond soon.
+                    <div className="flex flex-col items-center justify-center py-12 text-center">
+                      <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+                        <MessageSquare className="w-8 h-8 text-muted-foreground/50" />
+                      </div>
+                      <p className="text-sm font-medium text-muted-foreground">No responses yet</p>
+                      <p className="text-xs text-muted-foreground/70 mt-1">An admin will respond soon</p>
                     </div>
                   ) : (
                     selectedTicket.responses.map(response => (
                       <div
                         key={response.id}
-                        className={`flex ${response.is_admin ? 'justify-end' : 'justify-start'}`}
+                        className={`flex ${response.is_admin ? 'justify-end' : 'justify-start'} transition-all duration-200`}
                       >
                         <div
-                          className={`max-w-[80%] p-3 rounded-lg ${
+                          className={`max-w-[80%] p-4 rounded-2xl transition-all duration-200 hover:shadow-md ${
                             response.is_admin
-                              ? 'bg-primary text-primary-foreground'
-                              : 'bg-muted'
+                              ? 'bg-primary text-primary-foreground rounded-br-md'
+                              : 'bg-muted rounded-bl-md'
                           }`}
                         >
-                          <p className="text-sm whitespace-pre-wrap">{response.message}</p>
-                          <p className={`text-xs mt-1 ${response.is_admin ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
-                            {response.is_admin ? 'Admin' : 'You'} | {format(new Date(response.created_at), 'MMM d, h:mm a')}
+                          <p className="text-sm whitespace-pre-wrap leading-relaxed">{response.message}</p>
+                          <p className={`text-xs mt-2 flex items-center gap-1.5 ${
+                            response.is_admin ? 'text-primary-foreground/70' : 'text-muted-foreground'
+                          }`}>
+                            <span className="font-medium">{response.is_admin ? 'Admin' : 'You'}</span>
+                            <span className="opacity-50">|</span>
+                            <span>{format(new Date(response.created_at), 'MMM d, h:mm a')}</span>
                           </p>
                         </div>
                       </div>
@@ -528,39 +578,57 @@ export default function SupportPage() {
               </ScrollArea>
 
               {/* Reply Input */}
-              {selectedTicket.status !== 'resolved' && (
-                <div className="flex gap-2 pt-2 border-t">
-                  <Textarea
-                    placeholder="Type your reply..."
-                    value={replyMessage}
-                    onChange={e => setReplyMessage(e.target.value)}
-                    className="min-h-[60px]"
-                    maxLength={2000}
-                  />
-                  <Button
-                    onClick={handleSendReply}
-                    disabled={sendingReply || !replyMessage.trim()}
-                    size="icon"
-                    className="shrink-0"
-                  >
-                    <Send className="w-4 h-4" />
-                  </Button>
+              {selectedTicket.status !== 'resolved' ? (
+                <div className="p-4 border-t bg-muted/20">
+                  <div className="flex gap-3">
+                    <Textarea
+                      placeholder="Type your reply..."
+                      value={replyMessage}
+                      onChange={e => setReplyMessage(e.target.value)}
+                      className="min-h-[80px] resize-none rounded-xl border-muted focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200"
+                      maxLength={2000}
+                    />
+                    <div className="flex flex-col gap-2">
+                      <Button
+                        onClick={handleSendReply}
+                        disabled={sendingReply || !replyMessage.trim()}
+                        size="icon"
+                        className="h-10 w-10 rounded-xl shrink-0 transition-all duration-200 hover:scale-105"
+                      >
+                        {sendingReply ? (
+                          <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                        ) : (
+                          <Send className="w-4 h-4" />
+                        )}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={handleCloseTicket}
+                        disabled={closingTicket}
+                        size="icon"
+                        className="h-10 w-10 rounded-xl shrink-0 transition-all duration-200 hover:scale-105 hover:border-destructive hover:text-destructive"
+                        title="Close Ticket"
+                      >
+                        {closingTicket ? (
+                          <div className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" />
+                        ) : (
+                          <X className="w-4 h-4" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {replyMessage.length}/2000 characters
+                  </p>
+                </div>
+              ) : (
+                <div className="p-4 border-t bg-green-50 dark:bg-green-950/20">
+                  <div className="flex items-center justify-center gap-2 text-green-600 dark:text-green-400">
+                    <CheckCircle className="w-4 h-4" />
+                    <span className="text-sm font-medium">This ticket has been resolved</span>
+                  </div>
                 </div>
               )}
-
-              <DialogFooter>
-                {selectedTicket.status !== 'resolved' && (
-                  <Button
-                    variant="outline"
-                    onClick={handleCloseTicket}
-                    disabled={closingTicket}
-                    className="gap-1"
-                  >
-                    <X className="w-4 h-4" />
-                    {closingTicket ? 'Closing...' : 'Close Ticket'}
-                  </Button>
-                )}
-              </DialogFooter>
             </>
           ) : null}
         </DialogContent>
