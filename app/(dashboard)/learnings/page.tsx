@@ -88,15 +88,39 @@ function getContentGradient(type: ModuleResourceType): { from: string; to: strin
 }
 
 // Get embed URL for Google Drive content
+// For view-only folders, we use specific URL formats that work better
 function getEmbedUrl(resource: ModuleResource): string {
   const id = resource.google_drive_id;
   if (!id) return resource.external_url || '';
 
   switch (resource.content_type) {
-    case 'video': return `https://drive.google.com/file/d/${id}/preview`;
-    case 'slides': return `https://docs.google.com/presentation/d/${id}/embed?start=false&loop=false&delayms=3000`;
-    case 'document': return `https://docs.google.com/document/d/${id}/preview`;
-    default: return resource.external_url || '';
+    case 'video':
+      // Use the preview URL with embedded player - works for most shared videos
+      // Adding timestamp parameter helps with caching issues
+      return `https://drive.google.com/file/d/${id}/preview?t=${Date.now()}`;
+    case 'slides':
+      return `https://docs.google.com/presentation/d/${id}/embed?start=false&loop=false&delayms=3000`;
+    case 'document':
+      return `https://docs.google.com/document/d/${id}/preview`;
+    default:
+      return resource.external_url || '';
+  }
+}
+
+// Get direct view URL for opening in new tab
+function getDirectViewUrl(resource: ModuleResource): string {
+  const id = resource.google_drive_id;
+  if (!id) return resource.external_url || '';
+
+  switch (resource.content_type) {
+    case 'video':
+      return `https://drive.google.com/file/d/${id}/view`;
+    case 'slides':
+      return `https://docs.google.com/presentation/d/${id}/edit?usp=sharing`;
+    case 'document':
+      return `https://docs.google.com/document/d/${id}/edit?usp=sharing`;
+    default:
+      return resource.external_url || '';
   }
 }
 
@@ -1014,9 +1038,9 @@ export default function LearningsPage() {
 
           {/* Week Tabs with Progress */}
           <Tabs value={activeWeek} onValueChange={setActiveWeek}>
-            <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50 p-1.5">
-              <ScrollArea className="w-full">
-                <TabsList className="inline-flex h-auto items-center justify-start bg-transparent p-0 gap-1">
+            <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50 p-1.5 overflow-hidden">
+              <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700 scrollbar-track-transparent">
+                <TabsList className="inline-flex h-auto items-center justify-start bg-transparent p-0 gap-1 min-w-max">
                   {weeks.map((week) => {
                     const progress = weekProgress[week];
                     const isComplete = progress && progress.completed === progress.total && progress.total > 0;
@@ -1026,7 +1050,7 @@ export default function LearningsPage() {
                         key={week}
                         value={week.toString()}
                         className={cn(
-                          "relative px-4 py-2.5 rounded-lg bg-transparent",
+                          "relative px-4 py-2.5 rounded-lg bg-transparent whitespace-nowrap",
                           "data-[state=active]:bg-gradient-to-br data-[state=active]:from-purple-500 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-purple-500/25",
                           "hover:bg-gray-100 dark:hover:bg-gray-800",
                           "transition-all duration-200"
@@ -1056,7 +1080,7 @@ export default function LearningsPage() {
                     );
                   })}
                 </TabsList>
-              </ScrollArea>
+              </div>
             </div>
 
             {weeks.map((week) => {
@@ -1231,35 +1255,35 @@ export default function LearningsPage() {
                   </div>
                 )}
                 {iframeError && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-red-50 dark:bg-red-950/20 rounded-lg border-2 border-red-200 dark:border-red-800 z-10">
+                  <div className="absolute inset-0 flex items-center justify-center bg-gray-900/95 rounded-lg border-2 border-purple-500/30 z-10">
                     <div className="flex flex-col items-center gap-4 p-6 max-w-md text-center">
-                      <AlertCircle className="w-12 h-12 text-red-500" />
+                      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-lg shadow-purple-500/25">
+                        <Video className="w-8 h-8 text-white" />
+                      </div>
                       <div>
-                        <h3 className="font-semibold text-lg mb-2 text-gray-900 dark:text-gray-100">Failed to load content</h3>
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                          This content couldn't be loaded. This may be due to privacy settings or the file being unavailable.
+                        <h3 className="font-semibold text-lg mb-2 text-white">Open in Google Drive</h3>
+                        <p className="text-sm text-gray-400 mb-4">
+                          This video is best viewed directly in Google Drive. Click below to watch it in a new tab.
                         </p>
                       </div>
                       <div className="flex gap-3">
                         <Button
                           onClick={() => {
-                            const url = selectedResource.google_drive_id
-                              ? `https://drive.google.com/file/d/${selectedResource.google_drive_id}/view`
-                              : selectedResource.external_url || getEmbedUrl(selectedResource);
+                            const url = getDirectViewUrl(selectedResource);
                             window.open(url, '_blank');
                           }}
-                          variant="outline"
-                          className="gap-2"
+                          className="gap-2 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
                         >
                           <ExternalLink className="w-4 h-4" />
-                          Open in new tab
+                          Open in Google Drive
                         </Button>
                         <Button
                           onClick={() => {
                             setIframeError(false);
                             setIframeLoading(true);
                           }}
-                          variant="default"
+                          variant="outline"
+                          className="border-gray-700 hover:bg-gray-800"
                         >
                           Retry
                         </Button>
@@ -1269,9 +1293,7 @@ export default function LearningsPage() {
                 )}
                 <iframe
                   src={(() => {
-                    const url = selectedResource.google_drive_id
-                      ? `https://drive.google.com/file/d/${selectedResource.google_drive_id}/preview`
-                      : getEmbedUrl(selectedResource);
+                    const url = getEmbedUrl(selectedResource);
                     console.log('[Learnings] Loading iframe:', {
                       title: selectedResource.title,
                       google_drive_id: selectedResource.google_drive_id,
@@ -1292,11 +1314,13 @@ export default function LearningsPage() {
                     setIframeError(true);
                   }}
                   className={cn(
-                    "w-full h-full rounded-lg transition-opacity duration-300",
+                    "w-full h-full rounded-lg transition-opacity duration-300 bg-black",
                     iframeLoading ? "opacity-0" : "opacity-100"
                   )}
-                  allow="autoplay; encrypted-media; fullscreen"
+                  allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
                   allowFullScreen
+                  referrerPolicy="no-referrer-when-downgrade"
+                  sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-presentation"
                   title={selectedResource.title}
                 />
               </div>
@@ -1340,13 +1364,19 @@ export default function LearningsPage() {
             </div>
           )}
 
-          {selectedResource?.external_url && (
-            <div className="flex justify-end border-t pt-4">
-              <Button variant="outline" size="sm" asChild>
-                <a href={selectedResource.external_url} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="w-4 h-4 mr-2" />
-                  Open in new tab
-                </a>
+          {selectedResource && (selectedResource.google_drive_id || selectedResource.external_url) && (
+            <div className="flex justify-end border-t border-gray-200 dark:border-gray-800 pt-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const url = getDirectViewUrl(selectedResource);
+                  window.open(url, '_blank');
+                }}
+                className="gap-2"
+              >
+                <ExternalLink className="w-4 h-4" />
+                Open in Google Drive
               </Button>
             </div>
           )}
