@@ -244,6 +244,15 @@ export default function CalendarPage() {
 
         if (error) throw error;
 
+        // Update BOTH sessions array AND selectedSession
+        setSessions(prev =>
+          prev.map(s =>
+            s.id === selectedSession.id && s.user_rsvp
+              ? { ...s, user_rsvp: { ...s.user_rsvp, reminder_enabled: newReminderEnabled } }
+              : s
+          )
+        );
+
         setSelectedSession(prev =>
           prev?.user_rsvp
             ? { ...prev, user_rsvp: { ...prev.user_rsvp, reminder_enabled: newReminderEnabled } }
@@ -443,20 +452,23 @@ export default function CalendarPage() {
 
       {/* Session Details Dialog */}
       <Dialog open={!!selectedSession} onOpenChange={(open) => !open && setSelectedSession(null)}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-xl">{selectedSession?.title}</DialogTitle>
-            <DialogDescription className="text-base">
-              {selectedSession && format(parseISO(selectedSession.scheduled_at), 'EEEE, MMMM d, yyyy')}
-            </DialogDescription>
-          </DialogHeader>
+        <DialogContent className="sm:max-w-md border-2 border-border shadow-xl p-0 gap-0 overflow-hidden">
+          {/* Header Section */}
+          <div className="p-6 border-b border-border bg-gradient-to-br from-muted/30 to-background">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-semibold">{selectedSession?.title}</DialogTitle>
+              <DialogDescription className="text-base text-muted-foreground">
+                {selectedSession && format(parseISO(selectedSession.scheduled_at), 'EEEE, MMMM d, yyyy')}
+              </DialogDescription>
+            </DialogHeader>
+          </div>
 
           {selectedSession && (
-            <div className="space-y-4 pt-2">
+            <div className="p-6 space-y-5">
               {/* Time Badge */}
-              <div className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-muted">
+              <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-muted/50 border border-border">
                 <Clock className="w-4 h-4 text-primary" />
-                <span className="font-medium">
+                <span className="font-semibold">
                   {formatTime(selectedSession.scheduled_at)}
                 </span>
                 <span className="text-muted-foreground">·</span>
@@ -465,9 +477,11 @@ export default function CalendarPage() {
 
               {/* Description */}
               {selectedSession.description && (
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  {selectedSession.description}
-                </p>
+                <div className="p-4 rounded-lg bg-muted/30 border border-border">
+                  <p className="text-sm text-foreground leading-relaxed">
+                    {selectedSession.description}
+                  </p>
+                </div>
               )}
 
               {/* Action Buttons */}
@@ -475,7 +489,7 @@ export default function CalendarPage() {
                 {/* Zoom Link */}
                 {selectedSession.zoom_link && (
                   <Button
-                    className="w-full gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+                    className="w-full gap-2 bg-blue-600 hover:bg-blue-700 text-white h-11"
                     onClick={() => window.open(selectedSession.zoom_link!, '_blank')}
                   >
                     <Video className="w-4 h-4" />
@@ -487,7 +501,7 @@ export default function CalendarPage() {
                 {/* Open in Google Calendar */}
                 <Button
                   variant="outline"
-                  className="w-full gap-2"
+                  className="w-full gap-2 h-11 border-border"
                   onClick={() => {
                     const date = parseISO(selectedSession.scheduled_at);
                     const gcalUrl = `https://calendar.google.com/calendar/r/day/${format(date, 'yyyy')}/${format(date, 'M')}/${format(date, 'd')}`;
@@ -501,14 +515,14 @@ export default function CalendarPage() {
               </div>
 
               {/* RSVP Section */}
-              <div className="space-y-3 pt-2 border-t">
+              <div className="space-y-3 pt-4 border-t border-border">
                 <Label className="text-sm font-semibold">Your RSVP</Label>
                 <div className="flex gap-2">
                   <Button
                     variant={selectedSession.user_rsvp?.response === 'yes' ? 'default' : 'outline'}
                     className={cn(
-                      'flex-1 gap-2',
-                      selectedSession.user_rsvp?.response === 'yes' && 'bg-green-600 hover:bg-green-700'
+                      'flex-1 gap-2 h-11',
+                      selectedSession.user_rsvp?.response === 'yes' && 'bg-green-600 hover:bg-green-700 border-green-600'
                     )}
                     onClick={() => handleRsvp('yes')}
                     disabled={rsvpLoading}
@@ -519,8 +533,8 @@ export default function CalendarPage() {
                   <Button
                     variant={selectedSession.user_rsvp?.response === 'no' ? 'default' : 'outline'}
                     className={cn(
-                      'flex-1 gap-2',
-                      selectedSession.user_rsvp?.response === 'no' && 'bg-red-600 hover:bg-red-700'
+                      'flex-1 gap-2 h-11',
+                      selectedSession.user_rsvp?.response === 'no' && 'bg-red-600 hover:bg-red-700 border-red-600'
                     )}
                     onClick={() => handleRsvp('no')}
                     disabled={rsvpLoading}
@@ -532,12 +546,16 @@ export default function CalendarPage() {
               </div>
 
               {/* Reminder Toggle - always visible, auto-RSVPs when enabled without existing RSVP */}
-              <div className="flex items-center justify-between p-3 rounded-lg bg-muted">
-                <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50 border border-border">
+                <div className="flex items-center gap-3">
                   {selectedSession.user_rsvp?.reminder_enabled ? (
-                    <Bell className="w-4 h-4 text-primary" />
+                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                      <Bell className="w-4 h-4 text-primary" />
+                    </div>
                   ) : (
-                    <BellOff className="w-4 h-4 text-muted-foreground" />
+                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+                      <BellOff className="w-4 h-4 text-muted-foreground" />
+                    </div>
                   )}
                   <div className="flex flex-col">
                     <span className="text-sm font-medium">Session reminder</span>
@@ -553,7 +571,7 @@ export default function CalendarPage() {
               </div>
 
               {/* Timezone Note */}
-              <p className="text-xs text-muted-foreground text-center pt-2">
+              <p className="text-xs text-muted-foreground text-center pt-2 border-t border-border/50">
                 Times shown in {showUTC ? 'UTC' : userTimezone}
               </p>
             </div>
