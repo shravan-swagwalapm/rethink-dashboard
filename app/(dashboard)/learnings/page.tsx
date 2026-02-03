@@ -574,7 +574,7 @@ export default function LearningsPage() {
         setIframeLoading(false);
         setIframeError(true);
       }
-    }, 10000); // 10 second timeout
+    }, 5000); // 5 second timeout - show fallback faster
 
     return () => clearTimeout(timeout);
   }, [selectedResource, iframeLoading]);
@@ -1247,19 +1247,25 @@ export default function LearningsPage() {
               {/* Main content */}
               <div className="flex-1 min-w-0 relative">
                 {iframeLoading && !iframeError && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-900 rounded-lg z-10">
-                    <div className="flex flex-col items-center gap-3">
-                      <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
-                      <p className="text-sm text-gray-600 dark:text-gray-400">Loading content...</p>
-                      <button
+                  <div className="absolute inset-0 flex items-center justify-center bg-gray-900 rounded-lg z-10">
+                    <div className="flex flex-col items-center gap-4 p-6 text-center">
+                      <Loader2 className="w-10 h-10 animate-spin text-purple-500" />
+                      <div>
+                        <p className="text-sm text-gray-300 mb-1">Loading video...</p>
+                        <p className="text-xs text-gray-500">If video doesn't appear, use the button below</p>
+                      </div>
+                      <Button
                         onClick={() => {
                           const url = getDirectViewUrl(selectedResource);
                           window.open(url, '_blank');
                         }}
-                        className="mt-2 text-xs text-purple-500 hover:text-purple-400 underline transition-colors"
+                        variant="outline"
+                        size="sm"
+                        className="gap-2 border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
                       >
-                        Taking too long? Open in Google Drive
-                      </button>
+                        <ExternalLink className="w-4 h-4" />
+                        Watch in Google Drive
+                      </Button>
                     </div>
                   </div>
                 )}
