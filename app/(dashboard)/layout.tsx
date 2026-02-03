@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react';
 import { DashboardSidebar } from '@/components/dashboard/sidebar';
 import { DashboardHeader } from '@/components/dashboard/header';
 import { useUser } from '@/hooks/use-user';
-import { FullPageLoader } from '@/components/ui/page-loader';
+import { StudentPageLoader } from '@/components/ui/page-loader';
 
 export default function DashboardLayout({
   children,
@@ -22,9 +22,9 @@ export default function DashboardLayout({
     setMobileMenuOpen(false);
   }, []);
 
-  // Show full-page loader while user data is loading
+  // Show futuristic full-page loader with motivational quotes while loading
   if (loading) {
-    return <FullPageLoader message="Loading your dashboard..." />;
+    return <StudentPageLoader message="Preparing your learning journey..." />;
   }
 
   return (
