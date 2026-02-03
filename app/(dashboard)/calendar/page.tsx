@@ -5,8 +5,9 @@ import { useUser } from '@/hooks/use-user';
 import { getClient } from '@/lib/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { StudentPageLoader } from '@/components/ui/page-loader';
 import {
   Dialog,
@@ -51,16 +52,19 @@ interface SessionWithRsvp extends Session {
   user_rsvp?: Rsvp;
 }
 
+type TimezoneMode = 'ist' | 'utc' | 'local';
+
 export default function CalendarPage() {
   const { profile, loading: userLoading, activeCohortId, isAdmin } = useUser();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [sessions, setSessions] = useState<SessionWithRsvp[]>([]);
   const [selectedSession, setSelectedSession] = useState<SessionWithRsvp | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showUTC, setShowUTC] = useState(false);
+  const [timezoneMode, setTimezoneMode] = useState<TimezoneMode>('ist');
   const [rsvpLoading, setRsvpLoading] = useState(false);
 
-  const userTimezone = profile?.timezone || 'Asia/Kolkata';
+  // Get browser's local timezone
+  const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   useEffect(() => {
     const fetchSessions = async () => {
@@ -281,10 +285,27 @@ export default function CalendarPage() {
 
   const formatTime = (dateStr: string) => {
     const date = parseISO(dateStr);
-    if (showUTC) {
-      return formatInTimeZone(date, 'UTC', 'h:mm a') + ' UTC';
+    switch (timezoneMode) {
+      case 'utc':
+        return formatInTimeZone(date, 'UTC', 'h:mm a') + ' UTC';
+      case 'local':
+        return formatInTimeZone(date, localTimezone, 'h:mm a');
+      case 'ist':
+      default:
+        return formatInTimeZone(date, 'Asia/Kolkata', 'h:mm a') + ' IST';
     }
-    return formatInTimeZone(date, userTimezone, 'h:mm a');
+  };
+
+  const getTimezoneLabel = () => {
+    switch (timezoneMode) {
+      case 'utc':
+        return 'UTC';
+      case 'local':
+        return localTimezone;
+      case 'ist':
+      default:
+        return 'IST (Asia/Kolkata)';
+    }
   };
 
   if (userLoading || loading) {
@@ -304,16 +325,50 @@ export default function CalendarPage() {
               </h1>
               <p className="text-white/80 mt-1">View and RSVP to your upcoming sessions</p>
             </div>
-            <div className="flex items-center gap-3 bg-white/10 rounded-lg px-3 py-2">
-              <Globe className="w-4 h-4 text-white/70" />
-              <Label htmlFor="utc-toggle" className="text-sm text-white/90 cursor-pointer">
-                Show UTC
-              </Label>
-              <Switch
-                id="utc-toggle"
-                checked={showUTC}
-                onCheckedChange={setShowUTC}
-              />
+            {/* Timezone Mode Selector */}
+            <div className="flex items-center gap-2 bg-white/10 rounded-lg p-1">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setTimezoneMode('ist')}
+                className={cn(
+                  'h-8 px-3 text-xs font-medium transition-all',
+                  timezoneMode === 'ist'
+                    ? 'bg-white text-purple-700 hover:bg-white hover:text-purple-700 shadow-md'
+                    : 'text-white/80 hover:text-white hover:bg-white/20'
+                )}
+              >
+                <Globe className="w-3 h-3 mr-1.5" />
+                IST
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setTimezoneMode('utc')}
+                className={cn(
+                  'h-8 px-3 text-xs font-medium transition-all',
+                  timezoneMode === 'utc'
+                    ? 'bg-white text-purple-700 hover:bg-white hover:text-purple-700 shadow-md'
+                    : 'text-white/80 hover:text-white hover:bg-white/20'
+                )}
+              >
+                <Clock className="w-3 h-3 mr-1.5" />
+                UTC
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setTimezoneMode('local')}
+                className={cn(
+                  'h-8 px-3 text-xs font-medium transition-all',
+                  timezoneMode === 'local'
+                    ? 'bg-white text-purple-700 hover:bg-white hover:text-purple-700 shadow-md'
+                    : 'text-white/80 hover:text-white hover:bg-white/20'
+                )}
+              >
+                <CalendarIcon className="w-3 h-3 mr-1.5" />
+                Local
+              </Button>
             </div>
           </div>
         </CardContent>
@@ -572,7 +627,7 @@ export default function CalendarPage() {
 
               {/* Timezone Note */}
               <p className="text-xs text-muted-foreground text-center pt-2 border-t border-border/50">
-                Times shown in {showUTC ? 'UTC' : userTimezone}
+                Times shown in {getTimezoneLabel()}
               </p>
             </div>
           )}
