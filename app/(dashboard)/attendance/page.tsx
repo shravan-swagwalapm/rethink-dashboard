@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { PageLoader } from '@/components/ui/page-loader';
+import { StudentPageLoader } from '@/components/ui/page-loader';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select,
@@ -221,7 +221,7 @@ function AttendanceContent() {
   );
 
   if (userLoading || loading) {
-    return <PageLoader message="Loading attendance..." />;
+    return <StudentPageLoader message="Loading attendance records..." />;
   }
 
   if (!isMentor && !isAdmin) {

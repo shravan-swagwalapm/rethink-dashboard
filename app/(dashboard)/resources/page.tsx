@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { PageLoader } from '@/components/ui/page-loader';
+import { StudentPageLoader } from '@/components/ui/page-loader';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Dialog,
@@ -200,7 +200,7 @@ export default function ResourcesPage() {
   const links = filteredResources.filter(r => r.type === 'link');
 
   if (userLoading || loading) {
-    return <PageLoader message="Loading resources..." />;
+    return <StudentPageLoader message="Loading your resources..." />;
   }
 
   return (

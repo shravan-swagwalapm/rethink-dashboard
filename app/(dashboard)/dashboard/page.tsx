@@ -9,7 +9,7 @@ import { StatsCards } from '@/components/dashboard/stats-cards';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { PageLoader } from '@/components/ui/page-loader';
+import { StudentPageLoader } from '@/components/ui/page-loader';
 import { Calendar, Clock, Video, ChevronRight, BookOpen, FolderOpen, Shield, Presentation, FileText, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import { format, isToday, isTomorrow, parseISO } from 'date-fns';
@@ -359,7 +359,7 @@ export default function DashboardPage() {
 
   // Show explicit loader while checking if user is logged in
   if (userLoading) {
-    return <PageLoader message="Loading dashboard..." />;
+    return <StudentPageLoader message="Loading your dashboard..." />;
   }
 
   // Admin role: Show system-wide dashboard

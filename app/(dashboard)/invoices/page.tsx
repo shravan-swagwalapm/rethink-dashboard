@@ -6,7 +6,7 @@ import { useUser } from '@/hooks/use-user';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { PageLoader } from '@/components/ui/page-loader';
+import { StudentPageLoader } from '@/components/ui/page-loader';
 import { toast } from 'sonner';
 import {
   Receipt,
@@ -136,7 +136,7 @@ export default function StudentInvoicesPage() {
   };
 
   if (userLoading || loading) {
-    return <PageLoader message="Loading invoices..." />;
+    return <StudentPageLoader message="Loading your invoices..." />;
   }
 
   if (!profile) {

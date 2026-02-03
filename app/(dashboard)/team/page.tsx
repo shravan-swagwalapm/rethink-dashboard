@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { PageLoader } from '@/components/ui/page-loader';
+import { StudentPageLoader } from '@/components/ui/page-loader';
 import {
   Table,
   TableBody,
@@ -139,7 +139,7 @@ export default function TeamPage() {
   };
 
   if (userLoading || loading) {
-    return <PageLoader message="Loading team..." />;
+    return <StudentPageLoader message="Loading your team..." />;
   }
 
   if (!isMentor && !isAdmin) {

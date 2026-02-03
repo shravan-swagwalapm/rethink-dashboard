@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { PageLoader } from '@/components/ui/page-loader';
+import { StudentPageLoader } from '@/components/ui/page-loader';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import {
@@ -267,7 +267,7 @@ export default function SupportPage() {
   };
 
   if (userLoading || loading) {
-    return <PageLoader message="Loading support..." />;
+    return <StudentPageLoader message="Loading support center..." />;
   }
 
   return (

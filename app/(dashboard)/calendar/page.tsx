@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { PageLoader } from '@/components/ui/page-loader';
+import { StudentPageLoader } from '@/components/ui/page-loader';
 import {
   Dialog,
   DialogContent,
@@ -288,7 +288,7 @@ export default function CalendarPage() {
   };
 
   if (userLoading || loading) {
-    return <PageLoader message="Loading calendar..." />;
+    return <StudentPageLoader message="Loading your schedule..." />;
   }
 
   return (

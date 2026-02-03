@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { PageLoader } from '@/components/ui/page-loader';
+import { StudentPageLoader } from '@/components/ui/page-loader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
@@ -609,7 +609,7 @@ export default function LearningsPage() {
   };
 
   if (userLoading || loading) {
-    return <PageLoader message="Loading learnings..." />;
+    return <StudentPageLoader message="Preparing your learning content..." />;
   }
 
   const currentWeekContent = activeWeek ? weekContent[parseInt(activeWeek)] : null;
