@@ -10,9 +10,9 @@
 
 | Metric | Count |
 |--------|-------|
-| Total Bugs Reported | 4 |
-| Fixed & Verified | 4 |
-| Features Completed | 2 |
+| Total Bugs Reported | 7 |
+| Fixed & Verified | 7 |
+| Features Completed | 3 |
 | UI Enhancements | 1 |
 | In Progress | 0 |
 | Pending | 0 |
@@ -188,6 +188,89 @@ Both the current date indicator and pending RSVP status used the same `bg-primar
 
 ---
 
+### BUG-005: Page Loader Appearing Twice on Navigation
+
+**Status**: 🟢 Fixed & Verified
+
+**Reported**: 2026-02-04
+**Fixed**: 2026-02-04
+
+**Description**:
+The full-page loader with motivational quotes was appearing twice when navigating between pages - once from the layout and once from the page component.
+
+**Root Cause**:
+Both the dashboard layout (`layout.tsx`) AND individual pages were showing `StudentPageLoader`, causing it to render twice in succession.
+
+**Fix Applied**:
+- Layout no longer shows loader - just renders children immediately
+- Each page handles its own loading with `StudentPageLoader`
+- Pattern: `if (userLoading || loading)` shows full-page loader until ALL data ready
+
+**Files Changed**:
+- `/app/(dashboard)/layout.tsx` - Removed loader logic
+- All 9 student pages - Updated to use `StudentPageLoader` with proper loading condition
+
+**Verification**:
+- Build: PASS
+- Single loader appears on navigation ✅
+- Loader stays until page content ready ✅
+
+---
+
+### BUG-006: Loader Disappearing Before "My Learnings" Assets Load
+
+**Status**: 🟢 Fixed & Verified
+
+**Reported**: 2026-02-04
+**Fixed**: 2026-02-04
+
+**Description**:
+On the dashboard, the loader would disappear but the "My Learnings" section would briefly show "No recent activity" before the actual assets appeared (flash of empty content).
+
+**Root Cause**:
+The dashboard had a `Promise.all()` for 8 data sources, but **Invoices** and **Learning Assets** were fetched AFTER Promise.all() completed. The `setLoading(false)` ran in the `finally` block before these separate fetches finished.
+
+**Fix Applied**:
+- Moved Invoices fetch INTO the Promise.all() bundle
+- Moved Learning Assets fetch INTO the Promise.all() bundle
+- Now all 10 data sources load in parallel before loader disappears
+
+**Files Changed**:
+- `/app/(dashboard)/dashboard/page.tsx` - Coordinated all fetches in Promise.all()
+
+**Verification**:
+- Build: PASS
+- Loader stays until "My Learnings" shows actual content ✅
+- No flash of "No recent activity" ✅
+
+---
+
+### BUG-007: Invoice Cards Showing Due Date and Created Date
+
+**Status**: 🟢 Fixed & Verified
+
+**Reported**: 2026-02-04
+**Fixed**: 2026-02-04
+
+**Description**:
+Invoice cards on both the dashboard and /invoices page were showing "Due: Jan 27, 2026" and "Created: Jan 28, 2026" which was unnecessary information for students.
+
+**Fix Applied**:
+- Removed due date display from /invoices page
+- Removed created date display from /invoices page
+- Removed created date from dashboard invoice card component
+- Invoice cards now only show: Invoice number, Status badge, Cohort name, Amount, View/Download buttons
+
+**Files Changed**:
+- `/app/(dashboard)/invoices/page.tsx` - Removed date displays
+- `/components/dashboard/invoice-card.tsx` - Removed created date, cleaned up unused import
+
+**Verification**:
+- Build: PASS
+- Invoice cards show cleaner layout ✅
+
+---
+
 ## Features
 
 ### FEATURE-001: Support Ticket System for Students
@@ -338,6 +421,52 @@ Complete visual overhaul of the student dashboard with futuristic, cyber-themed 
 
 ---
 
+### FEATURE-003: Global Search Across All Weeks on My Learnings
+
+**Status**: 🟢 Completed
+
+**Requested**: 2026-02-04
+**Completed**: 2026-02-04
+
+**Description**:
+The search on the My Learnings page only worked on the currently selected week tab. Users couldn't find content in other weeks without manually switching tabs.
+
+**Root Cause**:
+Search filters (`filterResources`, `filterCaseStudies`) only operated on `currentWeekContent`, not all weeks. Data was organized by week in a `Record<number, WeekContent>` structure with no cross-week search capability.
+
+**Features Implemented**:
+
+1. **Global Search Across All Weeks**
+   - Searches ALL weeks simultaneously, not just current tab
+   - Matches: title + description + parent module name
+
+2. **Filter Chips**
+   - All, Recordings, Presentations, Notes, Case Studies
+   - Shows count for each type
+   - Active filter highlighted in purple
+
+3. **Search Results View**
+   - Dedicated results page (replaces week tabs when searching)
+   - Results grouped by week with visual week badges
+   - Each result shows:
+     - Type badge with color (Recording/Presentation/Notes/Case Study)
+     - Title and module name
+     - Description preview
+   - Click result → jumps to that week and opens content
+
+4. **UX Improvements**
+   - Placeholder changed to "Search all weeks..."
+   - Clear button (X) when search query exists
+   - Empty state when no results found
+
+**Files Changed**:
+- `/app/(dashboard)/learnings/page.tsx` - Added ~400 lines for global search
+
+**Git Commit**:
+- `ba678b1` - Add global search across all weeks on My Learnings page
+
+---
+
 ## Session Log
 
 ### Session 1 - 2026-02-03
@@ -354,7 +483,7 @@ Complete visual overhaul of the student dashboard with futuristic, cyber-themed 
 
 ---
 
-### Session 2 - 2026-02-04
+### Session 2 - 2026-02-04 (Early Morning)
 
 **Time Started**: ~12:00 AM
 **Features Completed**: 1 (Futuristic UI Overhaul)
@@ -372,6 +501,44 @@ Complete visual overhaul of the student dashboard with futuristic, cyber-themed 
 6. Redesigned calendar header with matching theme
 7. Added aurora wave SVG backgrounds
 8. Added 15+ CSS animations
+
+---
+
+### Session 3 - 2026-02-04 (Afternoon)
+
+**Time Started**: ~3:00 PM
+**Bugs Fixed**: 4
+**Features Completed**: 1
+
+| Item | Title | Status |
+|------|-------|--------|
+| BUG-004 | Pending RSVP Color Conflict | Fixed |
+| BUG-005 | Double Loader on Navigation | Fixed |
+| BUG-006 | Loader Disappearing Before My Learnings Loads | Fixed |
+| BUG-007 | Invoice Cards Showing Dates | Fixed |
+| FEATURE-003 | Global Search on My Learnings | Completed |
+
+**Work Done**:
+1. Changed pending RSVP color from purple to amber/yellow
+2. Added hint text to calendar session dialog
+3. Added View button to invoice cards (alongside Download)
+4. Fixed double loader issue - single full-page loader per page
+5. Coordinated all dashboard fetches in Promise.all() to prevent flash
+6. Removed due date and created date from invoice cards
+7. Implemented global search across all weeks on My Learnings page
+   - Filter chips (All, Recordings, Presentations, Notes, Case Studies)
+   - Results grouped by week
+   - Click to jump to week and open content
+
+**Git Commits This Session**:
+- `058a6e7` - Fix pending RSVP color
+- `7aaccc7` - Add hint text to calendar dialog
+- `aca7921` - Increase font size for hints
+- `0fb669e` - Add View button to invoices
+- `79157c5` - Fix double loader issue
+- `72c6592` - Fix loader timing for My Learnings
+- `f32944c` - Remove dates from invoice cards
+- `ba678b1` - Add global search on My Learnings
 
 ---
 
@@ -402,4 +569,4 @@ Then [your specific task here]
 
 ---
 
-*Last Updated: 2026-02-04 3:30 PM - BUG-004 Pending RSVP color fixed*
+*Last Updated: 2026-02-04 4:30 PM - Session 3 completed (4 bugs fixed, 1 feature added)*
