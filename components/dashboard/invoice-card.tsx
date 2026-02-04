@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Receipt, ChevronRight, CheckCircle, Clock, AlertCircle, Download, Eye } from 'lucide-react';
 import Link from 'next/link';
-import { format } from 'date-fns';
 import type { Invoice, Cohort } from '@/types';
 
 interface InvoiceWithCohort extends Invoice {
@@ -98,7 +97,7 @@ export function InvoiceCard({ invoices, pendingAmount, onDownload, onView }: Inv
                   <div className="min-w-0">
                     <p className="font-mono text-sm truncate">{invoice.invoice_number}</p>
                     <p className="text-xs text-muted-foreground">
-                      {invoice.cohort?.name || 'N/A'} • {format(new Date(invoice.created_at), 'MMM d')}
+                      {invoice.cohort?.name || 'N/A'}
                     </p>
                   </div>
                 </div>

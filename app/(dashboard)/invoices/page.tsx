@@ -241,22 +241,13 @@ export default function StudentInvoicesPage() {
                           </span>
                         </Badge>
                       </div>
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                        {invoice.cohort && (
-                          <span className="flex items-center gap-1">
-                            <Badge variant="outline" className="font-normal">
-                              {invoice.cohort.name}
-                            </Badge>
-                          </span>
-                        )}
-                        {invoice.due_date && (
-                          <span className="flex items-center gap-1">
-                            <Calendar className="w-3 h-3" />
-                            Due: {format(new Date(invoice.due_date), 'MMM d, yyyy')}
-                          </span>
-                        )}
-                        <span>Created: {format(new Date(invoice.created_at), 'MMM d, yyyy')}</span>
-                      </div>
+                      {invoice.cohort && (
+                        <div className="text-sm text-muted-foreground">
+                          <Badge variant="outline" className="font-normal">
+                            {invoice.cohort.name}
+                          </Badge>
+                        </div>
+                      )}
                     </div>
                   </div>
 
