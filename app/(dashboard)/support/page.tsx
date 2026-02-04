@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { PageLoader } from '@/components/ui/page-loader';
+import { StudentPageLoader } from '@/components/ui/page-loader';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import {
@@ -266,10 +266,10 @@ export default function SupportPage() {
     return CATEGORIES.find(c => c.value === categoryValue) || CATEGORIES[4];
   };
 
-  // Layout already handles user auth loading with StudentPageLoader
-  // Only show page-specific loading state for data
-  if (loading) {
-    return <PageLoader message="Loading support center..." />;
+  // Show full-page loader until BOTH auth AND data are ready
+  // This prevents flash of empty content
+  if (userLoading || loading) {
+    return <StudentPageLoader message="Loading support center..." />;
   }
 
   return (

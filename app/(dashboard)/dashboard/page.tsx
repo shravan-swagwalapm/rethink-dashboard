@@ -9,7 +9,7 @@ import { StatsCards } from '@/components/dashboard/stats-cards';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { PageLoader } from '@/components/ui/page-loader';
+import { StudentPageLoader } from '@/components/ui/page-loader';
 import { Calendar, Clock, Video, ChevronRight, BookOpen, FolderOpen, Shield, Presentation, FileText, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import { format, isToday, isTomorrow, parseISO } from 'date-fns';
@@ -357,10 +357,10 @@ export default function DashboardPage() {
     }
   };
 
-  // Layout already handles user auth loading with StudentPageLoader
-  // Only show page-specific loading state (not full-page loader) for data
-  if (loading) {
-    return <PageLoader message="Loading your dashboard..." />;
+  // Show full-page loader until BOTH auth AND data are ready
+  // This prevents flash of empty content
+  if (userLoading || loading) {
+    return <StudentPageLoader message="Loading your dashboard..." />;
   }
 
   // Admin role: Show system-wide dashboard

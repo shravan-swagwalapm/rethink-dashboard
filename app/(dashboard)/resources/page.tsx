@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { PageLoader } from '@/components/ui/page-loader';
+import { StudentPageLoader } from '@/components/ui/page-loader';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Dialog,
@@ -199,10 +199,10 @@ export default function ResourcesPage() {
   const files = filteredResources.filter(r => r.type === 'file');
   const links = filteredResources.filter(r => r.type === 'link');
 
-  // Layout already handles user auth loading with StudentPageLoader
-  // Only show page-specific loading state for data
-  if (loading) {
-    return <PageLoader message="Loading your resources..." />;
+  // Show full-page loader until BOTH auth AND data are ready
+  // This prevents flash of empty content
+  if (userLoading || loading) {
+    return <StudentPageLoader message="Loading your resources..." />;
   }
 
   return (

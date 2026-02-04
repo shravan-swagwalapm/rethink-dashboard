@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { PageLoader } from '@/components/ui/page-loader';
+import { StudentPageLoader } from '@/components/ui/page-loader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
@@ -608,10 +608,10 @@ export default function LearningsPage() {
     }
   };
 
-  // Layout already handles user auth loading with StudentPageLoader
-  // Only show page-specific loading state for data
-  if (loading) {
-    return <PageLoader message="Preparing your learning content..." />;
+  // Show full-page loader until BOTH auth AND data are ready
+  // This prevents flash of empty content
+  if (userLoading || loading) {
+    return <StudentPageLoader message="Loading your learnings..." />;
   }
 
   const currentWeekContent = activeWeek ? weekContent[parseInt(activeWeek)] : null;

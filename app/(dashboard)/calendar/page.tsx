@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { PageLoader } from '@/components/ui/page-loader';
+import { StudentPageLoader } from '@/components/ui/page-loader';
 import {
   Dialog,
   DialogContent,
@@ -308,10 +308,10 @@ export default function CalendarPage() {
     }
   };
 
-  // Layout already handles user auth loading with StudentPageLoader
-  // Only show page-specific loading state for data
-  if (loading) {
-    return <PageLoader message="Loading your schedule..." />;
+  // Show full-page loader until BOTH auth AND data are ready
+  // This prevents flash of empty content
+  if (userLoading || loading) {
+    return <StudentPageLoader message="Loading your schedule..." />;
   }
 
   return (

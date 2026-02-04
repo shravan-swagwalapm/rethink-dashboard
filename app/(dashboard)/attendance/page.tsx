@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { PageLoader } from '@/components/ui/page-loader';
+import { StudentPageLoader } from '@/components/ui/page-loader';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select,
@@ -220,10 +220,10 @@ function AttendanceContent() {
     { byUser: {} as Record<string, { user: Profile; total: number; count: number }> }
   );
 
-  // Layout already handles user auth loading with StudentPageLoader
-  // Only show page-specific loading state for data
-  if (loading) {
-    return <PageLoader message="Loading attendance records..." />;
+  // Show full-page loader until BOTH auth AND data are ready
+  // This prevents flash of empty content
+  if (userLoading || loading) {
+    return <StudentPageLoader message="Loading attendance records..." />;
   }
 
   if (!isMentor && !isAdmin) {
