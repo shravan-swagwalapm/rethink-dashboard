@@ -216,6 +216,8 @@ export default function DashboardPage() {
             sessionsResult,
             modulesResult,
             resourcesResult,
+            invoicesResult,
+            learningAssetsResult,
           ] = await Promise.all([
             // Fetch cohort info
             supabase
@@ -263,6 +265,14 @@ export default function DashboardPage() {
               .eq('type', 'file')
               .order('created_at', { ascending: false })
               .limit(4),
+            // Fetch invoices (uses API route for proper auth)
+            fetch('/api/invoices')
+              .then(r => r.ok ? r.json() : { invoices: [], stats: { pending_amount: 0 } })
+              .catch(() => ({ invoices: [], stats: { pending_amount: 0 } })),
+            // Fetch recent learning assets (recordings, presentations, etc.)
+            fetch(`/api/learnings/recent?cohort_id=${activeCohortId}&limit=4`)
+              .then(r => r.ok ? r.json() : { recent: [] })
+              .catch(() => ({ recent: [] })),
           ]);
 
           // Process cohort data
@@ -292,31 +302,13 @@ export default function DashboardPage() {
           setUpcomingSessions(sessionsResult.data || []);
           setRecentModules(modulesResult.data || []);
           setRecentResources(resourcesResult.data || []);
-        }
 
-        // Fetch invoices separately (uses API route for proper auth)
-        try {
-          const invoiceResponse = await fetch('/api/invoices');
-          if (invoiceResponse.ok) {
-            const invoiceData = await invoiceResponse.json();
-            setInvoices(invoiceData.invoices || []);
-            setPendingInvoiceAmount(invoiceData.stats?.pending_amount || 0);
-          }
-        } catch (invoiceError) {
-          console.error('Error fetching invoices:', invoiceError);
-        }
+          // Set invoices
+          setInvoices(invoicesResult.invoices || []);
+          setPendingInvoiceAmount(invoicesResult.stats?.pending_amount || 0);
 
-        // Fetch recent learning assets (recordings, presentations, etc.)
-        if (activeCohortId) {
-          try {
-            const learningAssetsResponse = await fetch(`/api/learnings/recent?cohort_id=${activeCohortId}&limit=4`);
-            if (learningAssetsResponse.ok) {
-              const learningAssetsData = await learningAssetsResponse.json();
-              setRecentLearningAssets(learningAssetsData.recent || []);
-            }
-          } catch (learningAssetsError) {
-            console.error('Error fetching learning assets:', learningAssetsError);
-          }
+          // Set learning assets
+          setRecentLearningAssets(learningAssetsResult.recent || []);
         }
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
