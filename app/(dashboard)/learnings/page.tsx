@@ -51,6 +51,17 @@ interface WeekContent {
   caseStudies: CaseStudy[];
 }
 
+interface SearchResult {
+  id: string;
+  title: string;
+  description?: string;
+  type: 'video' | 'slides' | 'document' | 'link' | 'case_study';
+  weekNumber: number;
+  moduleName?: string;
+  resource?: ModuleResource;
+  caseStudy?: CaseStudy;
+}
+
 // Get icon for content type
 function getContentIcon(type: ModuleResourceType, className?: string) {
   const iconClass = cn('w-5 h-5', className);
@@ -156,6 +167,11 @@ export default function LearningsPage() {
   const [iframeLoading, setIframeLoading] = useState(true);
   const [iframeError, setIframeError] = useState(false);
   const [weekProgress, setWeekProgress] = useState<Record<number, { completed: number; total: number }>>({});
+
+  // Global search state
+  const [isSearching, setIsSearching] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<'all' | 'video' | 'slides' | 'document' | 'case_study'>('all');
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -351,6 +367,167 @@ export default function LearningsPage() {
       cs.description?.toLowerCase().includes(searchQuery.toLowerCase())
     );
   };
+
+  // Global search function that searches across ALL weeks
+  const performGlobalSearch = (query: string): SearchResult[] => {
+    if (!query.trim()) return [];
+
+    const lowerQuery = query.toLowerCase().trim();
+    const results: SearchResult[] = [];
+
+    // Search through all weeks
+    Object.entries(weekContent).forEach(([weekNum, content]) => {
+      const weekNumber = parseInt(weekNum);
+
+      // Search recordings (videos)
+      content.recordings.forEach(resource => {
+        const module = content.modules.find(m =>
+          m.resources.some(r => r.id === resource.id)
+        );
+        const moduleName = module?.title || '';
+
+        if (
+          resource.title.toLowerCase().includes(lowerQuery) ||
+          resource.description?.toLowerCase().includes(lowerQuery) ||
+          moduleName.toLowerCase().includes(lowerQuery)
+        ) {
+          results.push({
+            id: resource.id,
+            title: resource.title,
+            description: resource.description || undefined,
+            type: 'video',
+            weekNumber,
+            moduleName: moduleName || undefined,
+            resource,
+          });
+        }
+      });
+
+      // Search presentations (slides)
+      content.presentations.forEach(resource => {
+        const module = content.modules.find(m =>
+          m.resources.some(r => r.id === resource.id)
+        );
+        const moduleName = module?.title || '';
+
+        if (
+          resource.title.toLowerCase().includes(lowerQuery) ||
+          resource.description?.toLowerCase().includes(lowerQuery) ||
+          moduleName.toLowerCase().includes(lowerQuery)
+        ) {
+          results.push({
+            id: resource.id,
+            title: resource.title,
+            description: resource.description || undefined,
+            type: 'slides',
+            weekNumber,
+            moduleName: moduleName || undefined,
+            resource,
+          });
+        }
+      });
+
+      // Search notes (documents)
+      content.notes.forEach(resource => {
+        const module = content.modules.find(m =>
+          m.resources.some(r => r.id === resource.id)
+        );
+        const moduleName = module?.title || '';
+
+        if (
+          resource.title.toLowerCase().includes(lowerQuery) ||
+          resource.description?.toLowerCase().includes(lowerQuery) ||
+          moduleName.toLowerCase().includes(lowerQuery)
+        ) {
+          results.push({
+            id: resource.id,
+            title: resource.title,
+            description: resource.description || undefined,
+            type: 'document',
+            weekNumber,
+            moduleName: moduleName || undefined,
+            resource,
+          });
+        }
+      });
+
+      // Search case studies
+      content.caseStudies.forEach(cs => {
+        if (
+          cs.title.toLowerCase().includes(lowerQuery) ||
+          cs.description?.toLowerCase().includes(lowerQuery)
+        ) {
+          results.push({
+            id: cs.id,
+            title: cs.title,
+            description: cs.description || undefined,
+            type: 'case_study',
+            weekNumber,
+            caseStudy: cs,
+          });
+        }
+      });
+    });
+
+    // Sort results by week number
+    return results.sort((a, b) => a.weekNumber - b.weekNumber);
+  };
+
+  // Handle search input change
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const query = e.target.value;
+    setSearchQuery(query);
+
+    if (query.trim()) {
+      setIsSearching(true);
+      const results = performGlobalSearch(query);
+      setSearchResults(results);
+    } else {
+      setIsSearching(false);
+      setSearchResults([]);
+      setActiveFilter('all');
+    }
+  };
+
+  // Handle clicking a search result
+  const handleSearchResultClick = (result: SearchResult) => {
+    // Jump to the week
+    setActiveWeek(result.weekNumber.toString());
+
+    // Clear search
+    setSearchQuery('');
+    setIsSearching(false);
+    setSearchResults([]);
+    setActiveFilter('all');
+
+    // If it's a resource, open it
+    if (result.resource) {
+      handleResourceClick(result.resource);
+    } else if (result.caseStudy) {
+      // For case studies, open the problem doc by default
+      if (result.caseStudy.problem_doc_url) {
+        handleCaseStudyClick(result.caseStudy, 'problem');
+      }
+    }
+  };
+
+  // Filter search results by type
+  const filteredSearchResults = useMemo(() => {
+    if (activeFilter === 'all') return searchResults;
+    return searchResults.filter(r => r.type === activeFilter);
+  }, [searchResults, activeFilter]);
+
+  // Group search results by week
+  const groupedSearchResults = useMemo(() => {
+    const grouped: Record<number, SearchResult[]> = {};
+    filteredSearchResults.forEach(result => {
+      if (!grouped[result.weekNumber]) {
+        grouped[result.weekNumber] = [];
+      }
+      grouped[result.weekNumber].push(result);
+    });
+    return grouped;
+  }, [filteredSearchResults]);
 
   const formatDuration = (seconds: number | null) => {
     if (!seconds) return null;
@@ -881,13 +1058,61 @@ export default function LearningsPage() {
         <div className="relative w-full sm:w-80">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <Input
-            placeholder="Search by title..."
+            placeholder="Search all weeks..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={handleSearchChange}
             className="pl-11 h-11 bg-white dark:bg-gray-900/80 border-2 border-gray-200 dark:border-gray-800 rounded-xl focus:border-purple-500 dark:focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
           />
+          {searchQuery && (
+            <button
+              onClick={() => {
+                setSearchQuery('');
+                setIsSearching(false);
+                setSearchResults([]);
+                setActiveFilter('all');
+              }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+            >
+              <span className="text-xs text-gray-600 dark:text-gray-300">×</span>
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Filter Chips - visible when searching */}
+      {isSearching && searchQuery && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm text-gray-500 dark:text-gray-400 mr-2">Filter:</span>
+          {[
+            { value: 'all' as const, label: 'All', count: searchResults.length },
+            { value: 'video' as const, label: 'Recordings', count: searchResults.filter(r => r.type === 'video').length },
+            { value: 'slides' as const, label: 'Presentations', count: searchResults.filter(r => r.type === 'slides').length },
+            { value: 'document' as const, label: 'Notes', count: searchResults.filter(r => r.type === 'document').length },
+            { value: 'case_study' as const, label: 'Case Studies', count: searchResults.filter(r => r.type === 'case_study').length },
+          ].map(filter => (
+            <button
+              key={filter.value}
+              onClick={() => setActiveFilter(filter.value)}
+              className={cn(
+                "px-3 py-1.5 rounded-lg text-sm font-medium transition-all border-2",
+                activeFilter === filter.value
+                  ? "bg-purple-500 text-white border-purple-500 shadow-lg shadow-purple-500/25"
+                  : "bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-800 hover:border-purple-500/50"
+              )}
+            >
+              {filter.label}
+              <span className={cn(
+                "ml-1.5 px-1.5 py-0.5 rounded text-xs",
+                activeFilter === filter.value
+                  ? "bg-white/20 text-white"
+                  : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400"
+              )}>
+                {filter.count}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {weeks.length === 0 ? (
         <div className="rounded-2xl border-2 border-dashed border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50 py-20">
@@ -1038,7 +1263,177 @@ export default function LearningsPage() {
             </div>
           )}
 
-          {/* Week Tabs with Progress */}
+          {/* Search Results Section - shown when searching */}
+          {isSearching && searchQuery && (
+            <div className="space-y-6">
+              {/* Results count */}
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  {filteredSearchResults.length === 0 ? (
+                    'No results found'
+                  ) : (
+                    <>
+                      Found <span className="font-semibold text-gray-900 dark:text-white">{filteredSearchResults.length}</span> {filteredSearchResults.length === 1 ? 'result' : 'results'}
+                      {activeFilter !== 'all' && (
+                        <> in <span className="font-semibold text-purple-500">{activeFilter === 'video' ? 'Recordings' : activeFilter === 'slides' ? 'Presentations' : activeFilter === 'document' ? 'Notes' : 'Case Studies'}</span></>
+                      )}
+                    </>
+                  )}
+                </p>
+                {filteredSearchResults.length > 0 && (
+                  <button
+                    onClick={() => {
+                      setSearchQuery('');
+                      setIsSearching(false);
+                      setSearchResults([]);
+                      setActiveFilter('all');
+                    }}
+                    className="text-sm text-purple-500 hover:text-purple-600 font-medium"
+                  >
+                    Clear search
+                  </button>
+                )}
+              </div>
+
+              {/* Empty state */}
+              {filteredSearchResults.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 rounded-2xl border-2 border-dashed border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/30">
+                  <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-gray-400 to-gray-500 flex items-center justify-center mb-4 shadow-lg shadow-gray-500/20">
+                    <Search className="w-7 h-7 text-white" />
+                  </div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 text-center font-medium mb-2">
+                    No results found for "{searchQuery}"
+                  </p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 text-center">
+                    Try searching for a different term or adjust your filters
+                  </p>
+                </div>
+              ) : (
+                /* Results grouped by week */
+                <div className="space-y-6">
+                  {Object.entries(groupedSearchResults)
+                    .sort(([a], [b]) => parseInt(a) - parseInt(b))
+                    .map(([weekNum, results]) => (
+                      <div key={weekNum} className="space-y-3">
+                        {/* Week header */}
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-md shadow-purple-500/20">
+                            <span className="text-xs font-bold text-white">{weekNum}</span>
+                          </div>
+                          <h3 className="font-semibold text-gray-900 dark:text-white">Week {weekNum}</h3>
+                          <Badge variant="secondary" className="ml-auto bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400">
+                            {results.length} {results.length === 1 ? 'result' : 'results'}
+                          </Badge>
+                        </div>
+
+                        {/* Results for this week */}
+                        <div className="grid gap-2 pl-10">
+                          {results.map((result) => {
+                            // Get colors based on type
+                            const getTypeConfig = () => {
+                              switch (result.type) {
+                                case 'video':
+                                  return {
+                                    label: 'Recording',
+                                    icon: <Video className="w-4 h-4" />,
+                                    colors: 'bg-purple-500/10 border-purple-500/30 text-purple-500',
+                                    borderHover: 'hover:border-purple-500/50',
+                                    shadowHover: 'hover:shadow-purple-500/10',
+                                  };
+                                case 'slides':
+                                  return {
+                                    label: 'Presentation',
+                                    icon: <Presentation className="w-4 h-4" />,
+                                    colors: 'bg-orange-500/10 border-orange-500/30 text-orange-500',
+                                    borderHover: 'hover:border-orange-500/50',
+                                    shadowHover: 'hover:shadow-orange-500/10',
+                                  };
+                                case 'document':
+                                  return {
+                                    label: 'Notes',
+                                    icon: <FileText className="w-4 h-4" />,
+                                    colors: 'bg-blue-500/10 border-blue-500/30 text-blue-500',
+                                    borderHover: 'hover:border-blue-500/50',
+                                    shadowHover: 'hover:shadow-blue-500/10',
+                                  };
+                                case 'case_study':
+                                  return {
+                                    label: 'Case Study',
+                                    icon: <FileQuestion className="w-4 h-4" />,
+                                    colors: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-500',
+                                    borderHover: 'hover:border-emerald-500/50',
+                                    shadowHover: 'hover:shadow-emerald-500/10',
+                                  };
+                                default:
+                                  return {
+                                    label: 'Resource',
+                                    icon: <Link2 className="w-4 h-4" />,
+                                    colors: 'bg-gray-500/10 border-gray-500/30 text-gray-500',
+                                    borderHover: 'hover:border-gray-500/50',
+                                    shadowHover: 'hover:shadow-gray-500/10',
+                                  };
+                              }
+                            };
+
+                            const typeConfig = getTypeConfig();
+
+                            return (
+                              <button
+                                key={result.id}
+                                onClick={() => handleSearchResultClick(result)}
+                                className={cn(
+                                  "w-full flex items-center gap-4 p-4 rounded-xl text-left transition-all duration-200 group",
+                                  "border-2 bg-white dark:bg-gray-900/80",
+                                  "border-gray-200 dark:border-gray-800",
+                                  typeConfig.borderHover,
+                                  "hover:shadow-lg",
+                                  typeConfig.shadowHover,
+                                  "hover:-translate-y-0.5"
+                                )}
+                              >
+                                {/* Type badge */}
+                                <div className={cn(
+                                  "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border flex-shrink-0",
+                                  typeConfig.colors
+                                )}>
+                                  {typeConfig.icon}
+                                  <span>{typeConfig.label}</span>
+                                </div>
+
+                                {/* Content */}
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-semibold text-gray-900 dark:text-white truncate group-hover:text-purple-500 dark:group-hover:text-purple-400 transition-colors">
+                                    {result.title}
+                                  </p>
+                                  <div className="flex items-center gap-2 mt-0.5">
+                                    {result.moduleName && (
+                                      <span className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                                        {result.moduleName}
+                                      </span>
+                                    )}
+                                    {result.description && (
+                                      <span className="text-xs text-gray-400 dark:text-gray-500 line-clamp-1">
+                                        {result.moduleName && ' - '}{result.description}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Chevron */}
+                                <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-purple-500 group-hover:translate-x-1 transition-all flex-shrink-0" />
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Week Tabs with Progress - only shown when NOT searching */}
+          {!isSearching && (
           <Tabs value={activeWeek} onValueChange={setActiveWeek}>
             <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50 p-1.5 overflow-hidden">
               <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700 scrollbar-track-transparent">
@@ -1178,6 +1573,7 @@ export default function LearningsPage() {
               );
             })}
           </Tabs>
+          )}
         </div>
       )}
 
