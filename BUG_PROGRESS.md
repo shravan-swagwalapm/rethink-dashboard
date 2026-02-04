@@ -10,8 +10,8 @@
 
 | Metric | Count |
 |--------|-------|
-| Total Bugs Reported | 3 |
-| Fixed & Verified | 3 |
+| Total Bugs Reported | 4 |
+| Fixed & Verified | 4 |
 | Features Completed | 2 |
 | UI Enhancements | 1 |
 | In Progress | 0 |
@@ -156,6 +156,35 @@ In `/app/auth/callback/admin/route.ts`, when a non-admin user tried admin login,
 **Verification**:
 - Non-admin clicks "Sign in as Administrator" → Blocked with error ✅
 - Admin clicks "Sign in as Administrator" → Allowed to /admin ✅
+
+---
+
+### BUG-004: Pending RSVP Color Conflict with Current Date
+
+**Status**: 🟢 Fixed & Verified
+
+**Reported**: 2026-02-04
+**Fixed**: 2026-02-04
+
+**Description**:
+In the calendar page, "Pending RSVP" sessions were displayed in purple (`bg-primary`), which is the same color used to highlight the current date. This made it confusing to distinguish between pending RSVPs and today's date indicator.
+
+**Root Cause**:
+Both the current date indicator and pending RSVP status used the same `bg-primary` purple color for visual styling.
+
+**Fix Applied**:
+- Changed pending RSVP color from `bg-primary` (purple) to `bg-amber-500` (yellow/amber)
+- Updated both the calendar grid session buttons AND the legend to use consistent amber color
+- Color scheme is now: Green (Attending), Red (Not attending), Yellow/Amber (Pending RSVP)
+
+**Files Changed**:
+- `/app/(dashboard)/calendar/page.tsx` - Session button styling + legend color
+
+**Verification**:
+- Build: PASS
+- Legend now shows yellow for "Pending RSVP" ✅
+- Calendar sessions without RSVP now display in amber/yellow ✅
+- Current date remains highlighted in purple (primary) ✅
 
 ---
 
@@ -373,4 +402,4 @@ Then [your specific task here]
 
 ---
 
-*Last Updated: 2026-02-04 2:00 AM - FEATURE-002 Futuristic UI Overhaul completed*
+*Last Updated: 2026-02-04 3:30 PM - BUG-004 Pending RSVP color fixed*

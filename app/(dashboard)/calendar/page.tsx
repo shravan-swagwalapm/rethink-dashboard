@@ -557,7 +557,7 @@ export default function CalendarPage() {
                             ? 'bg-green-500 text-white hover:bg-green-600'
                             : session.user_rsvp?.response === 'no'
                             ? 'bg-red-500/80 text-white hover:bg-red-600'
-                            : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                            : 'bg-amber-500 text-white hover:bg-amber-600'
                         )}
                       >
                         <span className="opacity-90">{formatTime(session.scheduled_at).replace(' IST', '').replace(' UTC', '')}</span>
@@ -592,7 +592,7 @@ export default function CalendarPage() {
           <span className="text-muted-foreground">Not attending</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded bg-primary shadow-sm" />
+          <div className="w-4 h-4 rounded bg-amber-500 shadow-sm" />
           <span className="text-muted-foreground">Pending RSVP</span>
         </div>
       </div>
