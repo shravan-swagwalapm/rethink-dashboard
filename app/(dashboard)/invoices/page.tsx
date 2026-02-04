@@ -6,7 +6,7 @@ import { useUser } from '@/hooks/use-user';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { StudentPageLoader } from '@/components/ui/page-loader';
+import { PageLoader } from '@/components/ui/page-loader';
 import { toast } from 'sonner';
 import {
   Receipt,
@@ -136,8 +136,10 @@ export default function StudentInvoicesPage() {
     }
   };
 
-  if (userLoading || loading) {
-    return <StudentPageLoader message="Loading your invoices..." />;
+  // Layout already handles user auth loading with StudentPageLoader
+  // Only show page-specific loading state for data
+  if (loading) {
+    return <PageLoader message="Loading your invoices..." />;
   }
 
   if (!profile) {

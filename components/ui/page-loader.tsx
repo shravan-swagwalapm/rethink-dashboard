@@ -1,7 +1,7 @@
 'use client';
 
 import { Loader2, Sparkles } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 
 interface PageLoaderProps {
   message?: string;
@@ -244,6 +244,44 @@ export function FullPageLoader({ message = 'Loading...' }: PageLoaderProps) {
       </div>
     </div>
   );
+}
+
+// Minimum display time for loaders to prevent flash
+const MINIMUM_LOADER_DISPLAY_MS = 500;
+
+// Hook to ensure minimum display time for loaders
+export function useMinimumLoadingTime(isLoading: boolean, minimumMs: number = MINIMUM_LOADER_DISPLAY_MS): boolean {
+  const [showLoader, setShowLoader] = useState(isLoading);
+  const loadStartTimeRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (isLoading) {
+      // Loading started - record time
+      loadStartTimeRef.current = Date.now();
+      setShowLoader(true);
+    } else {
+      // Loading finished - ensure minimum display time
+      if (loadStartTimeRef.current) {
+        const elapsed = Date.now() - loadStartTimeRef.current;
+        const remaining = minimumMs - elapsed;
+
+        if (remaining > 0) {
+          // Wait remaining time before hiding
+          const timer = setTimeout(() => {
+            setShowLoader(false);
+          }, remaining);
+          return () => clearTimeout(timer);
+        } else {
+          // Minimum time already passed
+          setShowLoader(false);
+        }
+      } else {
+        setShowLoader(false);
+      }
+    }
+  }, [isLoading, minimumMs]);
+
+  return showLoader;
 }
 
 // Student-specific loader with quote - can be used across student pages

@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react';
 import { DashboardSidebar } from '@/components/dashboard/sidebar';
 import { DashboardHeader } from '@/components/dashboard/header';
 import { useUser } from '@/hooks/use-user';
-import { StudentPageLoader } from '@/components/ui/page-loader';
+import { StudentPageLoader, useMinimumLoadingTime } from '@/components/ui/page-loader';
 
 export default function DashboardLayout({
   children,
@@ -13,6 +13,10 @@ export default function DashboardLayout({
 }) {
   const { loading, profile } = useUser();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Use minimum loading time to prevent flash of loader
+  // This ensures the loader shows for at least 500ms to prevent jarring transitions
+  const showLoader = useMinimumLoadingTime(loading);
 
   const handleMobileMenuToggle = useCallback(() => {
     setMobileMenuOpen((prev) => !prev);
@@ -23,7 +27,8 @@ export default function DashboardLayout({
   }, []);
 
   // Show futuristic full-page loader with motivational quotes while loading
-  if (loading) {
+  // Layout handles user auth loading - pages should NOT show their own full-page loader
+  if (showLoader) {
     return <StudentPageLoader message="Preparing your learning journey..." />;
   }
 

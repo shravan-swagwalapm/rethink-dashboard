@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { StudentPageLoader } from '@/components/ui/page-loader';
+import { PageLoader } from '@/components/ui/page-loader';
 import {
   Table,
   TableBody,
@@ -138,8 +138,10 @@ export default function TeamPage() {
     return 'text-red-600 dark:text-red-400';
   };
 
-  if (userLoading || loading) {
-    return <StudentPageLoader message="Loading your team..." />;
+  // Layout already handles user auth loading with StudentPageLoader
+  // Only show page-specific loading state for data
+  if (loading) {
+    return <PageLoader message="Loading your team..." />;
   }
 
   if (!isMentor && !isAdmin) {
