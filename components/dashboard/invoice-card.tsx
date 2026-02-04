@@ -3,7 +3,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Receipt, ChevronRight, CheckCircle, Clock, AlertCircle, Download } from 'lucide-react';
+import { Receipt, ChevronRight, CheckCircle, Clock, AlertCircle, Download, Eye } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import type { Invoice, Cohort } from '@/types';
@@ -16,9 +16,10 @@ interface InvoiceCardProps {
   invoices: InvoiceWithCohort[];
   pendingAmount: number;
   onDownload?: (invoice: InvoiceWithCohort) => void;
+  onView?: (invoice: InvoiceWithCohort) => void;
 }
 
-export function InvoiceCard({ invoices, pendingAmount, onDownload }: InvoiceCardProps) {
+export function InvoiceCard({ invoices, pendingAmount, onDownload, onView }: InvoiceCardProps) {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
@@ -103,12 +104,24 @@ export function InvoiceCard({ invoices, pendingAmount, onDownload }: InvoiceCard
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <span className="font-medium text-sm">{formatCurrency(invoice.amount)}</span>
+                  {invoice.pdf_path && onView && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => onView(invoice)}
+                      title="View Invoice"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </Button>
+                  )}
                   {invoice.pdf_path && onDownload && (
                     <Button
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8"
                       onClick={() => onDownload(invoice)}
+                      title="Download Invoice"
                     >
                       <Download className="w-4 h-4" />
                     </Button>

@@ -726,6 +726,7 @@ export default function DashboardPage() {
           <InvoiceCard
             invoices={invoices}
             pendingAmount={pendingInvoiceAmount}
+            onView={handleInvoiceDownload}
             onDownload={handleInvoiceDownload}
           />
         </div>

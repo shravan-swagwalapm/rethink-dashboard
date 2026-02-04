@@ -17,6 +17,7 @@ import {
   IndianRupee,
   FileText,
   Calendar,
+  Eye,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import type { Invoice, Cohort } from '@/types';
@@ -257,7 +258,7 @@ export default function StudentInvoicesPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-4 sm:flex-shrink-0">
+                  <div className="flex items-center gap-3 sm:flex-shrink-0">
                     <p className="text-lg font-bold">{formatCurrency(invoice.amount)}</p>
                     <Button
                       variant="outline"
@@ -265,8 +266,17 @@ export default function StudentInvoicesPage() {
                       onClick={() => handleDownload(invoice)}
                       disabled={downloadingId === invoice.id || !invoice.pdf_path}
                     >
+                      <Eye className="w-4 h-4 mr-2" />
+                      View
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDownload(invoice)}
+                      disabled={downloadingId === invoice.id || !invoice.pdf_path}
+                    >
                       <Download className="w-4 h-4 mr-2" />
-                      {downloadingId === invoice.id ? 'Opening...' : 'Download'}
+                      Download
                     </Button>
                   </div>
                 </div>
