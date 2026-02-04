@@ -717,6 +717,11 @@ export default function CalendarPage() {
                 />
               </div>
 
+              {/* Save hint */}
+              <p className="text-xs text-muted-foreground text-center">
+                Please close the card once you save your settings
+              </p>
+
               {/* Timezone Note */}
               <p className="text-xs text-muted-foreground text-center pt-2 border-t border-border/50">
                 Times shown in {getTimezoneLabel()}
