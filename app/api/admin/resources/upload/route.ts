@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File;
-    const cohortId = formData.get('cohort_id') as string;
+    const cohortIdParam = formData.get('cohort_id') as string;
     const parentId = formData.get('parent_id') as string | null;
     const weekNumber = formData.get('week_number') as string | null;
 
@@ -60,16 +60,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'File is required' }, { status: 400 });
     }
 
-    if (!cohortId) {
+    if (!cohortIdParam) {
       return NextResponse.json({ error: 'Cohort is required' }, { status: 400 });
     }
+
+    // Handle global library: use 'global' for storage path, NULL for database
+    const isGlobal = cohortIdParam === 'global';
+    const storageFolder = isGlobal ? 'global' : cohortIdParam;
+    const dbCohortId = isGlobal ? null : cohortIdParam;
 
     const adminClient = await createAdminClient();
 
     // Generate unique filename
     const timestamp = Date.now();
     const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-    const filePath = `${cohortId}/${timestamp}_${sanitizedName}`;
+    const filePath = `${storageFolder}/${timestamp}_${sanitizedName}`;
 
     // Convert File to ArrayBuffer then to Buffer for upload
     const arrayBuffer = await file.arrayBuffer();
@@ -111,7 +116,7 @@ export async function POST(request: NextRequest) {
         file_path: uploadData.path,
         file_type: getFileType(file.name),
         file_size: file.size,
-        cohort_id: cohortId,
+        cohort_id: dbCohortId,
         parent_id: parentId || null,
         week_number: weekNumber ? parseInt(weekNumber) : null,
         uploaded_by: auth.userId,
