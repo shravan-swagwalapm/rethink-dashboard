@@ -403,10 +403,7 @@ export function ResourcePreviewModal({
                 setIframeLoading(false);
                 setIframeError(true);
               }}
-              className={cn(
-                'w-full h-full rounded-lg transition-opacity duration-300 bg-black',
-                iframeLoading ? 'opacity-0' : 'opacity-100'
-              )}
+              className="w-full h-full rounded-lg bg-gray-900"
               allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
               allowFullScreen
               title={resource.title}
