@@ -625,38 +625,12 @@ export function UniversalViewer({ fileUrl, fileName, fileType, isOpen, onClose }
                 )}
               </AnimatePresence>
 
-              {state.strategy === 'blob' ? (
-                <object
-                  data={state.viewerUrl}
-                  type="application/pdf"
-                  className="absolute inset-0 w-full h-full rounded-b-lg"
-                  onLoad={handleIframeLoad}
-                  onError={handleIframeError}
-                  aria-label={`PDF viewer for ${fileName}`}
-                >
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="text-center space-y-4 max-w-md p-6">
-                      <div className="w-16 h-16 mx-auto rounded-full bg-muted flex items-center justify-center">
-                        <FileText className="w-8 h-8 text-muted-foreground" />
-                      </div>
-                      <div>
-                        <p className="font-semibold mb-2 dark:text-white">Browser PDF Viewer Not Available</p>
-                        <p className="text-sm text-muted-foreground mb-4">
-                          Your browser doesn&apos;t support inline PDF viewing.
-                        </p>
-                      </div>
-                      <Button onClick={handleDownload} className="gradient-bg text-white">
-                        <Download className="w-4 h-4 mr-2" />
-                        Download PDF
-                      </Button>
-                    </div>
-                  </div>
-                </object>
-              ) : (
+              {/* Use iframe for all document types including PDFs for consistent full-screen behavior */}
+              {(state.strategy === 'blob' || state.strategy === 'office' || state.strategy === 'google' || state.strategy === 'direct') && (
                 <iframe
                   ref={iframeRef}
                   src={state.viewerUrl}
-                  className="absolute inset-0 w-full h-full border-0 rounded-b-lg"
+                  className="absolute inset-0 w-full h-full border-0"
                   title={`Document viewer for ${fileName}`}
                   sandbox={getSandboxAttrs()}
                   allow="autoplay; fullscreen; clipboard-write"
