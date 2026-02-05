@@ -400,11 +400,14 @@ export function UniversalViewer({ fileUrl, fileName, fileType, isOpen, onClose }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl max-h-[95vh] w-[95vw] flex flex-col p-0 overflow-hidden">
-        <DialogHeader className="px-6 py-4 border-b flex-shrink-0 bg-background">
+      <DialogContent
+        className="fixed inset-0 w-screen h-screen max-w-none translate-x-0 translate-y-0 top-0 left-0 flex flex-col p-0 overflow-hidden border-0 rounded-none m-0"
+        style={{ transform: 'none' }}
+      >
+        <DialogHeader className="px-4 py-2 border-b flex-shrink-0 bg-background/95 backdrop-blur-sm">
           <div className="flex items-center justify-between">
-            <DialogTitle className="text-lg font-semibold truncate pr-4 flex items-center gap-2">
-              <span className="text-2xl">{getFileIcon()}</span>
+            <DialogTitle className="text-sm font-semibold truncate pr-4 flex items-center gap-2">
+              <span className="text-lg">{getFileIcon()}</span>
               <span className="truncate">{fileName}</span>
             </DialogTitle>
             <div className="flex items-center gap-2 flex-shrink-0">
@@ -428,7 +431,7 @@ export function UniversalViewer({ fileUrl, fileName, fileType, isOpen, onClose }
           </div>
         </DialogHeader>
 
-        <div className="flex-1 overflow-hidden relative bg-muted/10" style={{ minHeight: '60vh' }}>
+        <div className="flex-1 overflow-hidden relative bg-muted/10">
           {/* Loading State */}
           {state.loading && (
             <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-10">
@@ -535,18 +538,12 @@ export function UniversalViewer({ fileUrl, fileName, fileType, isOpen, onClose }
           )}
         </div>
 
-        {/* Footer */}
-        <div className="px-6 py-3 border-t bg-muted/30 text-sm text-muted-foreground text-center flex-shrink-0">
-          <span className="hidden sm:inline">
-            Viewing with {getViewerName()}
-            {state.strategy !== 'none' && (
-              <span className="text-xs ml-2 opacity-60">
-                (Strategy: {state.strategy})
-              </span>
-            )}
-            {' • '}
-          </span>
-          For full features, download and open in the native application
+        {/* Footer - Minimal */}
+        <div className="px-4 py-1.5 border-t bg-muted/30 text-xs text-muted-foreground text-center flex-shrink-0 flex items-center justify-center gap-2">
+          <span className="opacity-60">Viewing with {getViewerName()}</span>
+          {state.strategy !== 'none' && (
+            <span className="opacity-40 text-[10px]">({state.strategy})</span>
+          )}
         </div>
       </DialogContent>
     </Dialog>
