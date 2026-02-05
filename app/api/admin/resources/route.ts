@@ -139,7 +139,7 @@ export async function POST(request: Request) {
         file_path: filePath,
         file_size: fileSize,
         file_type: fileType,
-        type: file ? 'file' : 'link',
+        type: 'file',
         uploaded_by: user.id,
       })
       .select()
