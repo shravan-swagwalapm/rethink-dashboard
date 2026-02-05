@@ -284,6 +284,7 @@ export default function AdminResourcesPage() {
   // REFS
   // ---------------------------------------------------------------------------
   const hasFetchedRef = useRef(false);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
 
   // ---------------------------------------------------------------------------
   // COMPUTED VALUES
@@ -651,11 +652,17 @@ export default function AdminResourcesPage() {
               ));
               resolve();
             } else {
-              const error = JSON.parse(xhr.responseText)?.error || 'Upload failed';
+              let errorMessage = 'Upload failed';
+              try {
+                const response = JSON.parse(xhr.responseText);
+                errorMessage = response?.error || `Server error (${xhr.status})`;
+              } catch {
+                errorMessage = `Server error (${xhr.status}): ${xhr.statusText || 'Unknown error'}`;
+              }
               setFileQueue(prev => prev.map(f =>
-                f.id === item.id ? { ...f, status: 'error' as const, error } : f
+                f.id === item.id ? { ...f, status: 'error' as const, error: errorMessage } : f
               ));
-              reject(new Error(error));
+              reject(new Error(errorMessage));
             }
           });
 
@@ -1196,6 +1203,15 @@ export default function AdminResourcesPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Hidden file input for Presentations tab */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept=".ppt,.pptx"
+                onChange={(e) => handleFilesSelected(e.target.files)}
+                className="hidden"
+              />
               {/* Drop Zone */}
               <div
                 className={`border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer ${
@@ -1215,19 +1231,10 @@ export default function AdminResourcesPage() {
                 }}
                 onClick={() => {
                   if (fileInputRef.current) {
-                    fileInputRef.current.accept = '.ppt,.pptx';
                     fileInputRef.current.click();
                   }
                 }}
               >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  multiple
-                  accept={ACCEPTED_FILE_TYPES}
-                  onChange={(e) => handleFilesSelected(e.target.files)}
-                  className="hidden"
-                />
                 <div className={`w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center transition-colors ${
                   dragOver ? 'bg-primary/20' : 'bg-muted'
                 }`}>
@@ -1326,6 +1333,15 @@ export default function AdminResourcesPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Hidden file input for PDFs tab */}
+              <input
+                ref={pdfInputRef}
+                type="file"
+                multiple
+                accept=".pdf,.doc,.docx"
+                onChange={(e) => handleFilesSelected(e.target.files)}
+                className="hidden"
+              />
               {/* Drop Zone */}
               <div
                 className={`border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer ${
@@ -1344,9 +1360,8 @@ export default function AdminResourcesPage() {
                   handleFilesSelected(e.dataTransfer.files);
                 }}
                 onClick={() => {
-                  if (fileInputRef.current) {
-                    fileInputRef.current.accept = '.pdf,.doc,.docx';
-                    fileInputRef.current.click();
+                  if (pdfInputRef.current) {
+                    pdfInputRef.current.click();
                   }
                 }}
               >

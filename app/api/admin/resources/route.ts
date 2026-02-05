@@ -87,27 +87,47 @@ export async function POST(request: Request) {
     let fileSize: number | null = null;
     let fileType: string | null = null;
 
-    // Allow file uploads for presentation and pdf categories (pdf includes all documents)
+    // Handle file uploads for presentation and pdf categories
     if (file && ['presentation', 'pdf'].includes(category)) {
       if (file.size > 104857600) {
         return NextResponse.json({ error: 'File exceeds 100MB limit' }, { status: 400 });
       }
 
+      // Validate folder path
+      const folder = isGlobal ? 'global' : cohortId;
+      if (!folder) {
+        return NextResponse.json({ error: 'Cohort ID is required for non-global uploads' }, { status: 400 });
+      }
+
       const timestamp = Date.now();
       const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-      const folder = isGlobal ? 'global' : cohortId;
       filePath = `${folder}/${category}/${timestamp}_${sanitizedName}`;
+
+      // Convert File to ArrayBuffer for upload (required for Next.js Edge runtime compatibility)
+      const arrayBuffer = await file.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
 
       const { error: uploadError } = await adminClient.storage
         .from('resources')
-        .upload(filePath, file);
+        .upload(filePath, buffer, {
+          contentType: file.type || 'application/octet-stream',
+          upsert: false,
+        });
 
       if (uploadError) {
-        return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
+        console.error('Supabase upload error:', uploadError);
+        return NextResponse.json({
+          error: `Upload failed: ${uploadError.message || 'Unknown storage error'}`
+        }, { status: 500 });
       }
 
       fileSize = file.size;
       fileType = file.name.split('.').pop()?.toLowerCase() || null;
+    } else if (file && !['presentation', 'pdf'].includes(category)) {
+      // File provided but category doesn't support file uploads
+      return NextResponse.json({
+        error: `File uploads not supported for category: ${category}. Use 'presentation' or 'pdf' category.`
+      }, { status: 400 });
     }
 
     const { data: resource, error: insertError } = await adminClient
@@ -129,11 +149,21 @@ export async function POST(request: Request) {
       .select()
       .single();
 
-    if (insertError) throw insertError;
+    if (insertError) {
+      console.error('Database insert error:', insertError);
+      // If file was uploaded, clean it up on database failure
+      if (filePath) {
+        await adminClient.storage.from('resources').remove([filePath]);
+      }
+      return NextResponse.json({
+        error: `Failed to save resource: ${insertError.message || 'Database error'}`
+      }, { status: 500 });
+    }
 
     return NextResponse.json({ resource }, { status: 201 });
   } catch (error) {
     console.error('Error creating resource:', error);
-    return NextResponse.json({ error: 'Failed to create resource' }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: `Failed to create resource: ${errorMessage}` }, { status: 500 });
   }
 }
