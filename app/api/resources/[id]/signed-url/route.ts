@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const supabase = await createClient();
 
@@ -14,7 +14,9 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const resourceId = params.id;
+    // Await params in Next.js 16
+    const { id } = await params;
+    const resourceId = id;
 
     // Get resource details
     const { data: resource, error: resourceError } = await supabase

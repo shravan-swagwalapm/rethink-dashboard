@@ -49,7 +49,7 @@ export async function GET(request: Request) {
 // POST: Create new resource with file upload
 export async function POST(request: Request) {
   const supabase = await createClient();
-  const adminClient = createAdminClient();
+  const adminClient = await createAdminClient();
 
   try {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
