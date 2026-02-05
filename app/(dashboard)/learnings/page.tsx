@@ -1613,25 +1613,37 @@ export default function LearningsPage() {
 
               {/* Action buttons */}
               {selectedResource && (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3 mr-12">
                   <Button
                     variant="outline"
                     size="icon"
                     onClick={() => handleToggleFavorite(selectedResource.id)}
+                    className={cn(
+                      "transition-all",
+                      favoriteResources.has(selectedResource.id) && "border-yellow-400 bg-yellow-50 dark:bg-yellow-950/20"
+                    )}
                   >
                     <Star className={cn(
-                      "w-4 h-4",
-                      favoriteResources.has(selectedResource.id) ? "fill-yellow-400 text-yellow-400" : ""
+                      "w-4 h-4 transition-all",
+                      favoriteResources.has(selectedResource.id)
+                        ? "fill-yellow-400 text-yellow-400"
+                        : "text-gray-400 dark:text-gray-500"
                     )} />
                   </Button>
                   <Button
                     variant="outline"
                     size="icon"
                     onClick={() => handleMarkComplete(selectedResource.id)}
+                    className={cn(
+                      "transition-all",
+                      completedResources.has(selectedResource.id) && "border-green-500 bg-green-50 dark:bg-green-950/20"
+                    )}
                   >
                     <Check className={cn(
-                      "w-4 h-4",
-                      completedResources.has(selectedResource.id) ? "text-green-500" : ""
+                      "w-4 h-4 transition-all",
+                      completedResources.has(selectedResource.id)
+                        ? "text-green-500 stroke-[3]"
+                        : "text-gray-400 dark:text-gray-500"
                     )} />
                   </Button>
                 </div>

@@ -10,8 +10,8 @@
 
 | Metric | Count |
 |--------|-------|
-| Total Bugs Reported | 7 |
-| Fixed & Verified | 7 |
+| Total Bugs Reported | 8 |
+| Fixed & Verified | 8 |
 | Features Completed | 3 |
 | UI Enhancements | 1 |
 | In Progress | 0 |
@@ -268,6 +268,44 @@ Invoice cards on both the dashboard and /invoices page were showing "Due: Jan 27
 **Verification**:
 - Build: PASS
 - Invoice cards show cleaner layout ✅
+
+---
+
+### BUG-008: Star and Check Buttons Too Close to Close Button in Video Dialog
+
+**Status**: 🟢 Fixed & Verified
+
+**Reported**: 2026-02-05
+**Fixed**: 2026-02-05
+
+**Description**:
+In the video/resource viewer dialog on the learnings page, the Star (favorite) and Check (mark as done) buttons were too close to the X (close) button, making it easy to accidentally click the wrong button. The buttons also lacked clear visual feedback when toggled.
+
+**Root Cause**:
+The action buttons container only had `gap-2` (8px) spacing between buttons and no margin-right to separate from the absolutely-positioned close button at `right-4` (16px). The toggled states also lacked distinctive styling.
+
+**Fix Applied**:
+- Changed button container spacing from `gap-2` to `gap-3` (12px between Star and Check buttons)
+- Added `mr-12` (48px margin-right) to create proper space from the close button
+- Enhanced Star button:
+  - Active state: Yellow filled star, yellow border, light yellow background
+  - Inactive state: Gray star icon
+  - Smooth transitions between states
+- Enhanced Check button:
+  - Active state: Green checkmark with thicker stroke, green border, light green background
+  - Inactive state: Gray checkmark
+  - Smooth transitions between states
+- Both buttons now have colored borders and backgrounds when active for better visual feedback
+
+**Files Changed**:
+- `/app/(dashboard)/learnings/page.tsx` - Updated action buttons styling and spacing (lines 1614-1638)
+
+**Verification**:
+- Build: PASS (no TypeScript errors)
+- Proper spacing from close button ✅
+- Clear visual distinction between active/inactive states ✅
+- Toggle functionality works correctly (star/unstar, done/undone) ✅
+- Smooth transitions on state changes ✅
 
 ---
 
@@ -569,4 +607,24 @@ Then [your specific task here]
 
 ---
 
-*Last Updated: 2026-02-04 4:30 PM - Session 3 completed (4 bugs fixed, 1 feature added)*
+---
+
+### Session 4 - 2026-02-05
+
+**Time Started**: ~2:50 PM
+**Bugs Fixed This Session**: 1
+
+| Bug ID | Title | Status | Time to Fix |
+|--------|-------|--------|-------------|
+| BUG-008 | Star and Check Buttons Too Close to Close Button | Fixed & Verified | ~5 min |
+
+**Work Done**:
+1. Improved spacing between Star/Check buttons and close button (mr-12)
+2. Increased gap between Star and Check buttons (gap-3)
+3. Enhanced visual feedback with colored borders and backgrounds for active states
+4. Added smooth transitions for state changes
+5. Made inactive states use gray color for better contrast
+
+---
+
+*Last Updated: 2026-02-05 3:00 PM - Session 4 completed (1 bug fixed)*
