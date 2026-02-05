@@ -395,8 +395,12 @@ export function ResourcePreviewModal({
               })()}
               onLoad={() => {
                 console.log('[ResourcePreview] Iframe loaded successfully');
-                setIframeLoading(false);
-                setIframeError(false);
+                // For PDFs, add small delay to ensure PDF viewer has rendered content
+                const delay = hasPdf ? 500 : 0;
+                setTimeout(() => {
+                  setIframeLoading(false);
+                  setIframeError(false);
+                }, delay);
               }}
               onError={(e) => {
                 console.error('[ResourcePreview] Iframe load error:', e);

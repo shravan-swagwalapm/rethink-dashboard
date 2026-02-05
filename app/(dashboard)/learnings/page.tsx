@@ -1902,8 +1902,13 @@ export default function LearningsPage() {
                   })()}
                   onLoad={() => {
                     console.log('[Learnings] Iframe loaded successfully');
-                    setIframeLoading(false);
-                    setIframeError(false);
+                    // For PDFs, add small delay to ensure PDF viewer has rendered content
+                    const hasPdf = hasUploadedFile(selectedResource as ModuleResource);
+                    const delay = hasPdf ? 500 : 0;
+                    setTimeout(() => {
+                      setIframeLoading(false);
+                      setIframeError(false);
+                    }, delay);
                   }}
                   onError={(e) => {
                     console.error('[Learnings] Iframe load error:', e);
