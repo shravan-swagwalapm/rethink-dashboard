@@ -27,12 +27,8 @@ import { format } from 'date-fns';
 import type { Resource, ResourceCategory } from '@/types';
 import { VideoThumbnail } from '@/components/resources/video-thumbnail';
 
-// Dynamic imports to avoid SSR issues with react-pdf
-const PDFViewer = dynamic(() => import('@/components/resources/pdf-viewer').then(mod => ({ default: mod.PDFViewer })), { ssr: false });
-const DocViewer = dynamic(() => import('@/components/resources/doc-viewer').then(mod => ({ default: mod.DocViewer })), { ssr: false });
-const PPTViewer = dynamic(() => import('@/components/resources/ppt-viewer').then(mod => ({ default: mod.PPTViewer })), { ssr: false });
-const ExcelViewer = dynamic(() => import('@/components/resources/excel-viewer').then(mod => ({ default: mod.ExcelViewer })), { ssr: false });
-const CSVViewer = dynamic(() => import('@/components/resources/csv-viewer').then(mod => ({ default: mod.CSVViewer })), { ssr: false });
+// Use universal iframe-based viewer for all document types (more reliable)
+const UniversalViewer = dynamic(() => import('@/components/resources/universal-viewer').then(mod => ({ default: mod.UniversalViewer })), { ssr: false });
 
 type Tab = ResourceCategory;
 
@@ -50,10 +46,11 @@ export default function ResourcesPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [viewerState, setViewerState] = useState<{
-    type: 'pdf' | 'doc' | 'ppt' | 'excel' | 'csv' | null;
+    isOpen: boolean;
     fileUrl: string;
     fileName: string;
-  }>({ type: null, fileUrl: '', fileName: '' });
+    fileType: string;
+  }>({ isOpen: false, fileUrl: '', fileName: '', fileType: '' });
 
   useEffect(() => {
     const fetchResources = async () => {
@@ -105,20 +102,18 @@ export default function ResourcesPage() {
 
       const { signedUrl } = await response.json();
 
-      const fileType = resource.file_type?.toLowerCase();
+      const fileType = resource.file_type?.toLowerCase() || '';
 
-      if (fileType === 'pdf') {
-        setViewerState({ type: 'pdf', fileUrl: signedUrl, fileName: resource.name });
-      } else if (['doc', 'docx'].includes(fileType || '')) {
-        setViewerState({ type: 'doc', fileUrl: signedUrl, fileName: resource.name });
-      } else if (['ppt', 'pptx'].includes(fileType || '')) {
-        setViewerState({ type: 'ppt', fileUrl: signedUrl, fileName: resource.name });
-      } else if (['xls', 'xlsx'].includes(fileType || '')) {
-        setViewerState({ type: 'excel', fileUrl: signedUrl, fileName: resource.name });
-      } else if (fileType === 'csv') {
-        setViewerState({ type: 'csv', fileUrl: signedUrl, fileName: resource.name });
+      // Open all supported document types in universal viewer
+      if (['pdf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'csv'].includes(fileType)) {
+        setViewerState({
+          isOpen: true,
+          fileUrl: signedUrl,
+          fileName: resource.name,
+          fileType: fileType
+        });
       } else {
-        // Fallback: open in new tab
+        // Fallback: open in new tab for unsupported types
         window.open(signedUrl, '_blank');
       }
     } catch (error) {
@@ -146,7 +141,7 @@ export default function ResourcesPage() {
   };
 
   const closeViewer = () => {
-    setViewerState({ type: null, fileUrl: '', fileName: '' });
+    setViewerState({ isOpen: false, fileUrl: '', fileName: '', fileType: '' });
   };
 
   // Show full-page loader until auth is ready
@@ -390,51 +385,14 @@ export default function ResourcesPage() {
         </>
       )}
 
-      {/* Document Viewers */}
-      {viewerState.type === 'pdf' && (
-        <PDFViewer
-          fileUrl={viewerState.fileUrl}
-          fileName={viewerState.fileName}
-          isOpen={true}
-          onClose={closeViewer}
-        />
-      )}
-
-      {viewerState.type === 'doc' && (
-        <DocViewer
-          fileUrl={viewerState.fileUrl}
-          fileName={viewerState.fileName}
-          isOpen={true}
-          onClose={closeViewer}
-        />
-      )}
-
-      {viewerState.type === 'ppt' && (
-        <PPTViewer
-          fileUrl={viewerState.fileUrl}
-          fileName={viewerState.fileName}
-          isOpen={true}
-          onClose={closeViewer}
-        />
-      )}
-
-      {viewerState.type === 'excel' && (
-        <ExcelViewer
-          fileUrl={viewerState.fileUrl}
-          fileName={viewerState.fileName}
-          isOpen={true}
-          onClose={closeViewer}
-        />
-      )}
-
-      {viewerState.type === 'csv' && (
-        <CSVViewer
-          fileUrl={viewerState.fileUrl}
-          fileName={viewerState.fileName}
-          isOpen={true}
-          onClose={closeViewer}
-        />
-      )}
+      {/* Universal Document Viewer */}
+      <UniversalViewer
+        fileUrl={viewerState.fileUrl}
+        fileName={viewerState.fileName}
+        fileType={viewerState.fileType}
+        isOpen={viewerState.isOpen}
+        onClose={closeViewer}
+      />
     </div>
   );
 }
