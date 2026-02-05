@@ -4,9 +4,9 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Download, X, ExternalLink, Loader2, RefreshCw, AlertTriangle, FileText, File, Sheet, Presentation, FileCode, Maximize2, Keyboard } from 'lucide-react';
-import { toast } from 'sonner';
+import { Download, X, ExternalLink, RefreshCw, AlertTriangle, FileText, File, Sheet, Presentation, Maximize2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { PDFRenderer } from './pdf-renderer';
 
 interface UniversalViewerProps {
   fileUrl: string;
@@ -175,7 +175,6 @@ export function UniversalViewer({ fileUrl, fileName, fileType, isOpen, onClose }
           iframeError: false,
         }));
       } catch (err) {
-        const errorMsg = err instanceof Error ? err.message : 'Unknown error';
         logError('Blob fetch failed:', err);
 
         // Fallback to Google viewer for PDFs
@@ -305,6 +304,8 @@ export function UniversalViewer({ fileUrl, fileName, fileType, isOpen, onClose }
       log('Dialog closed - cleaning up');
       cleanupBlobUrl();
       clearLoadTimeout();
+      // Reset state when dialog closes - this is intentional cleanup
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setState({
         loading: true,
         error: null,
@@ -376,9 +377,14 @@ export function UniversalViewer({ fileUrl, fileName, fileType, isOpen, onClose }
   };
 
   const getViewerName = () => {
+    // For PDFs with blob strategy, we're using our custom react-pdf viewer
+    if (state.strategy === 'blob' && fileType?.toLowerCase() === 'pdf') {
+      return 'Full-Screen PDF Viewer';
+    }
+
     switch (state.strategy) {
       case 'blob':
-        return 'Browser PDF Viewer';
+        return 'Direct Viewer';
       case 'office':
         return 'Microsoft Office Online';
       case 'google':
@@ -583,8 +589,26 @@ export function UniversalViewer({ fileUrl, fileName, fileType, isOpen, onClose }
             )}
           </AnimatePresence>
 
-          {/* Document viewer iframe/object */}
-          {shouldShowIframe && (
+          {/* PDF Viewer - Full screen react-pdf renderer (no browser chrome) */}
+          {shouldShowIframe && state.strategy === 'blob' && fileType?.toLowerCase() === 'pdf' && (
+            <PDFRenderer
+              fileUrl={state.viewerUrl}
+              fileName={fileName}
+              onLoadSuccess={() => {
+                setState(prev => ({ ...prev, iframeLoaded: true }));
+              }}
+              onLoadError={(error) => {
+                setState(prev => ({
+                  ...prev,
+                  error,
+                  iframeError: true
+                }));
+              }}
+            />
+          )}
+
+          {/* Document viewer iframe for non-PDF files (Office/Google viewers) */}
+          {shouldShowIframe && !(state.strategy === 'blob' && fileType?.toLowerCase() === 'pdf') && (
             <>
               {/* Loading indicator for iframe - styled notification */}
               <AnimatePresence>
@@ -625,7 +649,7 @@ export function UniversalViewer({ fileUrl, fileName, fileType, isOpen, onClose }
                 )}
               </AnimatePresence>
 
-              {/* Use iframe for all document types including PDFs for consistent full-screen behavior */}
+              {/* Iframe for Office/Google viewers */}
               {(state.strategy === 'blob' || state.strategy === 'office' || state.strategy === 'google' || state.strategy === 'direct') && (
                 <iframe
                   ref={iframeRef}
