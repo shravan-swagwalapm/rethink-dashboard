@@ -16,9 +16,11 @@ export type NotificationType = 'session_reminder' | 'new_resource' | 'system';
 
 export type ResourceType = 'file' | 'folder' | 'link';
 
+export type ResourceCategory = 'video' | 'article' | 'presentation' | 'pdf';
+
 export type ModuleResourceType = 'video' | 'slides' | 'document' | 'link';
 
-export type FileType = 'pdf' | 'doc' | 'docx' | 'xls' | 'xlsx' | 'mp4' | 'other';
+export type FileType = 'pdf' | 'doc' | 'docx' | 'xls' | 'xlsx' | 'ppt' | 'pptx' | 'mp4' | 'other';
 
 // Core Types
 export interface Profile {
@@ -132,6 +134,9 @@ export interface Resource {
   keywords: string[] | null;
   uploaded_by: string | null;
   created_at: string;
+  // New fields for enhanced resources system
+  category: ResourceCategory | null;  // Resource category for organization
+  is_global: boolean;                 // Global library resources visible to all students
 }
 
 export interface LearningModule {
