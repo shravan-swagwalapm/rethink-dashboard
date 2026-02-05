@@ -104,17 +104,18 @@ export default function ResourcesPage() {
 
       const fileType = resource.file_type?.toLowerCase() || '';
 
-      // Open all supported document types in universal viewer
+      // For documents (PDF, Office files, CSV): Open directly in new tab
+      // These work better in browser's native viewer
       if (['pdf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'csv'].includes(fileType)) {
+        window.open(signedUrl, '_blank');
+      } else {
+        // For other types (videos, etc.): Use modal viewer
         setViewerState({
           isOpen: true,
           fileUrl: signedUrl,
           fileName: resource.name,
           fileType: fileType
         });
-      } else {
-        // Fallback: open in new tab for unsupported types
-        window.open(signedUrl, '_blank');
       }
     } catch (error) {
       console.error('Error opening viewer:', error);
@@ -318,8 +319,8 @@ export default function ResourcesPage() {
                         className="flex-1"
                         size="sm"
                       >
-                        <Eye className="w-4 h-4 mr-2" />
-                        Open
+                        <ExternalLink className="w-4 h-4 mr-2" />
+                        Open in Tab
                       </Button>
                       <Button
                         onClick={() => handleDownload(resource)}
@@ -366,8 +367,8 @@ export default function ResourcesPage() {
                       variant="ghost"
                       size="sm"
                     >
-                      <Eye className="w-4 h-4 mr-2" />
-                      Preview
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      Open in Tab
                     </Button>
                     <Button
                       onClick={() => handleDownload(resource)}
