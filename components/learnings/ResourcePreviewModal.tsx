@@ -252,18 +252,22 @@ export function ResourcePreviewModal({
           {/* Main content */}
           <div className="flex-1 min-w-0 relative">
             {/* Loading State */}
-            {iframeLoading && !iframeError && (
+            {(iframeLoading || pdfLoading) && !iframeError && (
               <div className="absolute inset-0 flex items-center justify-center bg-gray-900 rounded-lg z-10">
                 <div className="flex flex-col items-center gap-4 p-6 text-center">
                   <Loader2 className="w-10 h-10 animate-spin text-purple-500" />
                   <div>
                     <p className="text-sm text-gray-300 mb-1">
-                      {resource.content_type === 'video'
+                      {pdfLoading
+                        ? 'Preparing document...'
+                        : resource.content_type === 'video'
                         ? 'Loading video...'
-                        : 'Loading content...'}
+                        : 'Loading document...'}
                     </p>
                     <p className="text-xs text-gray-500">
-                      {resource.content_type === 'video'
+                      {pdfLoading
+                        ? 'Generating secure viewing link'
+                        : resource.content_type === 'video'
                         ? "If video doesn't appear, use the button below"
                         : 'Content will appear shortly'}
                     </p>

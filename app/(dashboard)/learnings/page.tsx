@@ -1763,18 +1763,24 @@ export default function LearningsPage() {
             <div className="flex gap-6 flex-1 min-h-0">
               {/* Main content */}
               <div className="flex-1 min-w-0 relative">
-                {iframeLoading && !iframeError && (
+                {(iframeLoading || pdfLoading) && !iframeError && (
                   <div className="absolute inset-0 flex items-center justify-center bg-gray-900 rounded-lg z-10">
                     <div className="flex flex-col items-center gap-4 p-6 text-center">
                       <Loader2 className="w-10 h-10 animate-spin text-purple-500" />
                       <div>
                         <p className="text-sm text-gray-300 mb-1">
-                          {selectedResource.content_type === 'video' ? 'Loading video...' : 'Loading content...'}
+                          {pdfLoading
+                            ? 'Preparing document...'
+                            : selectedResource.content_type === 'video'
+                            ? 'Loading video...'
+                            : 'Loading document...'}
                         </p>
                         <p className="text-xs text-gray-500">
-                          {selectedResource.content_type === 'video'
+                          {pdfLoading
+                            ? 'Generating secure viewing link'
+                            : selectedResource.content_type === 'video'
                             ? "If video doesn't appear, use the button below"
-                            : "Content will appear shortly"}
+                            : 'Content will appear shortly'}
                         </p>
                       </div>
                       {selectedResource.content_type === 'video' && (
