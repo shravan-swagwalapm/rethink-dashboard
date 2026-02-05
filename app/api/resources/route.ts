@@ -15,24 +15,47 @@ export async function GET(request: Request) {
       );
     }
 
-    // Get user profile to determine cohort
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('cohort_id')
-      .eq('id', user.id)
-      .single();
+    // Parse query parameters
+    const { searchParams } = new URL(request.url);
+    const category = searchParams.get('category'); // Filter by category
+    const search = searchParams.get('search'); // Text search
+    const requestedCohortId = searchParams.get('cohort_id'); // Cohort from client
 
-    if (!profile?.cohort_id) {
+    // Determine which cohort to use for filtering
+    let userCohortId: string | null = null;
+
+    // If client passed a cohort_id, validate the user has access to it
+    if (requestedCohortId) {
+      // Check if user has a role assignment for this cohort
+      const { data: roleAssignment } = await supabase
+        .from('user_role_assignments')
+        .select('cohort_id')
+        .eq('user_id', user.id)
+        .eq('cohort_id', requestedCohortId)
+        .single();
+
+      if (roleAssignment) {
+        userCohortId = requestedCohortId;
+      }
+    }
+
+    // Fallback to legacy profile.cohort_id if no valid requested cohort
+    if (!userCohortId) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('cohort_id')
+        .eq('id', user.id)
+        .single();
+
+      userCohortId = profile?.cohort_id || null;
+    }
+
+    if (!userCohortId) {
       return NextResponse.json(
         { error: 'User not assigned to a cohort' },
         { status: 400 }
       );
     }
-
-    // Parse query parameters
-    const { searchParams } = new URL(request.url);
-    const category = searchParams.get('category'); // Filter by category
-    const search = searchParams.get('search'); // Text search
 
     // CRITICAL LOGIC: Check if there are any global resources for this category
     let hasGlobalResources = false;
@@ -61,7 +84,7 @@ export async function GET(request: Request) {
     } else {
       // Show cohort-specific resources
       query = query
-        .eq('cohort_id', profile.cohort_id)
+        .eq('cohort_id', userCohortId)
         .eq('is_global', false);
     }
 

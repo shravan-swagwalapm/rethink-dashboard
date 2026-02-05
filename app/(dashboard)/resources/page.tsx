@@ -60,6 +60,11 @@ export default function ResourcesPage() {
           category: activeTab,
         });
 
+        // Pass active cohort ID to ensure proper filtering
+        if (activeCohortId) {
+          params.append('cohort_id', activeCohortId);
+        }
+
         if (searchQuery) {
           params.append('search', searchQuery);
         }
