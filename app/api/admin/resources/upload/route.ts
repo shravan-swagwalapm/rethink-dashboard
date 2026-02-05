@@ -42,6 +42,28 @@ function getFileType(filename: string): string {
   return typeMap[ext] || 'other';
 }
 
+function getCategoryFromFileType(filename: string): string {
+  const ext = filename.split('.').pop()?.toLowerCase() || '';
+
+  // Video
+  if (['mp4', 'mov', 'avi', 'webm', 'mkv'].includes(ext)) {
+    return 'video';
+  }
+
+  // Presentation
+  if (['ppt', 'pptx'].includes(ext)) {
+    return 'presentation';
+  }
+
+  // PDF
+  if (ext === 'pdf') {
+    return 'pdf';
+  }
+
+  // Article (documents, text files, etc.)
+  return 'article';
+}
+
 // POST - Upload file
 export async function POST(request: NextRequest) {
   const auth = await verifyAdmin();
@@ -125,6 +147,7 @@ export async function POST(request: NextRequest) {
         file_path: uploadData.path,
         file_type: getFileType(file.name),
         file_size: file.size,
+        category: getCategoryFromFileType(file.name),
         cohort_id: dbCohortId,
         parent_id: parentId || null,
         week_number: weekNumber ? parseInt(weekNumber) : null,
