@@ -80,6 +80,15 @@ export async function POST(request: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
+    // Log upload attempt details for debugging
+    console.log('[Upload] Attempting to upload:', {
+      bucket: 'resources',
+      filePath,
+      fileSize: file.size,
+      fileType: file.type,
+      cohortId: storageFolder,
+    });
+
     // Upload to Supabase Storage
     const { data: uploadData, error: uploadError } = await adminClient.storage
       .from('resources')
@@ -89,7 +98,7 @@ export async function POST(request: NextRequest) {
       });
 
     if (uploadError) {
-      console.error('Upload error:', uploadError);
+      console.error('[Upload] Storage upload failed:', uploadError);
 
       // Provide specific error messages
       let errorMessage = 'Failed to upload file';
@@ -126,13 +135,31 @@ export async function POST(request: NextRequest) {
 
     if (dbError) {
       // Cleanup uploaded file if database insert fails
+      console.error('[Upload] Database insert failed:', dbError);
       await adminClient.storage.from('resources').remove([filePath]);
       throw dbError;
     }
 
+    console.log('[Upload] Storage upload succeeded:', uploadData);
     return NextResponse.json(resource);
   } catch (error) {
-    console.error('Error uploading file:', error);
-    return NextResponse.json({ error: 'Failed to upload file' }, { status: 500 });
+    console.error('[Upload] Error uploading file:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorDetails = error instanceof Error ? error.stack : String(error);
+
+    console.error('[Upload] Error details:', {
+      message: errorMessage,
+      details: errorDetails,
+      error: error
+    });
+
+    return NextResponse.json(
+      {
+        error: 'Failed to upload file',
+        details: errorMessage,  // Send actual error to frontend for debugging
+        timestamp: new Date().toISOString()
+      },
+      { status: 500 }
+    );
   }
 }
