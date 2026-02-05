@@ -1996,7 +1996,7 @@ export default function LearningsPage() {
 
       {/* Case Study Preview Modal */}
       <Dialog open={!!previewCaseStudy} onOpenChange={() => setPreviewCaseStudy(null)}>
-        <DialogContent className="max-w-[95vw] w-[95vw] max-h-[95vh] h-[95vh] flex flex-col dark:bg-gray-900">
+        <DialogContent className="max-w-[95vw] w-[95vw] max-h-[95vh] h-[95vh] sm:max-w-[95vw] flex flex-col dark:bg-gray-900">
           <DialogHeader>
             <DialogTitle className="dark:text-white">{previewCaseStudy?.title}</DialogTitle>
           </DialogHeader>

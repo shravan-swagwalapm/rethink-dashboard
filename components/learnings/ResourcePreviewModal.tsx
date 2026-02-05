@@ -93,7 +93,7 @@ export function ResourcePreviewModal({
 
   return (
     <Dialog open={!!resource} onOpenChange={onClose}>
-      <DialogContent className="max-w-[95vw] w-[95vw] max-h-[95vh] h-[95vh] flex flex-col dark:bg-gray-900">
+      <DialogContent className="max-w-[95vw] w-[95vw] max-h-[95vh] h-[95vh] sm:max-w-[95vw] flex flex-col dark:bg-gray-900">
         <DialogHeader className="border-b dark:border-gray-800 pb-4">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1 space-y-2">
