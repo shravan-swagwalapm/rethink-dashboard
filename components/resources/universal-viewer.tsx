@@ -3,8 +3,10 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Download, X, ExternalLink, Loader2, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Download, X, ExternalLink, Loader2, RefreshCw, AlertTriangle, FileText, File, Sheet, Presentation, FileCode, Maximize2, Keyboard } from 'lucide-react';
 import { toast } from 'sonner';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface UniversalViewerProps {
   fileUrl: string;
@@ -352,22 +354,24 @@ export function UniversalViewer({ fileUrl, fileName, fileType, isOpen, onClose }
     window.open(fileUrl, '_blank');
   };
 
+  // Get file icon component and styling based on file type
   const getFileIcon = () => {
-    switch (fileType?.toLowerCase()) {
+    const type = fileType?.toLowerCase();
+    switch (type) {
       case 'pdf':
-        return '📄';
+        return { Icon: FileText, color: 'from-red-500 to-red-600 dark:from-red-600 dark:to-red-700', bg: 'bg-red-500/10 dark:bg-red-500/20' };
       case 'doc':
       case 'docx':
-        return '📝';
+        return { Icon: FileText, color: 'from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700', bg: 'bg-blue-500/10 dark:bg-blue-500/20' };
       case 'ppt':
       case 'pptx':
-        return '📊';
+        return { Icon: Presentation, color: 'from-orange-500 to-orange-600 dark:from-orange-600 dark:to-orange-700', bg: 'bg-orange-500/10 dark:bg-orange-500/20' };
       case 'xls':
       case 'xlsx':
       case 'csv':
-        return '📈';
+        return { Icon: Sheet, color: 'from-green-500 to-green-600 dark:from-green-600 dark:to-green-700', bg: 'bg-green-500/10 dark:bg-green-500/20' };
       default:
-        return '📎';
+        return { Icon: File, color: 'from-gray-500 to-gray-600 dark:from-gray-600 dark:to-gray-700', bg: 'bg-gray-500/10 dark:bg-gray-500/20' };
     }
   };
 
@@ -398,120 +402,250 @@ export function UniversalViewer({ fileUrl, fileName, fileType, isOpen, onClose }
     return 'allow-scripts allow-same-origin allow-popups allow-forms allow-downloads allow-presentation';
   };
 
+  const fileIconInfo = getFileIcon();
+  const { Icon: FileIcon, color: iconColor, bg: iconBg } = fileIconInfo;
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl max-h-[95vh] w-[95vw] flex flex-col p-0 overflow-hidden">
-        <DialogHeader className="px-6 py-4 border-b flex-shrink-0 bg-background">
-          <div className="flex items-center justify-between">
-            <DialogTitle className="text-lg font-semibold truncate pr-4 flex items-center gap-2">
-              <span className="text-2xl">{getFileIcon()}</span>
-              <span className="truncate">{fileName}</span>
-            </DialogTitle>
+      <DialogContent className="max-w-7xl max-h-[95vh] w-[95vw] flex flex-col p-0 overflow-hidden border-2 dark:border-primary/20 shadow-2xl shadow-primary/10">
+        {/* Futuristic top accent gradient with glow */}
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary via-accent to-primary animate-gradient-x" />
+
+        {/* Header with gradient background and enhanced styling */}
+        <DialogHeader className="relative px-6 py-5 flex-shrink-0 bg-gradient-to-br from-card via-card/95 to-primary/5 dark:from-card dark:via-card/95 dark:to-primary/10 border-b-2 border-primary/20 dark:border-primary/30">
+          {/* Decorative cyber grid pattern */}
+          <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05] pointer-events-none grid-pattern" />
+
+          <div className="relative flex items-center justify-between gap-4">
+            {/* Enhanced file info with icon and badge */}
+            <div className="flex items-center gap-4 flex-1 min-w-0">
+              {/* Animated file icon with gradient */}
+              <motion.div
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ duration: 0.3 }}
+                className={`w-14 h-14 rounded-xl bg-gradient-to-br ${iconColor} flex items-center justify-center text-white shadow-lg hover:scale-110 transition-transform duration-300 animate-breathe`}
+              >
+                <FileIcon className="w-7 h-7" />
+              </motion.div>
+
+              <div className="flex-1 min-w-0">
+                <DialogTitle className="text-xl font-bold truncate pr-4 flex items-center gap-2 dark:text-white">
+                  <span className="truncate">{fileName}</span>
+                </DialogTitle>
+                <div className="flex items-center gap-2 mt-1">
+                  <Badge className={`${iconBg} border-0 font-semibold uppercase text-xs`}>
+                    {fileType?.toUpperCase() || 'FILE'}
+                  </Badge>
+                  <Badge variant="outline" className="text-xs border-primary/30 dark:border-primary/50">
+                    {getViewerName()}
+                  </Badge>
+                </div>
+              </div>
+            </div>
+
+            {/* Action buttons with enhanced styling */}
             <div className="flex items-center gap-2 flex-shrink-0">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleOpenInNewTab}
-                className="hidden sm:flex"
+                className="hidden sm:flex gap-2 hover:bg-primary/10 hover:border-primary/50 dark:hover:bg-primary/20 transition-all duration-300 hover:scale-105"
               >
-                <ExternalLink className="w-4 h-4 mr-2" />
-                Open in Tab
+                <Maximize2 className="w-4 h-4" />
+                <span className="hidden md:inline">Open in Tab</span>
               </Button>
-              <Button variant="outline" size="sm" onClick={handleDownload}>
-                <Download className="w-4 h-4 mr-2" />
-                Download
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDownload}
+                className="gap-2 gradient-bg text-white border-0 hover:opacity-90 transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-primary/30"
+              >
+                <Download className="w-4 h-4" />
+                <span className="hidden sm:inline">Download</span>
               </Button>
-              <Button variant="ghost" size="icon" onClick={onClose}>
-                <X className="w-4 h-4" />
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onClose}
+                className="hover:bg-destructive/10 hover:text-destructive transition-all duration-300 hover:scale-110 hover:rotate-90"
+              >
+                <X className="w-5 h-5" />
               </Button>
             </div>
           </div>
         </DialogHeader>
 
-        <div className="flex-1 overflow-hidden relative bg-muted/10" style={{ minHeight: '60vh' }}>
-          {/* Loading State */}
-          {state.loading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-10">
-              <div className="flex flex-col items-center gap-3">
-                <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                <p className="text-sm text-muted-foreground">Loading {fileType?.toUpperCase()}...</p>
-              </div>
-            </div>
-          )}
+        {/* Main content area with enhanced background */}
+        <div className="flex-1 overflow-hidden relative bg-gradient-to-br from-muted/5 via-background to-muted/10 dark:from-muted/10 dark:via-background dark:to-primary/5" style={{ minHeight: '65vh' }}>
+          {/* Subtle dot pattern background */}
+          <div className="absolute inset-0 opacity-[0.02] dark:opacity-[0.04] pointer-events-none dot-pattern" />
 
-          {/* Error State */}
-          {state.error && (
-            <div className="absolute inset-0 flex items-center justify-center z-10">
-              <div className="flex flex-col items-center gap-4 max-w-md text-center px-4">
-                <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center">
-                  <X className="w-8 h-8 text-destructive" />
-                </div>
-                <div>
-                  <h3 className="font-semibold mb-2">Unable to Load File</h3>
-                  <p className="text-sm text-muted-foreground">{state.error}</p>
-                </div>
-                <div className="flex gap-2 flex-wrap justify-center">
-                  <Button onClick={handleRetry} variant="outline">
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                    Retry
-                  </Button>
-                  <Button onClick={handleOpenInNewTab}>
-                    <ExternalLink className="w-4 h-4 mr-2" />
-                    Open in New Tab
-                  </Button>
-                  <Button onClick={handleDownload} variant="outline">
-                    <Download className="w-4 h-4 mr-2" />
-                    Download
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
+          {/* Enhanced Loading State with futuristic design */}
+          <AnimatePresence>
+            {state.loading && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 flex items-center justify-center bg-background/80 dark:bg-background/90 backdrop-blur-md z-10"
+              >
+                <div className="flex flex-col items-center gap-6">
+                  {/* Futuristic loader with orbiting elements */}
+                  <div className="relative">
+                    <div className="w-20 h-20 rounded-full border-4 border-primary/20 dark:border-primary/30" />
+                    <div className="absolute inset-0 w-20 h-20 rounded-full border-4 border-transparent border-t-primary animate-spin" />
+                    <div className="absolute inset-2 w-16 h-16 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 animate-pulse-slow" />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <FileIcon className="w-8 h-8 text-primary animate-breathe" />
+                    </div>
+                  </div>
 
-          {/* Iframe Container */}
-          {shouldShowIframe && (
-            <>
-              {/* iframe not loaded warning - shows after a delay */}
-              {!state.iframeLoaded && !state.loading && (
-                <div className="absolute top-4 left-4 right-4 z-20">
-                  <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg px-4 py-2 flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4 text-yellow-600 flex-shrink-0" />
-                    <span className="text-sm text-yellow-700 dark:text-yellow-300">
-                      If the document doesn&apos;t appear,
-                      <button
-                        onClick={handleTryAlternative}
-                        className="underline mx-1 hover:no-underline"
-                      >
-                        try an alternative viewer
-                      </button>
-                      or
-                      <button
-                        onClick={handleDownload}
-                        className="underline ml-1 hover:no-underline"
-                      >
-                        download the file
-                      </button>
-                    </span>
+                  <div className="text-center space-y-2">
+                    <p className="text-lg font-semibold dark:text-white">Loading Document</p>
+                    <p className="text-sm text-muted-foreground">
+                      Preparing {fileType?.toUpperCase()} viewer...
+                    </p>
+                    {/* Progress indicator */}
+                    <div className="w-48 h-1 bg-muted rounded-full overflow-hidden">
+                      <motion.div
+                        className="h-full bg-gradient-to-r from-primary via-accent to-primary"
+                        animate={{ x: ['-100%', '100%'] }}
+                        transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
+                      />
+                    </div>
                   </div>
                 </div>
-              )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Enhanced Error State with styled error card */}
+          <AnimatePresence>
+            {state.error && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="absolute inset-0 flex items-center justify-center z-10 p-6"
+              >
+                <div className="max-w-md w-full">
+                  {/* Error card with cyber styling */}
+                  <div className="relative overflow-hidden rounded-2xl border-2 border-destructive/30 bg-gradient-to-br from-card via-card to-destructive/5 p-8 shadow-2xl shadow-destructive/10">
+                    {/* Top accent */}
+                    <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-destructive/50 via-destructive to-destructive/50" />
+
+                    <div className="flex flex-col items-center gap-6 text-center">
+                      {/* Error icon with pulse */}
+                      <div className="relative">
+                        <div className="w-20 h-20 rounded-full bg-gradient-to-br from-destructive/20 to-destructive/10 flex items-center justify-center animate-pulse">
+                          <AlertTriangle className="w-10 h-10 text-destructive" />
+                        </div>
+                        <div className="absolute -inset-1 bg-destructive/20 rounded-full blur-xl animate-pulse" />
+                      </div>
+
+                      <div className="space-y-2">
+                        <h3 className="text-xl font-bold dark:text-white">Unable to Load Document</h3>
+                        <p className="text-sm text-muted-foreground leading-relaxed">{state.error}</p>
+                      </div>
+
+                      {/* Action buttons */}
+                      <div className="flex flex-col sm:flex-row gap-3 w-full">
+                        <Button
+                          onClick={handleRetry}
+                          variant="outline"
+                          className="flex-1 gap-2 hover:bg-primary/10 hover:border-primary transition-all duration-300"
+                        >
+                          <RefreshCw className="w-4 h-4" />
+                          Retry Loading
+                        </Button>
+                        <Button
+                          onClick={handleOpenInNewTab}
+                          className="flex-1 gap-2 gradient-bg text-white border-0"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                          Open in Tab
+                        </Button>
+                      </div>
+
+                      <Button
+                        onClick={handleDownload}
+                        variant="ghost"
+                        className="w-full gap-2 hover:bg-muted"
+                      >
+                        <Download className="w-4 h-4" />
+                        Download Instead
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Document viewer iframe/object */}
+          {shouldShowIframe && (
+            <>
+              {/* Loading indicator for iframe - styled notification */}
+              <AnimatePresence>
+                {!state.iframeLoaded && !state.loading && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    className="absolute top-6 left-6 right-6 z-20 max-w-2xl mx-auto"
+                  >
+                    <div className="relative overflow-hidden rounded-xl border-2 border-yellow-500/30 dark:border-yellow-500/40 bg-gradient-to-r from-yellow-500/10 via-yellow-400/5 to-yellow-500/10 backdrop-blur-sm p-4 shadow-xl shadow-yellow-500/10">
+                      <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-yellow-500/20 dark:bg-yellow-500/30 flex items-center justify-center flex-shrink-0 animate-pulse">
+                          <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
+                        </div>
+                        <div className="flex-1 space-y-2">
+                          <p className="text-sm font-medium text-yellow-900 dark:text-yellow-200">
+                            Document taking longer to load?
+                          </p>
+                          <div className="flex flex-wrap gap-2 text-xs">
+                            <button
+                              onClick={handleTryAlternative}
+                              className="px-3 py-1.5 rounded-lg bg-yellow-500/20 hover:bg-yellow-500/30 dark:bg-yellow-500/30 dark:hover:bg-yellow-500/40 text-yellow-900 dark:text-yellow-200 font-medium transition-all duration-200 hover:scale-105"
+                            >
+                              Try Alternative Viewer
+                            </button>
+                            <button
+                              onClick={handleDownload}
+                              className="px-3 py-1.5 rounded-lg bg-yellow-500/20 hover:bg-yellow-500/30 dark:bg-yellow-500/30 dark:hover:bg-yellow-500/40 text-yellow-900 dark:text-yellow-200 font-medium transition-all duration-200 hover:scale-105"
+                            >
+                              Download File
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {state.strategy === 'blob' ? (
-                // For blob PDFs, use object tag which handles PDFs better
                 <object
                   data={state.viewerUrl}
                   type="application/pdf"
-                  className="absolute inset-0 w-full h-full"
+                  className="absolute inset-0 w-full h-full rounded-b-lg"
                   onLoad={handleIframeLoad}
                   onError={handleIframeError}
+                  aria-label={`PDF viewer for ${fileName}`}
                 >
-                  {/* Fallback content if object fails */}
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="text-center">
-                      <p className="text-muted-foreground mb-4">
-                        Your browser cannot display this PDF.
-                      </p>
-                      <Button onClick={handleDownload}>
+                    <div className="text-center space-y-4 max-w-md p-6">
+                      <div className="w-16 h-16 mx-auto rounded-full bg-muted flex items-center justify-center">
+                        <FileText className="w-8 h-8 text-muted-foreground" />
+                      </div>
+                      <div>
+                        <p className="font-semibold mb-2 dark:text-white">Browser PDF Viewer Not Available</p>
+                        <p className="text-sm text-muted-foreground mb-4">
+                          Your browser doesn&apos;t support inline PDF viewing.
+                        </p>
+                      </div>
+                      <Button onClick={handleDownload} className="gradient-bg text-white">
                         <Download className="w-4 h-4 mr-2" />
                         Download PDF
                       </Button>
@@ -519,34 +653,52 @@ export function UniversalViewer({ fileUrl, fileName, fileType, isOpen, onClose }
                   </div>
                 </object>
               ) : (
-                // For external viewers, use iframe
                 <iframe
                   ref={iframeRef}
                   src={state.viewerUrl}
-                  className="absolute inset-0 w-full h-full border-0"
-                  title={fileName}
+                  className="absolute inset-0 w-full h-full border-0 rounded-b-lg"
+                  title={`Document viewer for ${fileName}`}
                   sandbox={getSandboxAttrs()}
                   allow="autoplay; fullscreen; clipboard-write"
                   onLoad={handleIframeLoad}
                   onError={handleIframeError}
+                  aria-label={`${fileType?.toUpperCase()} document viewer`}
                 />
               )}
             </>
           )}
         </div>
 
-        {/* Footer */}
-        <div className="px-6 py-3 border-t bg-muted/30 text-sm text-muted-foreground text-center flex-shrink-0">
-          <span className="hidden sm:inline">
-            Viewing with {getViewerName()}
-            {state.strategy !== 'none' && (
-              <span className="text-xs ml-2 opacity-60">
-                (Strategy: {state.strategy})
-              </span>
-            )}
-            {' • '}
-          </span>
-          For full features, download and open in the native application
+        {/* Enhanced Footer with keyboard shortcuts and viewer info */}
+        <div className="relative px-6 py-4 border-t-2 border-primary/20 bg-gradient-to-br from-muted/30 via-card to-primary/5 dark:from-muted/20 dark:via-card dark:to-primary/10 flex-shrink-0">
+          {/* Decorative top border glow */}
+          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
+
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs">
+            {/* Viewer info */}
+            <div className="flex items-center gap-3 text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                <span className="font-medium">Viewing with {getViewerName()}</span>
+              </div>
+              {state.strategy !== 'none' && (
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 border-primary/30">
+                  {state.strategy}
+                </Badge>
+              )}
+            </div>
+
+            {/* Keyboard shortcuts hint */}
+            <div className="hidden lg:flex items-center gap-2 text-muted-foreground">
+              <Keyboard className="w-3.5 h-3.5" />
+              <span>Press <kbd className="px-1.5 py-0.5 rounded bg-muted border text-[10px] font-mono">ESC</kbd> to close</span>
+            </div>
+
+            {/* Download recommendation */}
+            <span className="text-muted-foreground text-center sm:text-right">
+              For best experience, download and open in native app
+            </span>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
