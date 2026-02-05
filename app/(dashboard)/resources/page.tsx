@@ -21,6 +21,9 @@ import {
   Eye,
   Star,
   BookOpen,
+  ChevronRight,
+  CheckCircle2,
+  Clock,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -39,6 +42,48 @@ const TABS: { value: Tab; label: string; icon: any }[] = [
   { value: 'pdf', label: 'PDFs', icon: FileType },
 ];
 
+// Type-specific styling helper
+const getResourceStyles = (category: ResourceCategory) => {
+  switch (category) {
+    case 'video':
+      return {
+        gradient: 'from-purple-500 to-purple-600',
+        border: 'border-purple-500/20 hover:border-purple-500/40',
+        shadow: 'shadow-lg shadow-purple-500/25',
+        glow: 'hover:shadow-purple-500/10',
+        badge: 'bg-purple-500/10 border-purple-500/20 text-purple-400',
+        iconBg: 'bg-gradient-to-br from-purple-500 to-purple-600'
+      };
+    case 'presentation':
+      return {
+        gradient: 'from-orange-500 to-orange-600',
+        border: 'border-orange-500/20 hover:border-orange-500/40',
+        shadow: 'shadow-lg shadow-orange-500/25',
+        glow: 'hover:shadow-orange-500/10',
+        badge: 'bg-orange-500/10 border-orange-500/20 text-orange-400',
+        iconBg: 'bg-gradient-to-br from-orange-500 to-orange-600'
+      };
+    case 'pdf':
+      return {
+        gradient: 'from-blue-500 to-blue-600',
+        border: 'border-blue-500/20 hover:border-blue-500/40',
+        shadow: 'shadow-lg shadow-blue-500/25',
+        glow: 'hover:shadow-blue-500/10',
+        badge: 'bg-blue-500/10 border-blue-500/20 text-blue-400',
+        iconBg: 'bg-gradient-to-br from-blue-500 to-blue-600'
+      };
+    case 'article':
+      return {
+        gradient: 'from-emerald-500 to-emerald-600',
+        border: 'border-emerald-500/20 hover:border-emerald-500/40',
+        shadow: 'shadow-lg shadow-emerald-500/25',
+        glow: 'hover:shadow-emerald-500/10',
+        badge: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400',
+        iconBg: 'bg-gradient-to-br from-emerald-500 to-emerald-600'
+      };
+  }
+};
+
 export default function ResourcesPage() {
   const { profile, loading: userLoading, activeCohortId } = useUser();
   const [activeTab, setActiveTab] = useState<Tab>('video');
@@ -51,6 +96,46 @@ export default function ResourcesPage() {
     fileName: string;
     fileType: string;
   }>({ isOpen: false, fileUrl: '', fileName: '', fileType: '' });
+  const [favoriteResources, setFavoriteResources] = useState<Set<string>>(new Set());
+  const [completedResources, setCompletedResources] = useState<Set<string>>(new Set());
+
+  // Toggle favorite status
+  const handleToggleFavorite = (resourceId: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    setFavoriteResources(prev => {
+      const next = new Set(prev);
+      if (next.has(resourceId)) {
+        next.delete(resourceId);
+        toast.success('Removed from favorites');
+      } else {
+        next.add(resourceId);
+        toast.success('Added to favorites');
+      }
+      return next;
+    });
+  };
+
+  // Toggle completion status
+  const handleMarkComplete = (resourceId: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    setCompletedResources(prev => {
+      const next = new Set(prev);
+      if (next.has(resourceId)) {
+        next.delete(resourceId);
+        toast.success('Marked as incomplete');
+      } else {
+        next.add(resourceId);
+        toast.success('Marked as complete');
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     const fetchResources = async () => {
@@ -175,6 +260,7 @@ export default function ResourcesPage() {
         {TABS.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.value;
+          const count = resources.length;
 
           return (
             <button
@@ -189,6 +275,17 @@ export default function ResourcesPage() {
             >
               <Icon className="w-5 h-5" />
               {tab.label}
+              {isActive && count > 0 && (
+                <Badge
+                  variant="secondary"
+                  className={cn(
+                    "ml-2 border",
+                    getResourceStyles(tab.value).badge
+                  )}
+                >
+                  {count} {count === 1 ? 'item' : 'items'}
+                </Badge>
+              )}
             </button>
           );
         })}
@@ -205,7 +302,7 @@ export default function ResourcesPage() {
         />
       </div>
 
-      {/* Content Area */}
+      {/* Content Area - Unified List View */}
       {loading ? (
         <div className="flex items-center justify-center py-16">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
@@ -225,170 +322,123 @@ export default function ResourcesPage() {
           </CardContent>
         </Card>
       ) : (
-        <>
-          {/* Videos Grid */}
-          {activeTab === 'video' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {resources.map((resource) => (
-                <Card
-                  key={resource.id}
-                  className="group overflow-hidden hover:border-primary/50 hover:shadow-lg transition-all hover-lift"
-                >
-                  <CardContent className="p-0">
-                    <a
-                      href={resource.external_url || '#'}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block"
-                    >
-                      <VideoThumbnail
-                        title={resource.name}
-                        thumbnailUrl={resource.thumbnail_url}
-                        duration={resource.duration}
-                      />
-                    </a>
-                    <div className="p-4">
-                      <h3 className="font-semibold line-clamp-2 mb-2">{resource.name}</h3>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">
-                          {resource.created_at && format(new Date(resource.created_at), 'MMM d, yyyy')}
-                        </span>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            // TODO: Add to favorites
-                            toast.success('Added to favorites');
-                          }}
-                        >
-                          <Star className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
+        <div className="space-y-3">
+          {resources.map((resource) => {
+            const styles = getResourceStyles(activeTab);
+            const isFavorite = favoriteResources.has(resource.id);
+            const isComplete = completedResources.has(resource.id);
+            const Icon = TABS.find(t => t.value === activeTab)?.icon || FileText;
 
-          {/* Articles List */}
-          {activeTab === 'article' && (
-            <div className="space-y-3">
-              {resources.map((resource) => (
-                <a
-                  key={resource.id}
-                  href={resource.external_url || '#'}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-4 p-4 rounded-xl border bg-card hover:bg-muted/50 hover:border-primary/50 transition-all hover-lift group"
-                >
-                  <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center flex-shrink-0">
-                    <ExternalLink className="w-6 h-6 text-blue-500" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold mb-1">{resource.name}</h3>
-                    <p className="text-sm text-muted-foreground truncate">
-                      {resource.external_url}
+            return (
+              <div
+                key={resource.id}
+                className={cn(
+                  "relative w-full flex items-center gap-3 md:gap-4 p-3 md:p-4 rounded-xl transition-all duration-300 group cursor-pointer",
+                  "border-2 bg-white dark:bg-gray-900/80 backdrop-blur-sm",
+                  isComplete
+                    ? "border-green-500/30 bg-green-50/50 dark:bg-green-900/10"
+                    : styles.border,
+                  "hover:shadow-lg hover:-translate-y-0.5",
+                  styles.glow
+                )}
+                onClick={() => {
+                  if (resource.external_url) {
+                    window.open(resource.external_url, '_blank');
+                  } else if (resource.file_path) {
+                    handleOpenViewer(resource);
+                  }
+                }}
+              >
+                {/* Icon container with gradient */}
+                <div className={cn(
+                  "w-9 h-9 md:w-11 md:h-11 rounded-xl flex items-center justify-center flex-shrink-0",
+                  "group-hover:scale-110 transition-transform duration-300",
+                  styles.iconBg,
+                  styles.shadow
+                )}>
+                  <Icon className="w-4 h-4 md:w-5 md:h-5 text-white" />
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="font-semibold text-gray-900 dark:text-white truncate group-hover:text-purple-500 dark:group-hover:text-purple-400 transition-colors text-sm md:text-base">
+                      {resource.name}
                     </p>
+                    {isFavorite && (
+                      <Star className="w-4 h-4 fill-yellow-400 text-yellow-400 flex-shrink-0 drop-shadow-sm" />
+                    )}
+                    {isComplete && (
+                      <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-500/10 border border-green-500/20 flex-shrink-0">
+                        <CheckCircle2 className="w-3 h-3 text-green-500" />
+                        <span className="text-xs font-medium text-green-500 hidden sm:inline">Done</span>
+                      </div>
+                    )}
                   </div>
-                  <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                    <ExternalLink className="w-5 h-5 text-muted-foreground" />
-                  </div>
-                </a>
-              ))}
-            </div>
-          )}
 
-          {/* Presentations Grid */}
-          {activeTab === 'presentation' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {resources.map((resource) => (
-                <Card
-                  key={resource.id}
-                  className="group hover:border-primary/50 hover:shadow-lg transition-all hover-lift"
-                >
-                  <CardContent className="p-4">
-                    <div className="w-full aspect-video rounded-lg bg-gradient-to-br from-orange-500/10 to-red-500/10 flex items-center justify-center mb-4">
-                      <PresentationIcon className="w-16 h-16 text-orange-500" />
-                    </div>
-                    <h3 className="font-semibold line-clamp-2 mb-2">{resource.name}</h3>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
+                  {/* Metadata row */}
+                  <div className="flex flex-wrap items-center gap-2 md:gap-3 text-xs md:text-sm text-gray-500 dark:text-gray-400">
+                    {resource.file_type && (
                       <span className="uppercase">{resource.file_type}</span>
-                      <span>•</span>
-                      <span>{formatFileSize(resource.file_size)}</span>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        onClick={() => handleOpenViewer(resource)}
-                        className="flex-1"
-                        size="sm"
-                      >
-                        <ExternalLink className="w-4 h-4 mr-2" />
-                        Open in Tab
-                      </Button>
-                      <Button
-                        onClick={() => handleDownload(resource)}
-                        variant="outline"
-                        size="sm"
-                      >
-                        <Download className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-
-          {/* PDFs List */}
-          {activeTab === 'pdf' && (
-            <div className="space-y-3">
-              {resources.map((resource) => (
-                <div
-                  key={resource.id}
-                  className="flex items-center gap-4 p-4 rounded-xl border bg-card hover:bg-muted/50 transition-all group"
-                >
-                  <div className="w-12 h-12 rounded-xl bg-red-500/10 flex items-center justify-center flex-shrink-0">
-                    <FileText className="w-6 h-6 text-red-500" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold mb-1">{resource.name}</h3>
-                    <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                      <span className="uppercase">{resource.file_type}</span>
-                      <span>•</span>
-                      <span>{formatFileSize(resource.file_size)}</span>
-                      {resource.created_at && (
-                        <>
-                          <span>•</span>
-                          <span>{format(new Date(resource.created_at), 'MMM d, yyyy')}</span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      onClick={() => handleOpenViewer(resource)}
-                      variant="ghost"
-                      size="sm"
-                    >
-                      <ExternalLink className="w-4 h-4 mr-2" />
-                      Open in Tab
-                    </Button>
-                    <Button
-                      onClick={() => handleDownload(resource)}
-                      variant="outline"
-                      size="sm"
-                    >
-                      <Download className="w-4 h-4 mr-2" />
-                      Download
-                    </Button>
+                    )}
+                    {resource.file_size && (
+                      <>
+                        <span className="hidden sm:inline">•</span>
+                        <span className="hidden sm:inline">{formatFileSize(resource.file_size)}</span>
+                      </>
+                    )}
+                    {resource.created_at && (
+                      <>
+                        <span className="hidden md:inline">•</span>
+                        <span className="hidden md:inline">{format(new Date(resource.created_at), 'MMM d, yyyy')}</span>
+                      </>
+                    )}
+                    {resource.duration && (
+                      <>
+                        <span className="hidden sm:inline">•</span>
+                        <span className="hidden sm:inline flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5" />
+                          {resource.duration}
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </>
+
+                {/* Action buttons - visible on hover (always visible on mobile) */}
+                <div className="flex items-center gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={(e) => handleToggleFavorite(resource.id, e)}
+                    className={cn(
+                      "w-8 h-8 md:w-9 md:h-9 rounded-lg flex items-center justify-center transition-all border",
+                      isFavorite
+                        ? "bg-yellow-500/10 border-yellow-500/30 text-yellow-500"
+                        : "hover:bg-gray-100 dark:hover:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-400 hover:text-gray-600"
+                    )}
+                    title={isFavorite ? "Remove from favorites" : "Add to favorites"}
+                  >
+                    <Star className={cn("w-3.5 h-3.5 md:w-4 md:h-4", isFavorite && "fill-current")} />
+                  </button>
+                  <button
+                    onClick={(e) => handleMarkComplete(resource.id, e)}
+                    className={cn(
+                      "w-8 h-8 md:w-9 md:h-9 rounded-lg flex items-center justify-center transition-all border",
+                      isComplete
+                        ? "bg-green-500/10 border-green-500/30 text-green-500"
+                        : "hover:bg-gray-100 dark:hover:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-400 hover:text-gray-600"
+                    )}
+                    title={isComplete ? "Mark as incomplete" : "Mark as complete"}
+                  >
+                    <CheckCircle2 className={cn("w-3.5 h-3.5 md:w-4 md:h-4", isComplete && "fill-current")} />
+                  </button>
+                </div>
+
+                {/* Chevron - slides right on hover */}
+                <ChevronRight className="w-4 h-4 md:w-5 md:h-5 text-gray-400 group-hover:text-purple-500 group-hover:translate-x-1 transition-all flex-shrink-0 hidden sm:block" />
+              </div>
+            );
+          })}
+        </div>
       )}
 
       {/* Universal Document Viewer */}
