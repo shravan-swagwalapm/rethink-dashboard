@@ -200,14 +200,17 @@ export default function ResourcesPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header with futuristic gradient */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary/80 to-accent p-8 shadow-lg">
-        {/* Aurora glow effect */}
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,oklch(0.65_0.2_195_/_0.2),transparent)] pointer-events-none" />
+      {/* Header with dark futuristic gradient */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-gray-950 via-purple-950 to-fuchsia-950 p-8 shadow-2xl border border-purple-500/10">
+        {/* Dark purple glow effect */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(168,85,247,0.15),transparent)] pointer-events-none" />
+
+        {/* Subtle grid pattern overlay */}
+        <div className="absolute inset-0 opacity-5" style={{ backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
 
         <div className="relative z-10">
-          <h1 className="text-3xl font-bold text-white mb-2">Learning Resources</h1>
-          <p className="text-white/80">
+          <h1 className="text-3xl font-bold text-white mb-2 drop-shadow-lg">Learning Resources</h1>
+          <p className="text-gray-100 font-medium">
             Access course materials, videos, and documents
           </p>
         </div>
@@ -225,10 +228,10 @@ export default function ResourcesPage() {
               key={tab.value}
               onClick={() => setActiveTab(tab.value)}
               className={cn(
-                'flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all whitespace-nowrap',
+                'flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all whitespace-nowrap border',
                 isActive
-                  ? 'bg-primary text-white shadow-[0_0_20px_oklch(0.55_0.25_280_/_0.4)]'
-                  : 'bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground'
+                  ? 'bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white shadow-[0_0_20px_rgba(168,85,247,0.5)] border-purple-500/50'
+                  : 'bg-gray-950 text-gray-300 border-gray-800 hover:bg-gray-900 hover:text-white hover:border-gray-700'
               )}
             >
               <Icon className="w-5 h-5" />
