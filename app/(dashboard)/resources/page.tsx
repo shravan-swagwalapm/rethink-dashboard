@@ -31,6 +31,7 @@ import { VideoThumbnail } from '@/components/resources/video-thumbnail';
 const PDFViewer = dynamic(() => import('@/components/resources/pdf-viewer').then(mod => ({ default: mod.PDFViewer })), { ssr: false });
 const DocViewer = dynamic(() => import('@/components/resources/doc-viewer').then(mod => ({ default: mod.DocViewer })), { ssr: false });
 const PPTViewer = dynamic(() => import('@/components/resources/ppt-viewer').then(mod => ({ default: mod.PPTViewer })), { ssr: false });
+const ExcelViewer = dynamic(() => import('@/components/resources/excel-viewer').then(mod => ({ default: mod.ExcelViewer })), { ssr: false });
 
 type Tab = ResourceCategory;
 
@@ -48,7 +49,7 @@ export default function ResourcesPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [viewerState, setViewerState] = useState<{
-    type: 'pdf' | 'doc' | 'ppt' | null;
+    type: 'pdf' | 'doc' | 'ppt' | 'excel' | null;
     fileUrl: string;
     fileName: string;
   }>({ type: null, fileUrl: '', fileName: '' });
@@ -111,6 +112,8 @@ export default function ResourcesPage() {
         setViewerState({ type: 'doc', fileUrl: signedUrl, fileName: resource.name });
       } else if (['ppt', 'pptx'].includes(fileType || '')) {
         setViewerState({ type: 'ppt', fileUrl: signedUrl, fileName: resource.name });
+      } else if (['xls', 'xlsx'].includes(fileType || '')) {
+        setViewerState({ type: 'excel', fileUrl: signedUrl, fileName: resource.name });
       } else {
         // Fallback: open in new tab
         window.open(signedUrl, '_blank');
@@ -405,6 +408,15 @@ export default function ResourcesPage() {
 
       {viewerState.type === 'ppt' && (
         <PPTViewer
+          fileUrl={viewerState.fileUrl}
+          fileName={viewerState.fileName}
+          isOpen={true}
+          onClose={closeViewer}
+        />
+      )}
+
+      {viewerState.type === 'excel' && (
+        <ExcelViewer
           fileUrl={viewerState.fileUrl}
           fileName={viewerState.fileName}
           isOpen={true}
