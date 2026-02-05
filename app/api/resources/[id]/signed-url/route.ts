@@ -49,19 +49,38 @@ export async function GET(
     }
 
     // Generate signed URL with appropriate expiry
-    // PPT files need longer expiry for Office Online (1 hour)
-    // Other files use shorter expiry for security (5 minutes)
-    const fileType = resource.file_type?.toLowerCase();
-    const isPPT = fileType === 'ppt' || fileType === 'pptx';
-    const expirySeconds = isPPT ? 3600 : 300;
+    // Office documents (doc, docx, ppt, pptx, xls, xlsx) need longer expiry
+    // because Office Online fetches the file from the URL and needs time
+    // PDFs use blob approach so 15 min is sufficient
+    // Other files use shorter expiry for security
+    const fileType = resource.file_type?.toLowerCase() || '';
+    const isOfficeDoc = ['doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx'].includes(fileType);
+    const isPDF = fileType === 'pdf';
+
+    // Office docs: 1 hour (Office Online needs to fetch), PDFs: 15 min, Others: 10 min
+    const expirySeconds = isOfficeDoc ? 3600 : (isPDF ? 900 : 600);
+
+    console.log('[SignedURL] Generating URL:', {
+      resourceId,
+      fileType,
+      isOfficeDoc,
+      expirySeconds,
+      filePath: resource.file_path,
+    });
 
     const { data: signedUrl, error: signedError } = await supabase.storage
       .from('resources')
       .createSignedUrl(resource.file_path, expirySeconds);
 
     if (signedError || !signedUrl) {
+      console.error('[SignedURL] Failed to generate:', signedError);
       return NextResponse.json({ error: 'Failed to generate URL' }, { status: 500 });
     }
+
+    console.log('[SignedURL] Generated successfully:', {
+      resourceId,
+      urlPrefix: signedUrl.signedUrl.substring(0, 80) + '...',
+    });
 
     return NextResponse.json({ signedUrl: signedUrl.signedUrl });
 
