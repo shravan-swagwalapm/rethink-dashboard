@@ -137,6 +137,8 @@ export interface Resource {
   // New fields for enhanced resources system
   category: ResourceCategory | null;  // Resource category for organization
   is_global: boolean;                 // Global library resources visible to all students
+  thumbnail_url: string | null;       // Video thumbnail URL
+  duration: string | null;            // Video duration (e.g., "10:24")
 }
 
 export interface LearningModule {

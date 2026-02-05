@@ -1,93 +1,75 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { useUser } from '@/hooks/use-user';
-import { getClient } from '@/lib/supabase/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { StudentPageLoader } from '@/components/ui/page-loader';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import {
   Search,
-  Folder,
-  FolderOpen,
+  Video,
   FileText,
-  FileSpreadsheet,
-  FileVideo,
-  File,
-  ChevronRight,
-  Home,
+  Presentation as PresentationIcon,
+  FileType,
+  Play,
+  ExternalLink,
   Download,
   Eye,
-  MoreVertical,
-  ArrowLeft,
-  Link as LinkIcon,
-  ExternalLink,
+  Star,
+  BookOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
-import type { Resource } from '@/types';
+import type { Resource, ResourceCategory } from '@/types';
+import { VideoThumbnail } from '@/components/resources/video-thumbnail';
+
+// Dynamic imports to avoid SSR issues with react-pdf
+const PDFViewer = dynamic(() => import('@/components/resources/pdf-viewer').then(mod => ({ default: mod.PDFViewer })), { ssr: false });
+const DocViewer = dynamic(() => import('@/components/resources/doc-viewer').then(mod => ({ default: mod.DocViewer })), { ssr: false });
+const PPTViewer = dynamic(() => import('@/components/resources/ppt-viewer').then(mod => ({ default: mod.PPTViewer })), { ssr: false });
+
+type Tab = ResourceCategory;
+
+const TABS: { value: Tab; label: string; icon: any }[] = [
+  { value: 'video', label: 'Videos', icon: Video },
+  { value: 'article', label: 'Articles', icon: BookOpen },
+  { value: 'presentation', label: 'Presentations', icon: PresentationIcon },
+  { value: 'pdf', label: 'PDFs', icon: FileType },
+];
 
 export default function ResourcesPage() {
-  const { profile, loading: userLoading, activeCohortId, isAdmin } = useUser();
+  const { profile, loading: userLoading, activeCohortId } = useUser();
+  const [activeTab, setActiveTab] = useState<Tab>('video');
   const [resources, setResources] = useState<Resource[]>([]);
-  const [currentFolder, setCurrentFolder] = useState<string | null>(null);
-  const [breadcrumbs, setBreadcrumbs] = useState<Resource[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [previewResource, setPreviewResource] = useState<Resource | null>(null);
+  const [viewerState, setViewerState] = useState<{
+    type: 'pdf' | 'doc' | 'ppt' | null;
+    fileUrl: string;
+    fileName: string;
+  }>({ type: null, fileUrl: '', fileName: '' });
 
   useEffect(() => {
     const fetchResources = async () => {
-      const supabase = getClient();
-
+      setLoading(true);
       try {
-        let query = supabase
-          .from('resources')
-          .select('*')
-          .order('type', { ascending: true })
-          .order('name', { ascending: true });
+        const params = new URLSearchParams({
+          category: activeTab,
+        });
 
-        // FILTERING LOGIC:
-        // - Admin role: Show ALL resources (global + all cohorts)
-        // - Student role: Show ONLY resources tagged to active cohort
-        if (!isAdmin) {
-          // Student role: filter by active cohort only
-          if (!activeCohortId) {
-            setLoading(false);
-            return;
-          }
-          query = query.eq('cohort_id', activeCohortId);
-        }
-        // Admin role: no cohort filter (shows all resources)
-
-        if (currentFolder) {
-          query = query.eq('parent_id', currentFolder);
-        } else {
-          query = query.is('parent_id', null);
+        if (searchQuery) {
+          params.append('search', searchQuery);
         }
 
-        const { data, error } = await query;
+        const response = await fetch(`/api/resources?${params}`);
+        if (!response.ok) throw new Error('Failed to fetch resources');
 
-        if (error) throw error;
-
-        setResources(data || []);
+        const data = await response.json();
+        setResources(data.resources || []);
       } catch (error) {
         console.error('Error fetching resources:', error);
         toast.error('Failed to load resources');
@@ -96,62 +78,10 @@ export default function ResourcesPage() {
       }
     };
 
-    if (!userLoading) {
+    if (!userLoading && activeCohortId) {
       fetchResources();
     }
-  }, [profile, currentFolder, userLoading, activeCohortId, isAdmin]);
-
-  // Build breadcrumbs when folder changes
-  useEffect(() => {
-    const buildBreadcrumbs = async () => {
-      if (!currentFolder) {
-        setBreadcrumbs([]);
-        return;
-      }
-
-      const supabase = getClient();
-      const crumbs: Resource[] = [];
-      let folderId: string | null = currentFolder;
-
-      while (folderId) {
-        const { data: folder } = await supabase
-          .from('resources')
-          .select('*')
-          .eq('id', folderId)
-          .single() as { data: Resource | null };
-
-        if (folder) {
-          crumbs.unshift(folder);
-          folderId = folder.parent_id;
-        } else {
-          break;
-        }
-      }
-
-      setBreadcrumbs(crumbs);
-    };
-
-    buildBreadcrumbs();
-  }, [currentFolder]);
-
-  const getFileIcon = (fileType: string | null) => {
-    switch (fileType?.toLowerCase()) {
-      case 'pdf':
-        return <FileText className="w-6 h-6 text-red-500" />;
-      case 'doc':
-      case 'docx':
-        return <FileText className="w-6 h-6 text-blue-500" />;
-      case 'xls':
-      case 'xlsx':
-        return <FileSpreadsheet className="w-6 h-6 text-green-500" />;
-      case 'mp4':
-      case 'mov':
-      case 'avi':
-        return <FileVideo className="w-6 h-6 text-purple-500" />;
-      default:
-        return <File className="w-6 h-6 text-muted-foreground" />;
-    }
-  };
+  }, [activeTab, searchQuery, userLoading, activeCohortId]);
 
   const formatFileSize = (bytes: number | null) => {
     if (!bytes) return '--';
@@ -160,287 +90,327 @@ export default function ResourcesPage() {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
+  const handleOpenViewer = async (resource: Resource) => {
+    if (!resource.file_path) {
+      toast.error('File not available');
+      return;
+    }
+
+    try {
+      // Get signed URL from API
+      const response = await fetch(`/api/resources/${resource.id}/signed-url`);
+      if (!response.ok) throw new Error('Failed to get file URL');
+
+      const { signedUrl } = await response.json();
+
+      const fileType = resource.file_type?.toLowerCase();
+
+      if (fileType === 'pdf') {
+        setViewerState({ type: 'pdf', fileUrl: signedUrl, fileName: resource.name });
+      } else if (['doc', 'docx'].includes(fileType || '')) {
+        setViewerState({ type: 'doc', fileUrl: signedUrl, fileName: resource.name });
+      } else if (['ppt', 'pptx'].includes(fileType || '')) {
+        setViewerState({ type: 'ppt', fileUrl: signedUrl, fileName: resource.name });
+      } else {
+        // Fallback: open in new tab
+        window.open(signedUrl, '_blank');
+      }
+    } catch (error) {
+      console.error('Error opening viewer:', error);
+      toast.error('Failed to open file');
+    }
+  };
+
   const handleDownload = async (resource: Resource) => {
     if (!resource.file_path) {
       toast.error('File not available');
       return;
     }
 
-    const supabase = getClient();
-    const { data, error } = await supabase.storage
-      .from('resources')
-      .createSignedUrl(resource.file_path, 60);
+    try {
+      const response = await fetch(`/api/resources/${resource.id}/signed-url`);
+      if (!response.ok) throw new Error('Failed to download file');
 
-    if (error || !data) {
+      const { signedUrl } = await response.json();
+      window.open(signedUrl, '_blank');
+    } catch (error) {
+      console.error('Error downloading:', error);
       toast.error('Failed to download file');
-      return;
-    }
-
-    window.open(data.signedUrl, '_blank');
-  };
-
-  const handlePreview = async (resource: Resource) => {
-    if (resource.file_type?.toLowerCase() === 'pdf') {
-      setPreviewResource(resource);
-    } else {
-      handleDownload(resource);
     }
   };
 
-  // Filter resources based on search
-  const filteredResources = searchQuery
-    ? resources.filter(r =>
-        r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        r.keywords?.some(k => k.toLowerCase().includes(searchQuery.toLowerCase()))
-      )
-    : resources;
+  const closeViewer = () => {
+    setViewerState({ type: null, fileUrl: '', fileName: '' });
+  };
 
-  const folders = filteredResources.filter(r => r.type === 'folder');
-  const files = filteredResources.filter(r => r.type === 'file');
-  const links = filteredResources.filter(r => r.type === 'link');
-
-  // Show full-page loader until BOTH auth AND data are ready
-  // This prevents flash of empty content
-  if (userLoading || loading) {
-    return <StudentPageLoader message="Loading your resources..." />;
+  // Show full-page loader until auth is ready
+  if (userLoading) {
+    return <StudentPageLoader message="Loading resources..." />;
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Resources</h1>
-          <p className="text-muted-foreground">
-            Access course materials, documents, and files
+      {/* Header with futuristic gradient */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary/80 to-accent p-8 shadow-lg">
+        {/* Aurora glow effect */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,oklch(0.65_0.2_195_/_0.2),transparent)] pointer-events-none" />
+
+        <div className="relative z-10">
+          <h1 className="text-3xl font-bold text-white mb-2">Learning Resources</h1>
+          <p className="text-white/80">
+            Access course materials, videos, and documents
           </p>
         </div>
-        <div className="relative w-full sm:w-64">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Search files..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
-        </div>
       </div>
 
-      {/* Breadcrumbs */}
-      <div className="flex items-center gap-2 text-sm">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-8 px-2"
-          onClick={() => setCurrentFolder(null)}
-        >
-          <Home className="w-4 h-4" />
-        </Button>
-        {breadcrumbs.map((crumb, index) => (
-          <div key={crumb.id} className="flex items-center gap-2">
-            <ChevronRight className="w-4 h-4 text-muted-foreground" />
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 px-2"
-              onClick={() => setCurrentFolder(crumb.id)}
+      {/* Tabs Navigation */}
+      <div className="flex items-center gap-4 overflow-x-auto pb-2">
+        {TABS.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.value;
+
+          return (
+            <button
+              key={tab.value}
+              onClick={() => setActiveTab(tab.value)}
+              className={cn(
+                'flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all whitespace-nowrap',
+                isActive
+                  ? 'bg-primary text-white shadow-[0_0_20px_oklch(0.55_0.25_280_/_0.4)]'
+                  : 'bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground'
+              )}
             >
-              {crumb.name}
-            </Button>
-          </div>
-        ))}
+              <Icon className="w-5 h-5" />
+              {tab.label}
+            </button>
+          );
+        })}
       </div>
 
-      {/* Back button when in folder */}
-      {currentFolder && (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setCurrentFolder(breadcrumbs[breadcrumbs.length - 2]?.id || null)}
-          className="gap-2"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back
-        </Button>
-      )}
+      {/* Search */}
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Input
+          placeholder={`Search ${activeTab}s...`}
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-10"
+        />
+      </div>
 
-      {resources.length === 0 && !currentFolder ? (
+      {/* Content Area */}
+      {loading ? (
+        <div className="flex items-center justify-center py-16">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+        </div>
+      ) : resources.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16">
-            <FolderOpen className="w-12 h-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium mb-2">No resources yet</h3>
+            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+              <FileText className="w-8 h-8 text-muted-foreground" />
+            </div>
+            <h3 className="text-lg font-medium mb-2">No {activeTab}s yet</h3>
             <p className="text-muted-foreground text-center max-w-sm">
-              Resources will appear here once uploaded by your instructors.
+              {searchQuery
+                ? `No results found for "${searchQuery}"`
+                : `${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}s will appear here once uploaded.`}
             </p>
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-6">
-          {/* Folders */}
-          {folders.length > 0 && (
-            <div className="space-y-3">
-              <h3 className="text-sm font-medium text-muted-foreground">Folders</h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                {folders.map((folder) => (
-                  <button
-                    key={folder.id}
-                    onClick={() => setCurrentFolder(folder.id)}
-                    className="group p-4 rounded-xl border bg-card hover:bg-muted/50 hover:border-primary/50 transition-all hover-lift text-left"
-                  >
-                    <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                      <Folder className="w-6 h-6 text-amber-500" />
-                    </div>
-                    <p className="font-medium truncate">{folder.name}</p>
-                    {folder.week_number && (
-                      <Badge variant="secondary" className="mt-2">
-                        Week {folder.week_number}
-                      </Badge>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Files */}
-          {files.length > 0 && (
-            <div className="space-y-3">
-              <h3 className="text-sm font-medium text-muted-foreground">Files</h3>
-              <div className="grid gap-2">
-                {files.map((file) => (
-                  <div
-                    key={file.id}
-                    className="flex items-center gap-4 p-4 rounded-xl border bg-card hover:bg-muted/50 transition-colors group"
-                  >
-                    <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center flex-shrink-0">
-                      {getFileIcon(file.file_type)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{file.name}</p>
-                      <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                        <span className="uppercase">{file.file_type || 'File'}</span>
-                        <span>•</span>
-                        <span>{formatFileSize(file.file_size)}</span>
-                        {file.created_at && (
-                          <>
-                            <span>•</span>
-                            <span>{format(new Date(file.created_at), 'MMM d, yyyy')}</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      {file.file_type?.toLowerCase() === 'pdf' && (
+        <>
+          {/* Videos Grid */}
+          {activeTab === 'video' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {resources.map((resource) => (
+                <Card
+                  key={resource.id}
+                  className="group overflow-hidden hover:border-primary/50 hover:shadow-lg transition-all hover-lift"
+                >
+                  <CardContent className="p-0">
+                    <a
+                      href={resource.external_url || '#'}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block"
+                    >
+                      <VideoThumbnail
+                        title={resource.name}
+                        thumbnailUrl={resource.thumbnail_url}
+                        duration={resource.duration}
+                      />
+                    </a>
+                    <div className="p-4">
+                      <h3 className="font-semibold line-clamp-2 mb-2">{resource.name}</h3>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">
+                          {resource.created_at && format(new Date(resource.created_at), 'MMM d, yyyy')}
+                        </span>
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handlePreview(file)}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            // TODO: Add to favorites
+                            toast.success('Added to favorites');
+                          }}
                         >
-                          <Eye className="w-4 h-4" />
+                          <Star className="w-4 h-4" />
                         </Button>
-                      )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          {/* Articles List */}
+          {activeTab === 'article' && (
+            <div className="space-y-3">
+              {resources.map((resource) => (
+                <a
+                  key={resource.id}
+                  href={resource.external_url || '#'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-4 p-4 rounded-xl border bg-card hover:bg-muted/50 hover:border-primary/50 transition-all hover-lift group"
+                >
+                  <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+                    <ExternalLink className="w-6 h-6 text-blue-500" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold mb-1">{resource.name}</h3>
+                    <p className="text-sm text-muted-foreground truncate">
+                      {resource.external_url}
+                    </p>
+                  </div>
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                    <ExternalLink className="w-5 h-5 text-muted-foreground" />
+                  </div>
+                </a>
+              ))}
+            </div>
+          )}
+
+          {/* Presentations Grid */}
+          {activeTab === 'presentation' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {resources.map((resource) => (
+                <Card
+                  key={resource.id}
+                  className="group hover:border-primary/50 hover:shadow-lg transition-all hover-lift"
+                >
+                  <CardContent className="p-4">
+                    <div className="w-full aspect-video rounded-lg bg-gradient-to-br from-orange-500/10 to-red-500/10 flex items-center justify-center mb-4">
+                      <PresentationIcon className="w-16 h-16 text-orange-500" />
+                    </div>
+                    <h3 className="font-semibold line-clamp-2 mb-2">{resource.name}</h3>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
+                      <span className="uppercase">{resource.file_type}</span>
+                      <span>•</span>
+                      <span>{formatFileSize(resource.file_size)}</span>
+                    </div>
+                    <div className="flex gap-2">
                       <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDownload(file)}
+                        onClick={() => handleOpenViewer(resource)}
+                        className="flex-1"
+                        size="sm"
+                      >
+                        <Eye className="w-4 h-4 mr-2" />
+                        Open
+                      </Button>
+                      <Button
+                        onClick={() => handleDownload(resource)}
+                        variant="outline"
+                        size="sm"
                       >
                         <Download className="w-4 h-4" />
                       </Button>
                     </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="sm:hidden">
-                          <MoreVertical className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        {file.file_type?.toLowerCase() === 'pdf' && (
-                          <DropdownMenuItem onClick={() => handlePreview(file)}>
-                            <Eye className="w-4 h-4 mr-2" />
-                            Preview
-                          </DropdownMenuItem>
-                        )}
-                        <DropdownMenuItem onClick={() => handleDownload(file)}>
-                          <Download className="w-4 h-4 mr-2" />
-                          Download
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                ))}
-              </div>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           )}
 
-          {/* Links */}
-          {links.length > 0 && (
+          {/* PDFs List */}
+          {activeTab === 'pdf' && (
             <div className="space-y-3">
-              <h3 className="text-sm font-medium text-muted-foreground">External Links</h3>
-              <div className="grid gap-2">
-                {links.map((link) => (
-                  <a
-                    key={link.id}
-                    href={link.external_url || '#'}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-4 p-4 rounded-xl border bg-card hover:bg-muted/50 hover:border-primary/50 transition-colors group"
-                  >
-                    <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center flex-shrink-0">
-                      <LinkIcon className="w-6 h-6 text-blue-500" />
+              {resources.map((resource) => (
+                <div
+                  key={resource.id}
+                  className="flex items-center gap-4 p-4 rounded-xl border bg-card hover:bg-muted/50 transition-all group"
+                >
+                  <div className="w-12 h-12 rounded-xl bg-red-500/10 flex items-center justify-center flex-shrink-0">
+                    <FileText className="w-6 h-6 text-red-500" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold mb-1">{resource.name}</h3>
+                    <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                      <span className="uppercase">{resource.file_type}</span>
+                      <span>•</span>
+                      <span>{formatFileSize(resource.file_size)}</span>
+                      {resource.created_at && (
+                        <>
+                          <span>•</span>
+                          <span>{format(new Date(resource.created_at), 'MMM d, yyyy')}</span>
+                        </>
+                      )}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{link.name}</p>
-                      <p className="text-sm text-muted-foreground truncate">
-                        {link.external_url}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <ExternalLink className="w-4 h-4 text-muted-foreground" />
-                    </div>
-                  </a>
-                ))}
-              </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      onClick={() => handleOpenViewer(resource)}
+                      variant="ghost"
+                      size="sm"
+                    >
+                      <Eye className="w-4 h-4 mr-2" />
+                      Preview
+                    </Button>
+                    <Button
+                      onClick={() => handleDownload(resource)}
+                      variant="outline"
+                      size="sm"
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      Download
+                    </Button>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
-
-          {filteredResources.length === 0 && searchQuery && (
-            <div className="text-center py-8">
-              <Search className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-              <p className="text-muted-foreground">
-                No results found for &ldquo;{searchQuery}&rdquo;
-              </p>
-            </div>
-          )}
-
-          {filteredResources.length === 0 && !searchQuery && currentFolder && (
-            <div className="text-center py-8">
-              <FolderOpen className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-              <p className="text-muted-foreground">This folder is empty</p>
-            </div>
-          )}
-        </div>
+        </>
       )}
 
-      {/* PDF Preview Dialog */}
-      <Dialog open={!!previewResource} onOpenChange={(open) => !open && setPreviewResource(null)}>
-        <DialogContent className="max-w-4xl h-[80vh]">
-          <DialogHeader>
-            <DialogTitle>{previewResource?.name}</DialogTitle>
-            <DialogDescription>
-              {previewResource?.file_type?.toUpperCase()} • {formatFileSize(previewResource?.file_size || null)}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex-1 min-h-0">
-            {previewResource?.file_path && (
-              <iframe
-                src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/resources/${previewResource.file_path}`}
-                className="w-full h-full rounded-lg"
-                title={previewResource.name}
-              />
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Document Viewers */}
+      {viewerState.type === 'pdf' && (
+        <PDFViewer
+          fileUrl={viewerState.fileUrl}
+          fileName={viewerState.fileName}
+          isOpen={true}
+          onClose={closeViewer}
+        />
+      )}
+
+      {viewerState.type === 'doc' && (
+        <DocViewer
+          fileUrl={viewerState.fileUrl}
+          fileName={viewerState.fileName}
+          isOpen={true}
+          onClose={closeViewer}
+        />
+      )}
+
+      {viewerState.type === 'ppt' && (
+        <PPTViewer
+          fileUrl={viewerState.fileUrl}
+          fileName={viewerState.fileName}
+          isOpen={true}
+          onClose={closeViewer}
+        />
+      )}
     </div>
   );
 }
