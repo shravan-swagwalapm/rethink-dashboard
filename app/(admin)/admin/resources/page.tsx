@@ -617,7 +617,14 @@ export default function AdminResourcesPage() {
         formData.append('name', item.name);
         // Determine category based on file extension
         const ext = item.name.split('.').pop()?.toLowerCase();
-        const category = ext === 'pdf' ? 'pdf' : 'presentation';
+        let category = 'pdf'; // Default to pdf for documents
+
+        if (['ppt', 'pptx'].includes(ext || '')) {
+          category = 'presentation';
+        } else if (['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv'].includes(ext || '')) {
+          category = 'pdf'; // All documents go to PDF category
+        }
+
         formData.append('category', category);
         formData.append('is_global', isGlobalMode.toString());
         if (!isGlobalMode && selectedCohortId) {

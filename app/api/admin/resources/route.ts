@@ -87,6 +87,7 @@ export async function POST(request: Request) {
     let fileSize: number | null = null;
     let fileType: string | null = null;
 
+    // Allow file uploads for presentation and pdf categories (pdf includes all documents)
     if (file && ['presentation', 'pdf'].includes(category)) {
       if (file.size > 104857600) {
         return NextResponse.json({ error: 'File exceeds 100MB limit' }, { status: 400 });
