@@ -300,23 +300,44 @@ export async function POST(request: NextRequest) {
 
     // Create a module resource
     if (body.type === 'resource') {
-      const googleDriveId = extractGoogleDriveId(body.url);
-      const contentType = body.content_type || detectContentType(body.url);
+      const contentType = body.content_type;
 
-      console.log('Creating resource:', { module_id: body.module_id, title: body.title, contentType, googleDriveId });
+      // Build insert data based on content type
+      const insertData: Record<string, unknown> = {
+        module_id: body.module_id,
+        title: body.title,
+        content_type: contentType,
+        duration_seconds: body.duration_seconds || null,
+        order_index: body.order_index || 0,
+        session_number: body.session_number || null,
+      };
+
+      // For videos: use external_url (YouTube)
+      if (contentType === 'video') {
+        insertData.external_url = body.external_url || body.url || null;
+        insertData.google_drive_id = null;  // Clear legacy field
+        insertData.file_path = null;
+        insertData.file_type = null;
+        insertData.file_size = null;
+      } else if (body.file_path) {
+        // For PDFs: use file_path from Supabase Storage
+        insertData.file_path = body.file_path;
+        insertData.file_type = body.file_type || 'pdf';
+        insertData.file_size = body.file_size || null;
+        insertData.external_url = null;
+        insertData.google_drive_id = null;
+      } else if (body.url) {
+        // Legacy: Google Drive URL support
+        const googleDriveId = extractGoogleDriveId(body.url);
+        insertData.google_drive_id = googleDriveId;
+        insertData.external_url = body.url;
+      }
+
+      console.log('Creating resource:', { module_id: body.module_id, title: body.title, contentType, insertData });
 
       const { data: resource, error } = await adminClient
         .from('module_resources')
-        .insert({
-          module_id: body.module_id,
-          title: body.title,
-          content_type: contentType,
-          google_drive_id: googleDriveId,
-          external_url: body.url,
-          duration_seconds: body.duration_seconds,
-          order_index: body.order_index || 0,
-          session_number: body.session_number || null,
-        })
+        .insert(insertData)
         .select()
         .single();
 
@@ -369,17 +390,42 @@ export async function PUT(request: NextRequest) {
 
     // Update module resource
     if (body.type === 'resource') {
-      const googleDriveId = body.url ? extractGoogleDriveId(body.url) : undefined;
-      const contentType = body.content_type || (body.url ? detectContentType(body.url) : undefined);
-
       const updateData: Record<string, unknown> = {
         title: body.title,
         order_index: body.order_index,
       };
 
-      if (googleDriveId !== undefined) updateData.google_drive_id = googleDriveId;
-      if (contentType !== undefined) updateData.content_type = contentType;
-      if (body.url !== undefined) updateData.external_url = body.url;
+      // Update content type if provided
+      if (body.content_type !== undefined) {
+        updateData.content_type = body.content_type;
+      }
+
+      // Handle video updates (YouTube URL)
+      if (body.external_url !== undefined) {
+        updateData.external_url = body.external_url;
+        // Clear legacy Google Drive ID when setting YouTube URL
+        if (body.external_url) {
+          updateData.google_drive_id = null;
+        }
+      }
+
+      // Handle PDF file updates
+      if (body.file_path !== undefined) {
+        updateData.file_path = body.file_path;
+        updateData.file_type = body.file_type || 'pdf';
+        updateData.file_size = body.file_size || null;
+        // Clear legacy fields
+        updateData.google_drive_id = null;
+        updateData.external_url = null;
+      }
+
+      // Legacy: Google Drive URL support
+      if (body.url !== undefined && !body.external_url && !body.file_path) {
+        const googleDriveId = body.url ? extractGoogleDriveId(body.url) : null;
+        updateData.google_drive_id = googleDriveId;
+        updateData.external_url = body.url;
+      }
+
       if (body.duration_seconds !== undefined) updateData.duration_seconds = body.duration_seconds;
       if (body.session_number !== undefined) updateData.session_number = body.session_number;
 

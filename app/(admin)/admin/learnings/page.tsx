@@ -61,7 +61,10 @@ import {
   Globe,
   AlertTriangle,
   Info,
+  Upload,
+  Youtube,
 } from 'lucide-react';
+import { isYouTubeUrl, getYouTubeEmbedUrl } from '@/lib/utils/youtube-url';
 import { format } from 'date-fns';
 import type { Cohort, LearningModule, ModuleResource, LearningModuleWithResources, CaseStudy } from '@/types';
 import { cn } from '@/lib/utils';
@@ -150,12 +153,15 @@ export default function LearningsPage() {
   const [targetModuleId, setTargetModuleId] = useState<string>('');
   const [resourceFormData, setResourceFormData] = useState({
     title: '',
-    url: '',
+    youtube_url: '',  // For videos - YouTube URL
     content_type: 'video' as 'video' | 'slides' | 'document' | 'link',
     duration_seconds: '',
     session_number: '',
     order_index: 0,
   });
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Case study form
   const [showCaseStudyForm, setShowCaseStudyForm] = useState(false);
@@ -168,6 +174,10 @@ export default function LearningsPage() {
     solution_visible: false,
     due_date: '',
   });
+  const [problemFile, setProblemFile] = useState<File | null>(null);
+  const [solutionFile, setSolutionFile] = useState<File | null>(null);
+  const problemFileRef = useRef<HTMLInputElement>(null);
+  const solutionFileRef = useRef<HTMLInputElement>(null);
 
   // Preview modal
   const [previewResource, setPreviewResource] = useState<ModuleResource | null>(null);
@@ -376,13 +386,60 @@ export default function LearningsPage() {
 
   // Resource CRUD
   const handleCreateResource = async () => {
-    if (!resourceFormData.title.trim() || !resourceFormData.url.trim()) {
-      toast.error('Title and URL are required');
+    // Validation based on content type
+    if (!resourceFormData.title.trim()) {
+      toast.error('Title is required');
       return;
     }
 
+    if (resourceFormData.content_type === 'video') {
+      if (!resourceFormData.youtube_url.trim()) {
+        toast.error('YouTube URL is required for videos');
+        return;
+      }
+      if (!isYouTubeUrl(resourceFormData.youtube_url)) {
+        toast.error('Please enter a valid YouTube URL');
+        return;
+      }
+    } else {
+      // For slides/documents, need a file
+      if (!selectedFile) {
+        toast.error('Please select a PDF file');
+        return;
+      }
+    }
+
     setSaving(true);
+    setUploadProgress(true);
+
     try {
+      let filePath: string | null = null;
+      let fileType: string | null = null;
+      let fileSize: number | null = null;
+
+      // For PDFs, upload first
+      if (selectedFile && resourceFormData.content_type !== 'video') {
+        const formData = new FormData();
+        formData.append('file', selectedFile);
+        formData.append('cohort_id', selectedCohort === GLOBAL_LIBRARY_ID ? 'global' : selectedCohort);
+
+        const uploadResponse = await fetch('/api/admin/resources/upload', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!uploadResponse.ok) {
+          const error = await uploadResponse.json();
+          throw new Error(error.error || 'Failed to upload file');
+        }
+
+        const uploadData = await uploadResponse.json();
+        filePath = uploadData.file_path;
+        fileType = uploadData.file_type;
+        fileSize = uploadData.file_size;
+      }
+
+      // Create resource record
       const response = await fetch('/api/admin/learnings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -390,11 +447,16 @@ export default function LearningsPage() {
           type: 'resource',
           module_id: targetModuleId,
           title: resourceFormData.title,
-          url: resourceFormData.url,
           content_type: resourceFormData.content_type,
           duration_seconds: resourceFormData.duration_seconds ? parseInt(resourceFormData.duration_seconds) : null,
           session_number: resourceFormData.session_number ? parseInt(resourceFormData.session_number) : null,
           order_index: resourceFormData.order_index,
+          // For videos: YouTube URL
+          external_url: resourceFormData.content_type === 'video' ? resourceFormData.youtube_url : null,
+          // For PDFs: file info
+          file_path: filePath,
+          file_type: fileType,
+          file_size: fileSize,
         }),
       });
 
@@ -406,9 +468,10 @@ export default function LearningsPage() {
       fetchModules();
     } catch (error) {
       console.error('Error creating resource:', error);
-      toast.error('Failed to create resource');
+      toast.error(error instanceof Error ? error.message : 'Failed to create resource');
     } finally {
       setSaving(false);
+      setUploadProgress(false);
     }
   };
 
@@ -416,7 +479,35 @@ export default function LearningsPage() {
     if (!editingResource || !resourceFormData.title.trim()) return;
 
     setSaving(true);
+    setUploadProgress(true);
+
     try {
+      let filePath: string | null = null;
+      let fileType: string | null = null;
+      let fileSize: number | null = null;
+
+      // If a new file was selected for PDFs, upload it
+      if (selectedFile && resourceFormData.content_type !== 'video') {
+        const formData = new FormData();
+        formData.append('file', selectedFile);
+        formData.append('cohort_id', selectedCohort === GLOBAL_LIBRARY_ID ? 'global' : selectedCohort);
+
+        const uploadResponse = await fetch('/api/admin/resources/upload', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!uploadResponse.ok) {
+          const error = await uploadResponse.json();
+          throw new Error(error.error || 'Failed to upload file');
+        }
+
+        const uploadData = await uploadResponse.json();
+        filePath = uploadData.file_path;
+        fileType = uploadData.file_type;
+        fileSize = uploadData.file_size;
+      }
+
       const response = await fetch('/api/admin/learnings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -424,11 +515,14 @@ export default function LearningsPage() {
           type: 'resource',
           id: editingResource.id,
           title: resourceFormData.title,
-          url: resourceFormData.url,
           content_type: resourceFormData.content_type,
           duration_seconds: resourceFormData.duration_seconds ? parseInt(resourceFormData.duration_seconds) : null,
           session_number: resourceFormData.session_number ? parseInt(resourceFormData.session_number) : null,
           order_index: resourceFormData.order_index,
+          // For videos: YouTube URL
+          external_url: resourceFormData.content_type === 'video' ? resourceFormData.youtube_url : undefined,
+          // For PDFs: file info (only if new file uploaded)
+          ...(filePath && { file_path: filePath, file_type: fileType, file_size: fileSize }),
         }),
       });
 
@@ -441,9 +535,10 @@ export default function LearningsPage() {
       fetchModules();
     } catch (error) {
       console.error('Error updating resource:', error);
-      toast.error('Failed to update resource');
+      toast.error(error instanceof Error ? error.message : 'Failed to update resource');
     } finally {
       setSaving(false);
+      setUploadProgress(false);
     }
   };
 
@@ -582,12 +677,20 @@ export default function LearningsPage() {
   };
 
   const resetResourceForm = () => {
-    setResourceFormData({ title: '', url: '', content_type: 'video', duration_seconds: '', session_number: '', order_index: 0 });
+    setResourceFormData({ title: '', youtube_url: '', content_type: 'video', duration_seconds: '', session_number: '', order_index: 0 });
     setTargetModuleId('');
+    setSelectedFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const resetCaseStudyForm = () => {
     setCaseStudyFormData({ title: '', description: '', problem_doc_url: '', solution_doc_url: '', solution_visible: false, due_date: '' });
+    setProblemFile(null);
+    setSolutionFile(null);
+    if (problemFileRef.current) problemFileRef.current.value = '';
+    if (solutionFileRef.current) solutionFileRef.current.value = '';
   };
 
   const openAddWeek = () => {
@@ -617,9 +720,10 @@ export default function LearningsPage() {
     }
     setTargetModuleId(currentWeekModule.id);
     setEditingResource(null);
+    setSelectedFile(null);
     setResourceFormData({
       title: '',
-      url: '',
+      youtube_url: '',
       content_type: contentType,
       duration_seconds: '',
       session_number: '',
@@ -631,9 +735,10 @@ export default function LearningsPage() {
   const openEditResource = (resource: ModuleResource) => {
     setEditingResource(resource);
     setTargetModuleId(resource.module_id || '');
+    setSelectedFile(null);
     setResourceFormData({
       title: resource.title,
-      url: resource.external_url || '',
+      youtube_url: resource.external_url || '',
       content_type: resource.content_type,
       duration_seconds: resource.duration_seconds?.toString() || '',
       session_number: resource.session_number?.toString() || '',
@@ -663,15 +768,6 @@ export default function LearningsPage() {
       due_date: caseStudy.due_date ? caseStudy.due_date.split('T')[0] : '',
     });
     setShowCaseStudyForm(true);
-  };
-
-  // Auto-detect content type when URL changes
-  const handleUrlChange = (url: string) => {
-    setResourceFormData(prev => ({
-      ...prev,
-      url,
-      content_type: detectContentType(url),
-    }));
   };
 
   const formatDuration = (seconds: number | null) => {
@@ -1271,16 +1367,24 @@ export default function LearningsPage() {
 
       {/* Resource Form Dialog */}
       <Dialog open={showResourceForm} onOpenChange={setShowResourceForm}>
-        <DialogContent className="dark:bg-gray-900 dark:border-gray-700 sm:max-w-[500px]">
+        <DialogContent className="dark:bg-gray-900 dark:border-gray-700 sm:max-w-[550px]">
           <DialogHeader>
-            <DialogTitle className="dark:text-white text-xl">
+            <DialogTitle className="dark:text-white text-xl flex items-center gap-2">
+              {resourceFormData.content_type === 'video' ? (
+                <Youtube className="w-5 h-5 text-red-500" />
+              ) : (
+                <FileText className="w-5 h-5 text-blue-500" />
+              )}
               {editingResource ? 'Edit Resource' : `Add ${getContentTypeLabel(resourceFormData.content_type).slice(0, -1)}`}
             </DialogTitle>
             <DialogDescription className="dark:text-gray-400">
-              Add content from Google Drive
+              {resourceFormData.content_type === 'video'
+                ? 'Add a YouTube video'
+                : 'Upload a PDF file'}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-5 py-2">
+            {/* Title */}
             <div className="space-y-2">
               <Label htmlFor="resource-title" className="dark:text-gray-300 font-medium">
                 Title <span className="text-red-500">*</span>
@@ -1293,41 +1397,133 @@ export default function LearningsPage() {
                 className="dark:bg-gray-950 dark:border-gray-700 dark:text-white h-11"
               />
             </div>
+
+            {/* Content Type Selector */}
             <div className="space-y-2">
-              <Label htmlFor="resource-url" className="dark:text-gray-300 font-medium">
-                Google Drive URL <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="resource-url"
-                placeholder="https://drive.google.com/file/d/..."
-                value={resourceFormData.url}
-                onChange={(e) => handleUrlChange(e.target.value)}
-                className="dark:bg-gray-950 dark:border-gray-700 dark:text-white h-11"
-              />
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                Paste the sharing link from Google Drive, Slides, or Docs
-              </p>
+              <Label className="dark:text-gray-300 font-medium">Content Type</Label>
+              <Select
+                value={resourceFormData.content_type}
+                onValueChange={(value: 'video' | 'slides' | 'document' | 'link') => {
+                  setResourceFormData({ ...resourceFormData, content_type: value, youtube_url: '' });
+                  setSelectedFile(null);
+                  if (fileInputRef.current) fileInputRef.current.value = '';
+                }}
+              >
+                <SelectTrigger className="dark:bg-gray-950 dark:border-gray-700 dark:text-white h-11">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
+                  <SelectItem value="video" className="dark:text-white dark:focus:bg-gray-800">
+                    <span className="flex items-center gap-2">
+                      <Youtube className="w-4 h-4 text-red-500" />
+                      Recording (YouTube)
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="slides" className="dark:text-white dark:focus:bg-gray-800">
+                    <span className="flex items-center gap-2">
+                      <Presentation className="w-4 h-4 text-orange-500" />
+                      PPT (PDF Upload)
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="document" className="dark:text-white dark:focus:bg-gray-800">
+                    <span className="flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-blue-500" />
+                      Notes (PDF Upload)
+                    </span>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <div className="grid grid-cols-3 gap-4">
+
+            {/* YouTube URL Input - for videos */}
+            {resourceFormData.content_type === 'video' && (
               <div className="space-y-2">
-                <Label htmlFor="resource-type" className="dark:text-gray-300 font-medium">Content Type</Label>
-                <Select
-                  value={resourceFormData.content_type}
-                  onValueChange={(value: 'video' | 'slides' | 'document' | 'link') =>
-                    setResourceFormData({ ...resourceFormData, content_type: value })
-                  }
-                >
-                  <SelectTrigger className="dark:bg-gray-950 dark:border-gray-700 dark:text-white h-11">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
-                    <SelectItem value="video" className="dark:text-white dark:focus:bg-gray-800">Recording</SelectItem>
-                    <SelectItem value="slides" className="dark:text-white dark:focus:bg-gray-800">PPT</SelectItem>
-                    <SelectItem value="document" className="dark:text-white dark:focus:bg-gray-800">Notes</SelectItem>
-                    <SelectItem value="link" className="dark:text-white dark:focus:bg-gray-800">Link</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="resource-youtube" className="dark:text-gray-300 font-medium flex items-center gap-2">
+                  <Youtube className="w-4 h-4 text-red-500" />
+                  YouTube URL <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="resource-youtube"
+                  placeholder="https://www.youtube.com/watch?v=..."
+                  value={resourceFormData.youtube_url}
+                  onChange={(e) => setResourceFormData({ ...resourceFormData, youtube_url: e.target.value })}
+                  className="dark:bg-gray-950 dark:border-gray-700 dark:text-white h-11"
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Paste any YouTube URL (watch, share, or embed link)
+                </p>
+                {resourceFormData.youtube_url && !isYouTubeUrl(resourceFormData.youtube_url) && (
+                  <p className="text-xs text-red-500">
+                    Please enter a valid YouTube URL
+                  </p>
+                )}
               </div>
+            )}
+
+            {/* PDF File Upload - for slides/documents */}
+            {(resourceFormData.content_type === 'slides' || resourceFormData.content_type === 'document') && (
+              <div className="space-y-2">
+                <Label className="dark:text-gray-300 font-medium flex items-center gap-2">
+                  <Upload className="w-4 h-4 text-blue-500" />
+                  PDF File <span className="text-red-500">*</span>
+                </Label>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      if (file.type !== 'application/pdf') {
+                        toast.error('Please select a PDF file');
+                        return;
+                      }
+                      if (file.size > 50 * 1024 * 1024) {
+                        toast.error('File size must be less than 50MB');
+                        return;
+                      }
+                      setSelectedFile(file);
+                    }
+                  }}
+                  className="hidden"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => fileInputRef.current?.click()}
+                  className={cn(
+                    "w-full h-24 border-2 border-dashed flex flex-col items-center justify-center gap-2 transition-all",
+                    "dark:border-gray-700 dark:bg-gray-950 dark:text-white",
+                    "hover:border-blue-500 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/20",
+                    selectedFile && "border-green-500 dark:border-green-500 bg-green-50 dark:bg-green-950/20"
+                  )}
+                >
+                  {selectedFile ? (
+                    <>
+                      <FileText className="w-8 h-8 text-green-500" />
+                      <span className="text-sm font-medium text-green-600 dark:text-green-400">{selectedFile.name}</span>
+                      <span className="text-xs text-gray-500">
+                        {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-8 h-8 text-gray-400" />
+                      <span className="text-sm text-gray-600 dark:text-gray-400">Click to select PDF file</span>
+                      <span className="text-xs text-gray-400">Max 50MB</span>
+                    </>
+                  )}
+                </Button>
+                {editingResource && !selectedFile && (
+                  <p className="text-xs text-amber-500 dark:text-amber-400">
+                    Leave empty to keep existing file
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Session Number and Duration */}
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="resource-session" className="dark:text-gray-300 font-medium">Session #</Label>
                 <Input
@@ -1339,17 +1535,19 @@ export default function LearningsPage() {
                   className="dark:bg-gray-950 dark:border-gray-700 dark:text-white h-11"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="resource-duration" className="dark:text-gray-300 font-medium">Duration (sec)</Label>
-                <Input
-                  id="resource-duration"
-                  type="number"
-                  placeholder="3600"
-                  value={resourceFormData.duration_seconds}
-                  onChange={(e) => setResourceFormData({ ...resourceFormData, duration_seconds: e.target.value })}
-                  className="dark:bg-gray-950 dark:border-gray-700 dark:text-white h-11"
-                />
-              </div>
+              {resourceFormData.content_type === 'video' && (
+                <div className="space-y-2">
+                  <Label htmlFor="resource-duration" className="dark:text-gray-300 font-medium">Duration (sec)</Label>
+                  <Input
+                    id="resource-duration"
+                    type="number"
+                    placeholder="3600"
+                    value={resourceFormData.duration_seconds}
+                    onChange={(e) => setResourceFormData({ ...resourceFormData, duration_seconds: e.target.value })}
+                    className="dark:bg-gray-950 dark:border-gray-700 dark:text-white h-11"
+                  />
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter className="gap-2">
@@ -1357,16 +1555,28 @@ export default function LearningsPage() {
               variant="outline"
               onClick={() => setShowResourceForm(false)}
               className="dark:border-gray-700 dark:text-white dark:hover:bg-gray-800"
+              disabled={saving}
             >
               Cancel
             </Button>
             <Button
               onClick={editingResource ? handleUpdateResource : handleCreateResource}
-              disabled={saving || !resourceFormData.title.trim() || !resourceFormData.url.trim()}
+              disabled={
+                saving ||
+                !resourceFormData.title.trim() ||
+                (resourceFormData.content_type === 'video' && !resourceFormData.youtube_url.trim()) ||
+                (resourceFormData.content_type !== 'video' && !selectedFile && !editingResource)
+              }
               className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white"
             >
-              {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              {editingResource ? 'Update' : 'Add'}
+              {saving ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  {uploadProgress ? 'Uploading...' : 'Saving...'}
+                </>
+              ) : (
+                editingResource ? 'Update' : 'Add'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

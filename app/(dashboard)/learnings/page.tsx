@@ -33,10 +33,20 @@ import {
   Star,
   Loader2,
   AlertCircle,
+  Download,
+  Youtube,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { isYouTubeUrl, getYouTubeEmbedUrl, getYouTubeWatchUrl } from '@/lib/utils/youtube-url';
 import type { LearningModule, ModuleResource, ModuleResourceType, CaseStudy, ResourceProgress, ResourceFavorite } from '@/types';
+
+// Extended ModuleResource interface with file fields
+interface ModuleResourceExtended extends ModuleResource {
+  file_path?: string | null;
+  file_type?: string | null;
+  file_size?: number | null;
+}
 
 interface ModuleWithResources extends LearningModule {
   resources: ModuleResource[];
@@ -98,41 +108,66 @@ function getContentGradient(type: ModuleResourceType): { from: string; to: strin
   }
 }
 
-// Get embed URL for Google Drive content
-// For view-only folders, we use specific URL formats that work better
-function getEmbedUrl(resource: ModuleResource): string {
-  const id = resource.google_drive_id;
-  if (!id) return resource.external_url || '';
-
-  switch (resource.content_type) {
-    case 'video':
-      // Use the preview URL with embedded player - works for most shared videos
-      // Adding timestamp parameter helps with caching issues
-      return `https://drive.google.com/file/d/${id}/preview?t=${Date.now()}`;
-    case 'slides':
-      return `https://docs.google.com/presentation/d/${id}/embed?start=false&loop=false&delayms=3000`;
-    case 'document':
-      return `https://docs.google.com/document/d/${id}/preview`;
-    default:
-      return resource.external_url || '';
+// Get embed URL for content
+// Supports: YouTube videos, PDF files (via signed URL), legacy Google Drive
+function getEmbedUrl(resource: ModuleResourceExtended): string {
+  // For videos: Check YouTube first
+  if (resource.content_type === 'video') {
+    if (resource.external_url && isYouTubeUrl(resource.external_url)) {
+      return getYouTubeEmbedUrl(resource.external_url);
+    }
+    // Legacy: Google Drive video fallback
+    if (resource.google_drive_id) {
+      return `https://drive.google.com/file/d/${resource.google_drive_id}/preview?t=${Date.now()}`;
+    }
+    return resource.external_url || '';
   }
+
+  // For PDFs with file_path: Return empty string - will be fetched async via signed URL
+  if (resource.file_path) {
+    return ''; // Handled separately with async signed URL fetch
+  }
+
+  // Legacy: Google Drive fallback for slides/documents
+  const id = resource.google_drive_id;
+  if (id) {
+    switch (resource.content_type) {
+      case 'slides':
+        return `https://docs.google.com/presentation/d/${id}/embed?start=false&loop=false&delayms=3000`;
+      case 'document':
+        return `https://docs.google.com/document/d/${id}/preview`;
+    }
+  }
+
+  return resource.external_url || '';
 }
 
 // Get direct view URL for opening in new tab
-function getDirectViewUrl(resource: ModuleResource): string {
-  const id = resource.google_drive_id;
-  if (!id) return resource.external_url || '';
-
-  switch (resource.content_type) {
-    case 'video':
-      return `https://drive.google.com/file/d/${id}/view`;
-    case 'slides':
-      return `https://docs.google.com/presentation/d/${id}/edit?usp=sharing`;
-    case 'document':
-      return `https://docs.google.com/document/d/${id}/edit?usp=sharing`;
-    default:
-      return resource.external_url || '';
+function getDirectViewUrl(resource: ModuleResourceExtended): string {
+  // For YouTube videos
+  if (resource.content_type === 'video' && resource.external_url && isYouTubeUrl(resource.external_url)) {
+    return getYouTubeWatchUrl(resource.external_url) || resource.external_url;
   }
+
+  // Legacy: Google Drive
+  const id = resource.google_drive_id;
+  if (id) {
+    switch (resource.content_type) {
+      case 'video':
+        return `https://drive.google.com/file/d/${id}/view`;
+      case 'slides':
+        return `https://docs.google.com/presentation/d/${id}/edit?usp=sharing`;
+      case 'document':
+        return `https://docs.google.com/document/d/${id}/edit?usp=sharing`;
+    }
+  }
+
+  return resource.external_url || '';
+}
+
+// Check if resource has an uploaded PDF file
+function hasUploadedFile(resource: ModuleResourceExtended): boolean {
+  return !!resource.file_path && resource.content_type !== 'video';
 }
 
 // Get embed URL for case study docs
@@ -172,6 +207,10 @@ export default function LearningsPage() {
   const [isSearching, setIsSearching] = useState(false);
   const [activeFilter, setActiveFilter] = useState<'all' | 'video' | 'slides' | 'document' | 'case_study'>('all');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+
+  // PDF signed URL state (for uploaded PDFs in Supabase Storage)
+  const [pdfSignedUrl, setPdfSignedUrl] = useState<string | null>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -755,6 +794,43 @@ export default function LearningsPage() {
 
     return () => clearTimeout(timeout);
   }, [selectedResource, iframeLoading]);
+
+  // Fetch signed URL for PDF resources (uploaded to Supabase Storage)
+  useEffect(() => {
+    const fetchSignedUrl = async () => {
+      if (!selectedResource) {
+        setPdfSignedUrl(null);
+        return;
+      }
+
+      const extendedResource = selectedResource as ModuleResourceExtended;
+
+      // Only fetch for PDFs with file_path (uploaded to Supabase Storage)
+      if (extendedResource.file_path && extendedResource.content_type !== 'video') {
+        setPdfLoading(true);
+        try {
+          const response = await fetch(`/api/module-resources/${selectedResource.id}/signed-url`);
+          if (response.ok) {
+            const data = await response.json();
+            setPdfSignedUrl(data.url);
+            console.log('[Learnings] PDF signed URL fetched:', { title: selectedResource.title, url: data.url });
+          } else {
+            console.error('[Learnings] Failed to fetch signed URL:', response.status);
+            setPdfSignedUrl(null);
+          }
+        } catch (error) {
+          console.error('[Learnings] Error fetching signed URL:', error);
+          setPdfSignedUrl(null);
+        } finally {
+          setPdfLoading(false);
+        }
+      } else {
+        setPdfSignedUrl(null);
+      }
+    };
+
+    fetchSignedUrl();
+  }, [selectedResource]);
 
   const handleResourceClick = async (resource: ModuleResource) => {
     if (resource.content_type === 'link' && resource.external_url) {
@@ -1614,6 +1690,44 @@ export default function LearningsPage() {
               {/* Action buttons */}
               {selectedResource && (
                 <div className="flex items-center gap-3 mr-12">
+                  {/* PDF View/Download buttons - only show for uploaded PDFs */}
+                  {hasUploadedFile(selectedResource as ModuleResourceExtended) && (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => {
+                          if (pdfSignedUrl) {
+                            window.open(pdfSignedUrl, '_blank');
+                          }
+                        }}
+                        disabled={pdfLoading || !pdfSignedUrl}
+                        title="View in new tab"
+                        className="transition-all"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => {
+                          if (pdfSignedUrl) {
+                            const link = document.createElement('a');
+                            link.href = pdfSignedUrl;
+                            link.download = selectedResource.title + '.pdf';
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                          }
+                        }}
+                        disabled={pdfLoading || !pdfSignedUrl}
+                        title="Download PDF"
+                        className="transition-all"
+                      >
+                        <Download className="w-4 h-4" />
+                      </Button>
+                    </>
+                  )}
                   <Button
                     variant="outline"
                     size="icon"
@@ -1661,21 +1775,31 @@ export default function LearningsPage() {
                     <div className="flex flex-col items-center gap-4 p-6 text-center">
                       <Loader2 className="w-10 h-10 animate-spin text-purple-500" />
                       <div>
-                        <p className="text-sm text-gray-300 mb-1">Loading video...</p>
-                        <p className="text-xs text-gray-500">If video doesn't appear, use the button below</p>
+                        <p className="text-sm text-gray-300 mb-1">
+                          {selectedResource.content_type === 'video' ? 'Loading video...' : 'Loading content...'}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {selectedResource.content_type === 'video'
+                            ? "If video doesn't appear, use the button below"
+                            : "Content will appear shortly"}
+                        </p>
                       </div>
-                      <Button
-                        onClick={() => {
-                          const url = getDirectViewUrl(selectedResource);
-                          window.open(url, '_blank');
-                        }}
-                        variant="outline"
-                        size="sm"
-                        className="gap-2 border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                        Watch in Google Drive
-                      </Button>
+                      {selectedResource.content_type === 'video' && (
+                        <Button
+                          onClick={() => {
+                            const url = getDirectViewUrl(selectedResource as ModuleResourceExtended);
+                            window.open(url, '_blank');
+                          }}
+                          variant="outline"
+                          size="sm"
+                          className="gap-2 border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
+                        >
+                          <Youtube className="w-4 h-4" />
+                          {isYouTubeUrl((selectedResource as ModuleResourceExtended).external_url || '')
+                            ? 'Watch on YouTube'
+                            : 'Watch in Google Drive'}
+                        </Button>
+                      )}
                     </div>
                   </div>
                 )}
@@ -1683,28 +1807,61 @@ export default function LearningsPage() {
                   <div className="absolute inset-0 flex items-center justify-center bg-gray-900/95 rounded-lg border-2 border-purple-500/30 z-10">
                     <div className="flex flex-col items-center gap-4 p-6 max-w-lg text-center">
                       <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-lg shadow-purple-500/25">
-                        <Video className="w-8 h-8 text-white" />
+                        {selectedResource.content_type === 'video' ? (
+                          <Video className="w-8 h-8 text-white" />
+                        ) : (
+                          <FileText className="w-8 h-8 text-white" />
+                        )}
                       </div>
                       <div>
-                        <h3 className="font-semibold text-lg mb-2 text-white">Video couldn't load here</h3>
+                        <h3 className="font-semibold text-lg mb-2 text-white">
+                          {selectedResource.content_type === 'video' ? "Video couldn't load here" : "Content couldn't load here"}
+                        </h3>
                         <p className="text-sm text-gray-400 mb-2">
-                          This can happen due to browser extensions (ad blockers) or Google account conflicts.
+                          {selectedResource.content_type === 'video'
+                            ? 'This can happen due to browser extensions (ad blockers) or account conflicts.'
+                            : 'There was an issue loading this content.'}
                         </p>
                         <p className="text-xs text-gray-500">
-                          Try opening in Google Drive, or use an incognito window.
+                          {selectedResource.content_type === 'video'
+                            ? 'Try opening externally, or use an incognito window.'
+                            : 'Try opening in a new tab or downloading the file.'}
                         </p>
                       </div>
                       <div className="flex gap-3">
-                        <Button
-                          onClick={() => {
-                            const url = getDirectViewUrl(selectedResource);
-                            window.open(url, '_blank');
-                          }}
-                          className="gap-2 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
-                        >
-                          <ExternalLink className="w-4 h-4" />
-                          Watch in Google Drive
-                        </Button>
+                        {selectedResource.content_type === 'video' ? (
+                          <Button
+                            onClick={() => {
+                              const url = getDirectViewUrl(selectedResource as ModuleResourceExtended);
+                              window.open(url, '_blank');
+                            }}
+                            className="gap-2 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
+                          >
+                            <Youtube className="w-4 h-4" />
+                            {isYouTubeUrl((selectedResource as ModuleResourceExtended).external_url || '')
+                              ? 'Watch on YouTube'
+                              : 'Watch in Google Drive'}
+                          </Button>
+                        ) : hasUploadedFile(selectedResource as ModuleResourceExtended) && pdfSignedUrl ? (
+                          <Button
+                            onClick={() => window.open(pdfSignedUrl, '_blank')}
+                            className="gap-2 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                            Open in New Tab
+                          </Button>
+                        ) : (
+                          <Button
+                            onClick={() => {
+                              const url = getDirectViewUrl(selectedResource as ModuleResourceExtended);
+                              window.open(url, '_blank');
+                            }}
+                            className="gap-2 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                            Open in Google Drive
+                          </Button>
+                        )}
                         <Button
                           onClick={() => {
                             setIframeError(false);
@@ -1721,11 +1878,24 @@ export default function LearningsPage() {
                 )}
                 <iframe
                   src={(() => {
-                    const url = getEmbedUrl(selectedResource);
+                    const extendedResource = selectedResource as ModuleResourceExtended;
+
+                    // For PDFs with file_path (uploaded to Supabase Storage), use the signed URL
+                    if (hasUploadedFile(extendedResource)) {
+                      console.log('[Learnings] Loading PDF via signed URL:', {
+                        title: selectedResource.title,
+                        file_path: extendedResource.file_path,
+                        signed_url: pdfSignedUrl ? 'loaded' : 'pending'
+                      });
+                      return pdfSignedUrl || '';
+                    }
+
+                    // For videos and legacy content, use getEmbedUrl
+                    const url = getEmbedUrl(extendedResource);
                     console.log('[Learnings] Loading iframe:', {
                       title: selectedResource.title,
                       google_drive_id: selectedResource.google_drive_id,
-                      external_url: selectedResource.external_url,
+                      external_url: extendedResource.external_url,
                       content_type: selectedResource.content_type,
                       iframe_url: url
                     });
@@ -1790,22 +1960,59 @@ export default function LearningsPage() {
             </div>
           )}
 
-          {selectedResource && (selectedResource.google_drive_id || selectedResource.external_url) && (
-            <div className="flex justify-end border-t border-gray-200 dark:border-gray-800 pt-4">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  const url = getDirectViewUrl(selectedResource);
-                  window.open(url, '_blank');
-                }}
-                className="gap-2"
-              >
-                <ExternalLink className="w-4 h-4" />
-                Open in Google Drive
-              </Button>
-            </div>
-          )}
+          {selectedResource && (() => {
+            const extendedResource = selectedResource as ModuleResourceExtended;
+            const hasPdf = hasUploadedFile(extendedResource);
+            const hasExternalContent = selectedResource.google_drive_id || extendedResource.external_url;
+
+            // Show footer only if there's external content or an uploaded PDF
+            if (!hasPdf && !hasExternalContent) return null;
+
+            return (
+              <div className="flex justify-end border-t border-gray-200 dark:border-gray-800 pt-4">
+                {hasPdf ? (
+                  // For uploaded PDFs, show View in New Tab button
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (pdfSignedUrl) {
+                        window.open(pdfSignedUrl, '_blank');
+                      }
+                    }}
+                    disabled={pdfLoading || !pdfSignedUrl}
+                    className="gap-2"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    View in New Tab
+                  </Button>
+                ) : (
+                  // For videos and legacy content
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const url = getDirectViewUrl(extendedResource);
+                      window.open(url, '_blank');
+                    }}
+                    className="gap-2"
+                  >
+                    {selectedResource.content_type === 'video' && isYouTubeUrl(extendedResource.external_url || '') ? (
+                      <>
+                        <Youtube className="w-4 h-4" />
+                        Open on YouTube
+                      </>
+                    ) : (
+                      <>
+                        <ExternalLink className="w-4 h-4" />
+                        Open in Google Drive
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
+            );
+          })()}
         </DialogContent>
       </Dialog>
 
