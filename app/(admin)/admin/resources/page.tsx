@@ -561,8 +561,8 @@ export default function AdminResourcesPage() {
     for (const file of Array.from(files)) {
       // Validate file type
       const ext = file.name.split('.').pop()?.toLowerCase();
-      if (!['pdf', 'ppt', 'pptx', 'doc', 'docx', 'xls', 'xlsx'].includes(ext || '')) {
-        toast.error(`${file.name}: Invalid file type. Accepted: PDF, PPT, PPTX, DOC, DOCX, XLS, XLSX`);
+      if (!['pdf', 'ppt', 'pptx', 'doc', 'docx', 'xls', 'xlsx', 'csv'].includes(ext || '')) {
+        toast.error(`${file.name}: Invalid file type. Accepted: PDF, PPT, PPTX, DOC, DOCX, XLS, XLSX, CSV`);
         continue;
       }
 

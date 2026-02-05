@@ -1,0 +1,52 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - img [ref=e6]
+      - heading "Rethink Systems" [level=1] [ref=e9]
+      - paragraph [ref=e10]: Your Learning Journey Starts Here
+    - generic [ref=e11]:
+      - generic [ref=e12]:
+        - generic [ref=e13]: Sign In to Your Account
+        - generic [ref=e14]: Choose how you'd like to sign in
+      - generic [ref=e15]:
+        - generic [ref=e16]:
+          - generic [ref=e17]:
+            - generic [ref=e18]: Mobile Number
+            - generic [ref=e19]:
+              - combobox "Select country code" [ref=e20]:
+                - generic:
+                  - generic:
+                    - generic: 🇮🇳
+                    - generic: "+91"
+                - img
+              - combobox [ref=e21]
+              - generic [ref=e22]:
+                - img [ref=e23]
+                - textbox "Mobile Number" [ref=e25]:
+                  - /placeholder: Enter your number
+          - button "Get Verification Code" [disabled]:
+            - text: Get Verification Code
+            - img
+          - paragraph [ref=e26]: We'll text you a 4-digit code
+        - generic [ref=e30]: Or
+        - button "Continue with Google" [ref=e31]:
+          - img
+          - text: Continue with Google
+        - paragraph [ref=e32]: Sign in with your registered email
+        - generic [ref=e36]: Admin Portal
+        - button "Sign in as Administrator" [ref=e37]:
+          - img
+          - text: Sign in as Administrator
+        - paragraph [ref=e38]: For administrators and team members only
+    - paragraph [ref=e39]:
+      - text: Questions? We're here to help
+      - link "shravan@naum.systems" [ref=e40] [cursor=pointer]:
+        - /url: mailto:shravan@naum.systems
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e46] [cursor=pointer]:
+    - img [ref=e47]
+  - alert [ref=e50]
+```

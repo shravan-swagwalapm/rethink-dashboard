@@ -32,6 +32,7 @@ const PDFViewer = dynamic(() => import('@/components/resources/pdf-viewer').then
 const DocViewer = dynamic(() => import('@/components/resources/doc-viewer').then(mod => ({ default: mod.DocViewer })), { ssr: false });
 const PPTViewer = dynamic(() => import('@/components/resources/ppt-viewer').then(mod => ({ default: mod.PPTViewer })), { ssr: false });
 const ExcelViewer = dynamic(() => import('@/components/resources/excel-viewer').then(mod => ({ default: mod.ExcelViewer })), { ssr: false });
+const CSVViewer = dynamic(() => import('@/components/resources/csv-viewer').then(mod => ({ default: mod.CSVViewer })), { ssr: false });
 
 type Tab = ResourceCategory;
 
@@ -49,7 +50,7 @@ export default function ResourcesPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [viewerState, setViewerState] = useState<{
-    type: 'pdf' | 'doc' | 'ppt' | 'excel' | null;
+    type: 'pdf' | 'doc' | 'ppt' | 'excel' | 'csv' | null;
     fileUrl: string;
     fileName: string;
   }>({ type: null, fileUrl: '', fileName: '' });
@@ -114,6 +115,8 @@ export default function ResourcesPage() {
         setViewerState({ type: 'ppt', fileUrl: signedUrl, fileName: resource.name });
       } else if (['xls', 'xlsx'].includes(fileType || '')) {
         setViewerState({ type: 'excel', fileUrl: signedUrl, fileName: resource.name });
+      } else if (fileType === 'csv') {
+        setViewerState({ type: 'csv', fileUrl: signedUrl, fileName: resource.name });
       } else {
         // Fallback: open in new tab
         window.open(signedUrl, '_blank');
@@ -417,6 +420,15 @@ export default function ResourcesPage() {
 
       {viewerState.type === 'excel' && (
         <ExcelViewer
+          fileUrl={viewerState.fileUrl}
+          fileName={viewerState.fileName}
+          isOpen={true}
+          onClose={closeViewer}
+        />
+      )}
+
+      {viewerState.type === 'csv' && (
+        <CSVViewer
           fileUrl={viewerState.fileUrl}
           fileName={viewerState.fileName}
           isOpen={true}

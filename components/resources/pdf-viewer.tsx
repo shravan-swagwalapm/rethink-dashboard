@@ -22,14 +22,17 @@ export function PDFViewer({ fileUrl, fileName, isOpen, onClose }: PDFViewerProps
   const [pageNumber, setPageNumber] = useState<number>(1);
   const [scale, setScale] = useState<number>(1.0);
   const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
     setLoading(false);
+    setError(null);
   };
 
   const onDocumentLoadError = (error: Error) => {
     console.error('PDF load error:', error);
+    setError('Failed to load PDF file. The file may be corrupted or inaccessible.');
     toast.error('Failed to load PDF');
     setLoading(false);
   };
@@ -56,7 +59,7 @@ export function PDFViewer({ fileUrl, fileName, isOpen, onClose }: PDFViewerProps
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0">
+      <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col p-0 overflow-hidden">
         <DialogHeader className="px-6 py-4 border-b">
           <div className="flex items-center justify-between">
             <DialogTitle className="text-lg font-semibold truncate pr-4">
@@ -117,25 +120,54 @@ export function PDFViewer({ fileUrl, fileName, isOpen, onClose }: PDFViewerProps
 
         {/* PDF Document */}
         <div className="flex-1 overflow-auto bg-muted/20 flex items-start justify-center p-6">
-          {loading && (
+          {loading && !error && (
             <div className="flex items-center justify-center h-full">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+              <div className="flex flex-col items-center gap-3">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+                <p className="text-sm text-muted-foreground">Loading PDF...</p>
+              </div>
             </div>
           )}
-          <Document
-            file={fileUrl}
-            onLoadSuccess={onDocumentLoadSuccess}
-            onLoadError={onDocumentLoadError}
-            loading=""
-            className="shadow-lg"
-          >
-            <Page
-              pageNumber={pageNumber}
-              scale={scale}
-              renderTextLayer={true}
-              renderAnnotationLayer={true}
-            />
-          </Document>
+
+          {error && (
+            <div className="flex flex-col items-center justify-center h-full gap-4 max-w-md text-center">
+              <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center">
+                <X className="w-8 h-8 text-destructive" />
+              </div>
+              <div>
+                <h3 className="font-semibold mb-2">Failed to Load PDF</h3>
+                <p className="text-sm text-muted-foreground">{error}</p>
+              </div>
+              <Button onClick={handleDownload} variant="outline">
+                <Download className="w-4 h-4 mr-2" />
+                Download Instead
+              </Button>
+            </div>
+          )}
+
+          {!error && (
+            <Document
+              file={{ url: fileUrl }}
+              onLoadSuccess={onDocumentLoadSuccess}
+              onLoadError={onDocumentLoadError}
+              loading=""
+              className="shadow-lg"
+              options={{
+                httpHeaders: {
+                  'Accept': 'application/pdf',
+                },
+                withCredentials: false,
+              }}
+            >
+              <Page
+                pageNumber={pageNumber}
+                scale={scale}
+                renderTextLayer={false}
+                renderAnnotationLayer={false}
+                className="shadow-lg"
+              />
+            </Document>
+          )}
         </div>
       </DialogContent>
     </Dialog>
