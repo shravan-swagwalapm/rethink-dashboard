@@ -10,8 +10,8 @@
 
 | Metric | Count |
 |--------|-------|
-| Total Bugs Reported | 8 |
-| Fixed & Verified | 8 |
+| Total Bugs Reported | 15 |
+| Fixed & Verified | 15 |
 | Features Completed | 3 |
 | UI Enhancements | 1 |
 | In Progress | 0 |
@@ -627,4 +627,179 @@ Then [your specific task here]
 
 ---
 
-*Last Updated: 2026-02-05 3:00 PM - Session 4 completed (1 bug fixed)*
+### Session 5 - 2026-02-05 (Evening) - RESOURCES SYSTEM FIXES
+
+**Time Started**: ~7:00 PM
+**Bugs Fixed This Session**: 7
+
+| Bug ID | Title | Status | Commit |
+|--------|-------|--------|--------|
+| BUG-009 | PDF/PPT Upload - Duration Column Not Found | 🟢 Fixed | `bdc416c` |
+| BUG-010 | PDF/PPT Upload - Thumbnail URL Column Not Found | 🟢 Fixed | `e3e480b` |
+| BUG-011 | PDF Dialog Not Opening + PPT Errors | 🟢 Fixed | `4b59ec8` |
+| BUG-012 | PATCH Route Non-existent Columns | 🟢 Fixed | `4ddda4a` |
+| BUG-013 | Generic Error Messages Hide Real Errors | 🟢 Fixed | `4ddda4a` |
+| BUG-014 | Cross-Cohort Resource Bleeding | 🟢 Fixed | `1b5d6cf` |
+| BUG-015 | Article/Video Upload - DB Constraint Violation | 🟢 Fixed | `d2130d2` |
+
+---
+
+## Bugs (Session 5)
+
+### BUG-009: PDF/PPT Upload - Duration Column Not Found
+
+**Status**: 🟢 Fixed
+
+**Error**: `Could not find the 'duration' column in 'resources' in the schema cache`
+
+**Root Cause**: API tried to insert `duration` field that doesn't exist in database schema.
+
+**Fix**: Removed `duration` from database insert in `app/api/admin/resources/route.ts`
+
+---
+
+### BUG-010: PDF/PPT Upload - Thumbnail URL Column Not Found
+
+**Status**: 🟢 Fixed
+
+**Error**: `Could not find the 'thumbnail_url' column in 'resources' in the schema cache`
+
+**Root Cause**: API tried to insert `thumbnail_url` field that doesn't exist in database schema.
+
+**Fix**: Removed `thumbnail_url` from both formData extraction and database insert.
+
+---
+
+### BUG-011: PDF Dialog Not Opening + PPT Upload Errors
+
+**Status**: 🟢 Fixed
+
+**Issue**: PDF file dialog wouldn't open; PPT uploads showed generic errors.
+
+**Root Cause**:
+- PDF and Presentations tabs were sharing the same `fileInputRef`
+- Generic error messages hid actual server errors
+
+**Fix**:
+- Added separate `pdfInputRef` for PDFs tab
+- Each tab now has its own file input element
+
+---
+
+### BUG-012: PATCH Route Non-existent Columns
+
+**Status**: 🟢 Fixed
+
+**Issue**: Editing resources would fail with schema errors.
+
+**Root Cause**: PATCH route at `app/api/admin/resources/[id]/route.ts` tried to update `thumbnail_url` and `duration`.
+
+**Fix**: Removed these fields from the PATCH update object.
+
+---
+
+### BUG-013: Generic Error Messages Hide Real Errors
+
+**Status**: 🟢 Fixed
+
+**Issue**: Toast showed generic "Failed to upload" without actual error details.
+
+**Fix**: Frontend now extracts and displays actual server error message in toast.
+
+---
+
+### BUG-014: Cross-Cohort Resource Bleeding
+
+**Status**: 🟢 Fixed
+
+**Issue**: Resources from Cohort 6 showing in Cohort 5.
+
+**Root Cause**:
+- Client used `activeCohortId` from multi-role system
+- API used legacy `profile.cohort_id` field
+- Client never passed cohort ID to API
+
+**Fix**:
+- Client now passes `activeCohortId` as query parameter
+- API validates user has access to requested cohort via `user_role_assignments`
+- Falls back to legacy `profile.cohort_id` if needed
+
+**Files Modified**:
+- `app/(dashboard)/resources/page.tsx` - passes cohort_id param
+- `app/api/resources/route.ts` - validates and uses passed cohort
+
+---
+
+### BUG-015: Article/Video Upload - Database Constraint Violation
+
+**Status**: 🟢 Fixed
+
+**Error**: `new row for relation "resources" violates check constraint "resources_type_check"`
+
+**Root Cause**:
+- Database constraint: `CHECK (type IN ('file', 'folder'))`
+- API tried to insert `type: 'link'` for articles/videos
+
+**Fix**: Changed to always use `type: 'file'` since `category` column now handles classification.
+
+**File**: `app/api/admin/resources/route.ts` line 142
+
+---
+
+## Key Files Modified (Session 5)
+
+### API Routes
+- `app/api/admin/resources/route.ts` - Main admin upload API (multiple fixes)
+- `app/api/admin/resources/[id]/route.ts` - PATCH route for editing
+- `app/api/resources/route.ts` - Student-facing API (cohort filtering)
+
+### Frontend Pages
+- `app/(admin)/admin/resources/page.tsx` - Admin upload interface (error messages, separate refs)
+- `app/(dashboard)/resources/page.tsx` - Student resources view (cohort param)
+
+---
+
+## Database Schema Notes (IMPORTANT for future reference)
+
+The `resources` table has these constraints that caused issues:
+
+1. **type column**: `CHECK (type IN ('file', 'folder'))` - Can ONLY be 'file' or 'folder', NOT 'link'
+2. **Missing columns**: `thumbnail_url` and `duration` don't exist in actual DB schema (TypeScript types are out of sync!)
+3. **category column**: Handles classification (video, article, pdf, presentation)
+4. **is_global column**: Determines if resource is global or cohort-specific
+
+### TypeScript vs Database Mismatch (TODO)
+The `types/index.ts` Resource interface defines `thumbnail_url` and `duration` but these columns DON'T EXIST in the database. A future task should either:
+- Add these columns via migration, OR
+- Remove them from TypeScript types
+
+---
+
+## Git Commits (Session 5)
+
+```
+d2130d2 Fix: Article/video upload failing - database constraint violation
+1b5d6cf Fix: Enforce proper cohort filtering in student resources
+4ddda4a Fix: Remove non-existent columns from PATCH route + improve error messages
+e3e480b Fix: Remove thumbnail_url from resources API insert
+bdc416c Fix: Remove 'duration' column from resources insert
+4b59ec8 Fix: Admin resources upload bugs - PDF dialog & PPT upload errors
+82e8933 Fix: Open documents directly in new tab instead of preview modal
+```
+
+---
+
+## Testing Checklist (After Deployment)
+
+- [ ] Upload article with title + URL → Should succeed
+- [ ] Upload video with title + URL → Should succeed
+- [ ] Upload PDF file → Should succeed
+- [ ] Upload PPT file → Should succeed
+- [ ] Edit a resource → Should succeed (no schema errors)
+- [ ] Student in Cohort 5 sees ONLY Cohort 5 resources
+- [ ] Student in Cohort 6 sees ONLY Cohort 6 resources
+- [ ] Error messages show actual server error (not generic "Failed")
+
+---
+
+*Last Updated: 2026-02-05 7:30 PM - Session 5 completed (7 resources bugs fixed)*
