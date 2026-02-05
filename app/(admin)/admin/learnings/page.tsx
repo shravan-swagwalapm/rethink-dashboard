@@ -1996,11 +1996,11 @@ export default function LearningsPage() {
 
       {/* Case Study Preview Modal */}
       <Dialog open={!!previewCaseStudy} onOpenChange={() => setPreviewCaseStudy(null)}>
-        <DialogContent className="max-w-4xl">
+        <DialogContent className="max-w-[95vw] w-[95vw] max-h-[95vh] h-[95vh] flex flex-col dark:bg-gray-900">
           <DialogHeader>
-            <DialogTitle>{previewCaseStudy?.title}</DialogTitle>
+            <DialogTitle className="dark:text-white">{previewCaseStudy?.title}</DialogTitle>
           </DialogHeader>
-          <div className="aspect-video bg-white rounded-lg overflow-hidden">
+          <div className="flex-1 min-h-0 bg-white dark:bg-black rounded-lg overflow-hidden">
             {previewCaseStudy && (
               <iframe
                 src={previewCaseStudy.url.replace('/edit', '/preview').replace('/view', '/preview')}
