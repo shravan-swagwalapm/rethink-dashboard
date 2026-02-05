@@ -163,7 +163,12 @@ export default function LearningsPage() {
   });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState(false);
+  const [uploadProgressPercent, setUploadProgressPercent] = useState<number>(0);
+  const [uploadStatus, setUploadStatus] = useState<'idle' | 'requesting-url' | 'uploading' | 'confirming' | 'complete'>('idle');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Direct upload threshold: files larger than 4MB bypass Vercel and upload directly to Supabase
+  const DIRECT_UPLOAD_THRESHOLD = 4 * 1024 * 1024; // 4MB
 
   // Case study form
   const [showCaseStudyForm, setShowCaseStudyForm] = useState(false);
@@ -386,6 +391,176 @@ export default function LearningsPage() {
     }
   };
 
+  // Large file upload function (bypasses Vercel's 4.5MB limit)
+  const uploadLargeFile = async (
+    file: File,
+    cohortId: string,
+    moduleId: string,
+    metadata: {
+      title: string;
+      contentType: 'slides' | 'document';
+      sessionNumber?: number;
+      orderIndex?: number;
+      durationSeconds?: number;
+    }
+  ): Promise<{ success: boolean; resource?: any; error?: string }> => {
+    try {
+      // Step 1: Request signed upload URL
+      setUploadStatus('requesting-url');
+      setUploadProgressPercent(0);
+
+      console.log('[Large Upload] Step 1: Requesting upload URL...', {
+        fileName: file.name,
+        fileSize: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
+      });
+
+      const urlResponse = await fetch('/api/admin/resources/upload-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filename: file.name,
+          fileSize: file.size,
+          contentType: file.type,
+          cohortId: cohortId === GLOBAL_LIBRARY_ID ? 'global' : cohortId,
+        }),
+      });
+
+      if (!urlResponse.ok) {
+        if (urlResponse.status === 413) {
+          throw new Error('File too large. Maximum upload size is 100MB.');
+        }
+
+        let errorMessage = 'Failed to get upload URL';
+        try {
+          const contentType = urlResponse.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const error = await urlResponse.json();
+            errorMessage = error.error || error.message || errorMessage;
+          } else {
+            errorMessage = `Upload URL request failed with status ${urlResponse.status}`;
+          }
+        } catch {
+          errorMessage = `Upload URL request failed with status ${urlResponse.status}`;
+        }
+
+        throw new Error(errorMessage);
+      }
+
+      const { uploadUrl, filePath, expiresAt } = await urlResponse.json();
+
+      console.log('[Large Upload] Step 1: Upload URL received', {
+        filePath,
+        expiresAt,
+      });
+
+      // Check if URL is about to expire (less than 1 minute left)
+      const expiresIn = new Date(expiresAt).getTime() - Date.now();
+      if (expiresIn < 60000) {
+        throw new Error('Upload URL expired. Please try again.');
+      }
+
+      // Step 2: Upload directly to Supabase Storage
+      setUploadStatus('uploading');
+
+      console.log('[Large Upload] Step 2: Uploading to Supabase Storage...');
+
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            const percent = Math.round((e.loaded / e.total) * 100);
+            setUploadProgressPercent(percent);
+            console.log(`[Large Upload] Upload progress: ${percent}%`);
+          }
+        });
+
+        xhr.addEventListener('load', () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            console.log('[Large Upload] Step 2: Upload complete!');
+            resolve();
+          } else {
+            console.error('[Large Upload] Upload failed:', xhr.status, xhr.statusText);
+            reject(new Error(`Upload failed with status ${xhr.status}`));
+          }
+        });
+
+        xhr.addEventListener('error', () => {
+          console.error('[Large Upload] Network error during upload');
+          reject(new Error('Network error during upload. Please check your connection.'));
+        });
+
+        xhr.addEventListener('timeout', () => {
+          console.error('[Large Upload] Upload timed out');
+          reject(new Error('Upload timed out. Please try again.'));
+        });
+
+        // Set timeout to 10 minutes for large files
+        xhr.timeout = 600000;
+
+        xhr.open('PUT', uploadUrl);
+        xhr.setRequestHeader('Content-Type', file.type);
+        xhr.send(file);
+      });
+
+      // Step 3: Confirm upload and create database record
+      setUploadStatus('confirming');
+      setUploadProgressPercent(100);
+
+      console.log('[Large Upload] Step 3: Confirming upload and creating DB record...');
+
+      const confirmResponse = await fetch('/api/admin/resources/confirm-upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filePath,
+          moduleId,
+          title: metadata.title,
+          contentType: metadata.contentType,
+          fileType: 'pdf',
+          fileSize: file.size,
+          sessionNumber: metadata.sessionNumber,
+          orderIndex: metadata.orderIndex,
+          durationSeconds: metadata.durationSeconds,
+        }),
+      });
+
+      if (!confirmResponse.ok) {
+        let errorMessage = 'Failed to confirm upload';
+        try {
+          const contentType = confirmResponse.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const error = await confirmResponse.json();
+            errorMessage = error.error || error.message || errorMessage;
+          } else {
+            errorMessage = `Confirmation failed with status ${confirmResponse.status}`;
+          }
+        } catch {
+          errorMessage = `Confirmation failed with status ${confirmResponse.status}`;
+        }
+
+        throw new Error(errorMessage);
+      }
+
+      const { resource } = await confirmResponse.json();
+
+      console.log('[Large Upload] Step 3: Complete! Resource created:', resource.id);
+
+      setUploadStatus('complete');
+      return { success: true, resource };
+
+    } catch (error) {
+      console.error('[Large Upload] Error:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Upload failed'
+      };
+    } finally {
+      setUploadStatus('idle');
+      setUploadProgressPercent(0);
+    }
+  };
+
   // Resource CRUD
   const handleCreateResource = async () => {
     // Validation based on content type
@@ -421,43 +596,84 @@ export default function LearningsPage() {
 
       // For PDFs, upload first
       if (selectedFile && resourceFormData.content_type !== 'video') {
-        const formData = new FormData();
-        formData.append('file', selectedFile);
-        formData.append('cohort_id', selectedCohort === GLOBAL_LIBRARY_ID ? 'global' : selectedCohort);
+        // Check file size and use appropriate upload method
+        if (selectedFile.size > DIRECT_UPLOAD_THRESHOLD) {
+          // Large file (>4MB): Use direct upload to bypass Vercel's 4.5MB limit
+          console.log('[Upload] Using direct upload for large file:', {
+            fileName: selectedFile.name,
+            fileSize: `${(selectedFile.size / 1024 / 1024).toFixed(2)} MB`,
+            threshold: `${(DIRECT_UPLOAD_THRESHOLD / 1024 / 1024).toFixed(0)} MB`,
+          });
 
-        const uploadResponse = await fetch('/api/admin/resources/upload', {
-          method: 'POST',
-          body: formData,
-        });
+          const result = await uploadLargeFile(
+            selectedFile,
+            selectedCohort,
+            targetModuleId,
+            {
+              title: resourceFormData.title,
+              contentType: resourceFormData.content_type as 'slides' | 'document',
+              sessionNumber: resourceFormData.session_number ? parseInt(resourceFormData.session_number) : undefined,
+              orderIndex: resourceFormData.order_index,
+              durationSeconds: resourceFormData.duration_seconds ? parseInt(resourceFormData.duration_seconds) : undefined,
+            }
+          );
 
-        if (!uploadResponse.ok) {
-          // Handle 413 Payload Too Large specifically
-          if (uploadResponse.status === 413) {
-            throw new Error('File too large. Maximum upload size is 100MB.');
+          if (!result.success) {
+            throw new Error(result.error || 'Upload failed');
           }
 
-          // Try to parse JSON error, but handle non-JSON responses gracefully
-          let errorMessage = 'Failed to upload file';
-          try {
-            const contentType = uploadResponse.headers.get('content-type');
-            if (contentType && contentType.includes('application/json')) {
-              const error = await uploadResponse.json();
-              errorMessage = error.error || error.message || errorMessage;
-            } else {
-              // Non-JSON response (likely HTML error page)
+          // Resource already created in confirm-upload step
+          toast.success('Resource added');
+          setShowResourceForm(false);
+          resetResourceForm();
+          fetchModules();
+          return; // Early return since resource is already created
+
+        } else {
+          // Small file (≤4MB): Use existing upload route (goes through Vercel)
+          console.log('[Upload] Using standard upload for small file:', {
+            fileName: selectedFile.name,
+            fileSize: `${(selectedFile.size / 1024 / 1024).toFixed(2)} MB`,
+          });
+
+          const formData = new FormData();
+          formData.append('file', selectedFile);
+          formData.append('cohort_id', selectedCohort === GLOBAL_LIBRARY_ID ? 'global' : selectedCohort);
+
+          const uploadResponse = await fetch('/api/admin/resources/upload', {
+            method: 'POST',
+            body: formData,
+          });
+
+          if (!uploadResponse.ok) {
+            // Handle 413 Payload Too Large specifically
+            if (uploadResponse.status === 413) {
+              throw new Error('File too large. Maximum upload size is 100MB.');
+            }
+
+            // Try to parse JSON error, but handle non-JSON responses gracefully
+            let errorMessage = 'Failed to upload file';
+            try {
+              const contentType = uploadResponse.headers.get('content-type');
+              if (contentType && contentType.includes('application/json')) {
+                const error = await uploadResponse.json();
+                errorMessage = error.error || error.message || errorMessage;
+              } else {
+                // Non-JSON response (likely HTML error page)
+                errorMessage = `Upload failed with status ${uploadResponse.status}`;
+              }
+            } catch {
               errorMessage = `Upload failed with status ${uploadResponse.status}`;
             }
-          } catch {
-            errorMessage = `Upload failed with status ${uploadResponse.status}`;
+
+            throw new Error(errorMessage);
           }
 
-          throw new Error(errorMessage);
+          const uploadData = await uploadResponse.json();
+          filePath = uploadData.file_path;
+          fileType = uploadData.file_type;
+          fileSize = uploadData.file_size;
         }
-
-        const uploadData = await uploadResponse.json();
-        filePath = uploadData.file_path;
-        fileType = uploadData.file_type;
-        fileSize = uploadData.file_size;
       }
 
       // Create resource record
@@ -1550,7 +1766,7 @@ export default function LearningsPage() {
                     <>
                       <Upload className="w-8 h-8 text-gray-400" />
                       <span className="text-sm text-gray-600 dark:text-gray-400">Click to select PDF file</span>
-                      <span className="text-xs text-gray-400">Max 50MB</span>
+                      <span className="text-xs text-gray-400">Max 100MB</span>
                     </>
                   )}
                 </Button>
@@ -1558,6 +1774,27 @@ export default function LearningsPage() {
                   <p className="text-xs text-amber-500 dark:text-amber-400">
                     Leave empty to keep existing file
                   </p>
+                )}
+
+                {/* Upload Progress Indicator */}
+                {selectedFile && uploadStatus === 'uploading' && (
+                  <div className="mt-3 space-y-2">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-600 dark:text-gray-400">Uploading...</span>
+                      <span className="font-medium tabular-nums text-blue-600 dark:text-blue-400">
+                        {uploadProgressPercent}%
+                      </span>
+                    </div>
+                    <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-blue-500 to-blue-600 transition-all duration-300 ease-out"
+                        style={{ width: `${uploadProgressPercent}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {(selectedFile.size / 1024 / 1024).toFixed(1)} MB • Direct upload to storage
+                    </p>
+                  </div>
                 )}
               </div>
             )}
@@ -1610,10 +1847,16 @@ export default function LearningsPage() {
               className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white"
             >
               {saving ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  {uploadProgress ? 'Uploading...' : 'Saving...'}
-                </>
+                <div className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  {uploadStatus === 'requesting-url' && 'Preparing...'}
+                  {uploadStatus === 'uploading' && (
+                    <span className="tabular-nums">{uploadProgressPercent}%</span>
+                  )}
+                  {uploadStatus === 'confirming' && 'Saving...'}
+                  {uploadStatus === 'idle' && uploadProgress && 'Uploading...'}
+                  {uploadStatus === 'idle' && !uploadProgress && 'Saving...'}
+                </div>
               ) : (
                 editingResource ? 'Update' : 'Add'
               )}
