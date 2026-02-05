@@ -1,6 +1,10 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 
+// Route segment config for large file uploads (up to 100MB)
+export const maxDuration = 120; // 2 minutes timeout for large uploads
+export const dynamic = 'force-dynamic'; // Disable caching for file uploads
+
 async function verifyAdmin() {
   const supabase = await createClient();
   const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -80,6 +84,15 @@ export async function POST(request: NextRequest) {
 
     if (!file) {
       return NextResponse.json({ error: 'File is required' }, { status: 400 });
+    }
+
+    // Validate file size (100MB max to match Supabase Storage bucket limit)
+    const maxSize = 100 * 1024 * 1024; // 100MB in bytes
+    if (file.size > maxSize) {
+      return NextResponse.json(
+        { error: 'File too large. Maximum file size is 100MB.' },
+        { status: 413 }
+      );
     }
 
     if (!cohortIdParam) {

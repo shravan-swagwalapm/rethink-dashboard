@@ -63,11 +63,13 @@ import {
   Info,
   Upload,
   Youtube,
+  Download,
 } from 'lucide-react';
 import { isYouTubeUrl, getYouTubeEmbedUrl } from '@/lib/utils/youtube-url';
 import { format } from 'date-fns';
 import type { Cohort, LearningModule, ModuleResource, LearningModuleWithResources, CaseStudy } from '@/types';
 import { cn } from '@/lib/utils';
+import { ResourcePreviewModal } from '@/components/learnings';
 
 // Helper to detect content type from URL
 function detectContentType(url: string): 'video' | 'slides' | 'document' | 'link' {
@@ -429,8 +431,27 @@ export default function LearningsPage() {
         });
 
         if (!uploadResponse.ok) {
-          const error = await uploadResponse.json();
-          throw new Error(error.error || 'Failed to upload file');
+          // Handle 413 Payload Too Large specifically
+          if (uploadResponse.status === 413) {
+            throw new Error('File too large. Maximum upload size is 100MB.');
+          }
+
+          // Try to parse JSON error, but handle non-JSON responses gracefully
+          let errorMessage = 'Failed to upload file';
+          try {
+            const contentType = uploadResponse.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+              const error = await uploadResponse.json();
+              errorMessage = error.error || error.message || errorMessage;
+            } else {
+              // Non-JSON response (likely HTML error page)
+              errorMessage = `Upload failed with status ${uploadResponse.status}`;
+            }
+          } catch {
+            errorMessage = `Upload failed with status ${uploadResponse.status}`;
+          }
+
+          throw new Error(errorMessage);
         }
 
         const uploadData = await uploadResponse.json();
@@ -498,8 +519,27 @@ export default function LearningsPage() {
         });
 
         if (!uploadResponse.ok) {
-          const error = await uploadResponse.json();
-          throw new Error(error.error || 'Failed to upload file');
+          // Handle 413 Payload Too Large specifically
+          if (uploadResponse.status === 413) {
+            throw new Error('File too large. Maximum upload size is 100MB.');
+          }
+
+          // Try to parse JSON error, but handle non-JSON responses gracefully
+          let errorMessage = 'Failed to upload file';
+          try {
+            const contentType = uploadResponse.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+              const error = await uploadResponse.json();
+              errorMessage = error.error || error.message || errorMessage;
+            } else {
+              // Non-JSON response (likely HTML error page)
+              errorMessage = `Upload failed with status ${uploadResponse.status}`;
+            }
+          } catch {
+            errorMessage = `Upload failed with status ${uploadResponse.status}`;
+          }
+
+          throw new Error(errorMessage);
         }
 
         const uploadData = await uploadResponse.json();
@@ -1478,8 +1518,8 @@ export default function LearningsPage() {
                         toast.error('Please select a PDF file');
                         return;
                       }
-                      if (file.size > 50 * 1024 * 1024) {
-                        toast.error('File size must be less than 50MB');
+                      if (file.size > 100 * 1024 * 1024) {
+                        toast.error('File size must be less than 100MB');
                         return;
                       }
                       setSelectedFile(file);
@@ -1697,32 +1737,19 @@ export default function LearningsPage() {
       </Dialog>
 
       {/* Resource Preview Modal */}
-      <Dialog open={!!previewResource} onOpenChange={() => setPreviewResource(null)}>
-        <DialogContent className="max-w-[95vw] w-[95vw] max-h-[95vh] h-[95vh] sm:max-w-[95vw] flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              {previewResource && getContentIcon(previewResource.content_type)}
-              {previewResource?.title}
-            </DialogTitle>
-          </DialogHeader>
-
-          {/* Content Display */}
-          {previewResource && (
-            <div className="w-full flex-1 min-h-0">
-              <iframe
-                src={previewResource.google_drive_id
-                  ? `https://drive.google.com/file/d/${previewResource.google_drive_id}/preview`
-                  : getEmbedUrl(previewResource)
-                }
-                className="w-full h-full rounded-lg"
-                allow="autoplay; encrypted-media; fullscreen"
-                allowFullScreen
-                title={previewResource.title}
-              />
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <ResourcePreviewModal
+        resource={previewResource}
+        onClose={() => setPreviewResource(null)}
+        isAdmin={true}
+        onEdit={(resource) => {
+          setPreviewResource(null);
+          openEditResource(resource);
+        }}
+        onDelete={(resourceId) => {
+          setPreviewResource(null);
+          handleDeleteResource(resourceId);
+        }}
+      />
 
       {/* Case Study Preview Modal */}
       <Dialog open={!!previewCaseStudy} onOpenChange={() => setPreviewCaseStudy(null)}>
