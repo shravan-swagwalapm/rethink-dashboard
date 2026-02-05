@@ -407,30 +407,30 @@ export function UniversalViewer({ fileUrl, fileName, fileType, isOpen, onClose }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-7xl max-h-[95vh] w-[95vw] flex flex-col p-0 overflow-hidden border-2 dark:border-primary/20 shadow-2xl shadow-primary/10">
+      <DialogContent className="fixed inset-0 w-screen h-screen max-w-none translate-x-0 translate-y-0 top-0 left-0 flex flex-col p-0 overflow-hidden border-0 rounded-none shadow-none m-0">
         {/* Futuristic top accent gradient with glow */}
         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary via-accent to-primary animate-gradient-x" />
 
-        {/* Header with gradient background and enhanced styling */}
-        <DialogHeader className="relative px-6 py-5 flex-shrink-0 bg-gradient-to-br from-card via-card/95 to-primary/5 dark:from-card dark:via-card/95 dark:to-primary/10 border-b-2 border-primary/20 dark:border-primary/30">
+        {/* Header with gradient background and enhanced styling - compact for full screen */}
+        <DialogHeader className="relative px-4 py-3 flex-shrink-0 bg-gradient-to-br from-card via-card/95 to-primary/5 dark:from-card dark:via-card/95 dark:to-primary/10 border-b border-primary/20 dark:border-primary/30">
           {/* Decorative cyber grid pattern */}
           <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05] pointer-events-none grid-pattern" />
 
           <div className="relative flex items-center justify-between gap-4">
             {/* Enhanced file info with icon and badge */}
             <div className="flex items-center gap-4 flex-1 min-w-0">
-              {/* Animated file icon with gradient */}
+              {/* Animated file icon with gradient - compact */}
               <motion.div
                 initial={{ scale: 0.8, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ duration: 0.3 }}
-                className={`w-14 h-14 rounded-xl bg-gradient-to-br ${iconColor} flex items-center justify-center text-white shadow-lg hover:scale-110 transition-transform duration-300 animate-breathe`}
+                className={`w-10 h-10 rounded-lg bg-gradient-to-br ${iconColor} flex items-center justify-center text-white shadow-lg hover:scale-110 transition-transform duration-300`}
               >
-                <FileIcon className="w-7 h-7" />
+                <FileIcon className="w-5 h-5" />
               </motion.div>
 
               <div className="flex-1 min-w-0">
-                <DialogTitle className="text-xl font-bold truncate pr-4 flex items-center gap-2 dark:text-white">
+                <DialogTitle className="text-base font-bold truncate pr-4 flex items-center gap-2 dark:text-white">
                   <span className="truncate">{fileName}</span>
                 </DialogTitle>
                 <div className="flex items-center gap-2 mt-1">
@@ -476,8 +476,8 @@ export function UniversalViewer({ fileUrl, fileName, fileType, isOpen, onClose }
           </div>
         </DialogHeader>
 
-        {/* Main content area with enhanced background */}
-        <div className="flex-1 overflow-hidden relative bg-gradient-to-br from-muted/5 via-background to-muted/10 dark:from-muted/10 dark:via-background dark:to-primary/5" style={{ minHeight: '65vh' }}>
+        {/* Main content area with enhanced background - full viewport */}
+        <div className="flex-1 overflow-hidden relative bg-gradient-to-br from-muted/5 via-background to-muted/10 dark:from-muted/10 dark:via-background dark:to-primary/5">
           {/* Subtle dot pattern background */}
           <div className="absolute inset-0 opacity-[0.02] dark:opacity-[0.04] pointer-events-none dot-pattern" />
 
@@ -669,35 +669,26 @@ export function UniversalViewer({ fileUrl, fileName, fileType, isOpen, onClose }
           )}
         </div>
 
-        {/* Enhanced Footer with keyboard shortcuts and viewer info */}
-        <div className="relative px-6 py-4 border-t-2 border-primary/20 bg-gradient-to-br from-muted/30 via-card to-primary/5 dark:from-muted/20 dark:via-card dark:to-primary/10 flex-shrink-0">
-          {/* Decorative top border glow */}
-          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
-
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs">
-            {/* Viewer info */}
-            <div className="flex items-center gap-3 text-muted-foreground">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                <span className="font-medium">Viewing with {getViewerName()}</span>
-              </div>
+        {/* Compact Footer - minimal for full screen viewing */}
+        <div className="relative px-4 py-2 border-t border-primary/10 bg-gradient-to-r from-muted/20 via-card/50 to-muted/20 flex-shrink-0">
+          <div className="flex items-center justify-between gap-3 text-[10px] text-muted-foreground">
+            {/* Viewer info - compact */}
+            <div className="flex items-center gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+              <span>{getViewerName()}</span>
               {state.strategy !== 'none' && (
-                <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 border-primary/30">
+                <Badge variant="outline" className="text-[9px] px-1 py-0 border-primary/20 h-4">
                   {state.strategy}
                 </Badge>
               )}
             </div>
 
-            {/* Keyboard shortcuts hint */}
-            <div className="hidden lg:flex items-center gap-2 text-muted-foreground">
-              <Keyboard className="w-3.5 h-3.5" />
-              <span>Press <kbd className="px-1.5 py-0.5 rounded bg-muted border text-[10px] font-mono">ESC</kbd> to close</span>
+            {/* Keyboard shortcut - compact */}
+            <div className="hidden md:flex items-center gap-1.5">
+              <span>Press</span>
+              <kbd className="px-1 py-0.5 rounded bg-muted border text-[9px] font-mono">ESC</kbd>
+              <span>to close</span>
             </div>
-
-            {/* Download recommendation */}
-            <span className="text-muted-foreground text-center sm:text-right">
-              For best experience, download and open in native app
-            </span>
           </div>
         </div>
       </DialogContent>
