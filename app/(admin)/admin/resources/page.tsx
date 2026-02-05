@@ -460,11 +460,18 @@ export default function AdminResourcesPage() {
           body: formData,
         });
 
-        if (!response.ok) throw new Error('Upload failed');
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || `Upload failed (${response.status})`);
+        }
         successCount++;
       } catch (error) {
         console.error('Video upload error:', error);
         failCount++;
+        // Show specific error for the first failure
+        if (failCount === 1 && error instanceof Error) {
+          toast.error(`Video upload failed: ${error.message}`);
+        }
       }
     }
 
@@ -475,8 +482,8 @@ export default function AdminResourcesPage() {
       setVideoRows([{ id: generateId(), title: '', url: '', thumbnailUrl: '', duration: '' }]);
       fetchResources();
     }
-    if (failCount > 0) {
-      toast.error(`Failed to upload ${failCount} video${failCount > 1 ? 's' : ''}`);
+    if (failCount > 1) {
+      toast.error(`Failed to upload ${failCount} videos total`);
     }
   };
 
@@ -530,11 +537,18 @@ export default function AdminResourcesPage() {
           body: formData,
         });
 
-        if (!response.ok) throw new Error('Upload failed');
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || `Upload failed (${response.status})`);
+        }
         successCount++;
       } catch (error) {
         console.error('Article upload error:', error);
         failCount++;
+        // Show specific error for the first failure
+        if (failCount === 1 && error instanceof Error) {
+          toast.error(`Article upload failed: ${error.message}`);
+        }
       }
     }
 
@@ -545,8 +559,8 @@ export default function AdminResourcesPage() {
       setArticleRows([{ id: generateId(), title: '', url: '' }]);
       fetchResources();
     }
-    if (failCount > 0) {
-      toast.error(`Failed to upload ${failCount} article${failCount > 1 ? 's' : ''}`);
+    if (failCount > 1) {
+      toast.error(`Failed to upload ${failCount} articles total`);
     }
   };
 

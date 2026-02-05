@@ -79,8 +79,6 @@ export async function PATCH(
 
     if (body.name !== undefined) updateData.name = body.name;
     if (body.external_url !== undefined) updateData.external_url = body.external_url;
-    if (body.thumbnail_url !== undefined) updateData.thumbnail_url = body.thumbnail_url;
-    if (body.duration !== undefined) updateData.duration = body.duration;
     if (body.category !== undefined) updateData.category = body.category;
     if (body.is_global !== undefined) updateData.is_global = body.is_global;
     if (body.cohort_id !== undefined) updateData.cohort_id = body.cohort_id;
