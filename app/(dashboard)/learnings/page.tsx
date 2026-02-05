@@ -1902,13 +1902,24 @@ export default function LearningsPage() {
                   })()}
                   onLoad={() => {
                     console.log('[Learnings] Iframe loaded successfully');
-                    // For PDFs, add small delay to ensure PDF viewer has rendered content
+                    // For PDFs, add delay to ensure PDF viewer has fully rendered and painted content
                     const hasPdf = hasUploadedFile(selectedResource as ModuleResource);
-                    const delay = hasPdf ? 500 : 0;
-                    setTimeout(() => {
+                    if (hasPdf) {
+                      // Wait for 2 animation frames (ensures 2 paint cycles)
+                      requestAnimationFrame(() => {
+                        requestAnimationFrame(() => {
+                          // Then add additional 800ms for PDF.js to fully render pages
+                          setTimeout(() => {
+                            setIframeLoading(false);
+                            setIframeError(false);
+                          }, 800);
+                        });
+                      });
+                    } else {
+                      // Videos: instant reveal
                       setIframeLoading(false);
                       setIframeError(false);
-                    }, delay);
+                    }
                   }}
                   onError={(e) => {
                     console.error('[Learnings] Iframe load error:', e);

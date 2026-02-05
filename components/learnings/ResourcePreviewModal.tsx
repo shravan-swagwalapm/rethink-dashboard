@@ -395,12 +395,24 @@ export function ResourcePreviewModal({
               })()}
               onLoad={() => {
                 console.log('[ResourcePreview] Iframe loaded successfully');
-                // For PDFs, add small delay to ensure PDF viewer has rendered content
-                const delay = hasPdf ? 500 : 0;
-                setTimeout(() => {
+                // For PDFs, add delay to ensure PDF viewer has fully rendered and painted content
+                // Using requestAnimationFrame ensures we wait for actual paint cycles
+                if (hasPdf) {
+                  // Wait for 2 animation frames (ensures 2 paint cycles)
+                  requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                      // Then add additional 800ms for PDF.js to fully render pages
+                      setTimeout(() => {
+                        setIframeLoading(false);
+                        setIframeError(false);
+                      }, 800);
+                    });
+                  });
+                } else {
+                  // Videos: instant reveal
                   setIframeLoading(false);
                   setIframeError(false);
-                }, delay);
+                }
               }}
               onError={(e) => {
                 console.error('[ResourcePreview] Iframe load error:', e);
