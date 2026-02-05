@@ -76,7 +76,6 @@ export async function POST(request: Request) {
     const cohortId = formData.get('cohort_id') as string | null;
     const externalUrl = formData.get('external_url') as string | null;
     const thumbnailUrl = formData.get('thumbnail_url') as string | null;
-    const duration = formData.get('duration') as string | null;
     const file = formData.get('file') as File | null;
 
     if (!name || !category) {
@@ -139,7 +138,6 @@ export async function POST(request: Request) {
         cohort_id: isGlobal ? null : cohortId,
         external_url: externalUrl,
         thumbnail_url: thumbnailUrl,
-        duration: duration,
         file_path: filePath,
         file_size: fileSize,
         file_type: fileType,
