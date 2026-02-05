@@ -18,10 +18,10 @@ export async function GET(
     const { id } = await params;
     const resourceId = id;
 
-    // Get resource details
+    // Get resource details (include file_type for expiry calculation)
     const { data: resource, error: resourceError } = await supabase
       .from('resources')
-      .select('file_path, cohort_id, is_global')
+      .select('file_path, cohort_id, is_global, file_type')
       .eq('id', resourceId)
       .single();
 
@@ -40,18 +40,24 @@ export async function GET(
       .eq('id', user.id)
       .single();
 
-    // Check access: global resources OR user's cohort matches
-    const hasAccess = resource.is_global || 
-                      (profile?.cohort_id === resource.cohort_id);
+    // Check access: global resources OR user's cohort matches (both must be non-null)
+    const hasAccess = resource.is_global ||
+                      (profile?.cohort_id && profile.cohort_id === resource.cohort_id);
 
     if (!hasAccess) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
-    // Generate signed URL (60 second expiry for security)
+    // Generate signed URL with appropriate expiry
+    // PPT files need longer expiry for Office Online (1 hour)
+    // Other files use shorter expiry for security (5 minutes)
+    const fileType = resource.file_type?.toLowerCase();
+    const isPPT = fileType === 'ppt' || fileType === 'pptx';
+    const expirySeconds = isPPT ? 3600 : 300;
+
     const { data: signedUrl, error: signedError } = await supabase.storage
       .from('resources')
-      .createSignedUrl(resource.file_path, 60);
+      .createSignedUrl(resource.file_path, expirySeconds);
 
     if (signedError || !signedUrl) {
       return NextResponse.json({ error: 'Failed to generate URL' }, { status: 500 });

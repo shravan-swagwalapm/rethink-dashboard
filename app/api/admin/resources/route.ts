@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient, createClient } from '@/lib/supabase/server';
+import { isAdminRole } from '@/lib/utils/auth';
 
 // GET: List all resources (admin view - no filtering)
 export async function GET(request: Request) {
@@ -18,8 +19,8 @@ export async function GET(request: Request) {
       .eq('id', user.id)
       .single();
 
-    if (!profile || !['admin', 'super_admin', 'company_user'].includes(profile.role)) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (!isAdminRole(profile?.role)) {
+      return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
     }
 
     // Parse query parameters
@@ -55,6 +56,17 @@ export async function POST(request: Request) {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Verify admin role
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    if (!isAdminRole(profile?.role)) {
+      return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
     }
 
     const formData = await request.formData();

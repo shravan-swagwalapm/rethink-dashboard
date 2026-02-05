@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import mammoth from 'mammoth';
+import DOMPurify from 'isomorphic-dompurify';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Download, X } from 'lucide-react';
@@ -36,10 +37,15 @@ export function DocViewer({ fileUrl, fileName, isOpen, onClose }: DocViewerProps
         // Convert to HTML using mammoth
         const result = await mammoth.convertToHtml({ arrayBuffer });
 
-        // Basic sanitization - remove potentially harmful tags
-        const sanitized = result.value
-          .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-          .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '');
+        // Comprehensive sanitization using DOMPurify
+        const sanitized = DOMPurify.sanitize(result.value, {
+          ALLOWED_TAGS: ['p', 'br', 'b', 'i', 'u', 'strong', 'em', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+                         'ul', 'ol', 'li', 'table', 'tr', 'td', 'th', 'thead', 'tbody', 'span', 'div',
+                         'a', 'img', 'blockquote', 'code', 'pre'],
+          ALLOWED_ATTR: ['class', 'href', 'src', 'alt', 'title'],
+          FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'input', 'style'],
+          FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'onblur'],
+        });
 
         setHtml(sanitized);
         setLoading(false);

@@ -37,12 +37,16 @@ export async function GET(request: Request) {
     // CRITICAL LOGIC: Check if there are any global resources for this category
     let hasGlobalResources = false;
 
-    const { count: globalCount } = await supabase
+    let globalQuery = supabase
       .from('resources')
       .select('*', { count: 'exact', head: true })
-      .eq('is_global', true)
-      .eq('category', category || '');
+      .eq('is_global', true);
 
+    if (category) {
+      globalQuery = globalQuery.eq('category', category);
+    }
+
+    const { count: globalCount } = await globalQuery;
     hasGlobalResources = (globalCount || 0) > 0;
 
     // Build query based on global override logic
@@ -66,9 +70,10 @@ export async function GET(request: Request) {
       query = query.eq('category', category);
     }
 
-    // Apply text search if provided
+    // Apply text search if provided (sanitize to prevent injection)
     if (search) {
-      query = query.or(`name.ilike.%${search}%,keywords.cs.{${search}}`);
+      const sanitizedSearch = search.replace(/[%_\\]/g, '\\$&').replace(/[{}]/g, '');
+      query = query.or(`name.ilike.%${sanitizedSearch}%,keywords.cs.{${sanitizedSearch}}`);
     }
 
     const { data: resources, error } = await query;
