@@ -400,10 +400,7 @@ export function UniversalViewer({ fileUrl, fileName, fileType, isOpen, onClose }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent
-        className="fixed inset-0 w-screen h-screen max-w-none translate-x-0 translate-y-0 top-0 left-0 flex flex-col p-0 overflow-hidden border-0 rounded-none m-0"
-        style={{ transform: 'none' }}
-      >
+      <DialogContent className="w-[80vw] h-[80vh] max-w-[80vw] flex flex-col p-0 overflow-hidden">
         <DialogHeader className="px-4 py-2 border-b flex-shrink-0 bg-background/95 backdrop-blur-sm">
           <div className="flex items-center justify-between">
             <DialogTitle className="text-sm font-semibold truncate pr-4 flex items-center gap-2">
