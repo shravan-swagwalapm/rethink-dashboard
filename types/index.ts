@@ -186,6 +186,11 @@ export interface ModuleResource {
   order_index: number;
   session_number: number | null;
   created_at: string;
+
+  // File storage fields (for uploaded PDFs/documents)
+  file_path?: string | null;
+  file_type?: string | null;
+  file_size?: number | null;
 }
 
 export interface ResourceProgress {

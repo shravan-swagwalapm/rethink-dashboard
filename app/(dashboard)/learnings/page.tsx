@@ -41,13 +41,6 @@ import { toast } from 'sonner';
 import { isYouTubeUrl, getYouTubeEmbedUrl, getYouTubeWatchUrl } from '@/lib/utils/youtube-url';
 import type { LearningModule, ModuleResource, ModuleResourceType, CaseStudy, ResourceProgress, ResourceFavorite } from '@/types';
 
-// Extended ModuleResource interface with file fields
-interface ModuleResourceExtended extends ModuleResource {
-  file_path?: string | null;
-  file_type?: string | null;
-  file_size?: number | null;
-}
-
 interface ModuleWithResources extends LearningModule {
   resources: ModuleResource[];
 }
@@ -110,7 +103,7 @@ function getContentGradient(type: ModuleResourceType): { from: string; to: strin
 
 // Get embed URL for content
 // Supports: YouTube videos, PDF files (via signed URL), legacy Google Drive
-function getEmbedUrl(resource: ModuleResourceExtended): string {
+function getEmbedUrl(resource: ModuleResource): string {
   // For videos: Check YouTube first
   if (resource.content_type === 'video') {
     if (resource.external_url && isYouTubeUrl(resource.external_url)) {
@@ -143,7 +136,7 @@ function getEmbedUrl(resource: ModuleResourceExtended): string {
 }
 
 // Get direct view URL for opening in new tab
-function getDirectViewUrl(resource: ModuleResourceExtended): string {
+function getDirectViewUrl(resource: ModuleResource): string {
   // For YouTube videos
   if (resource.content_type === 'video' && resource.external_url && isYouTubeUrl(resource.external_url)) {
     return getYouTubeWatchUrl(resource.external_url) || resource.external_url;
@@ -166,7 +159,7 @@ function getDirectViewUrl(resource: ModuleResourceExtended): string {
 }
 
 // Check if resource has an uploaded PDF file
-function hasUploadedFile(resource: ModuleResourceExtended): boolean {
+function hasUploadedFile(resource: ModuleResource): boolean {
   return !!resource.file_path && resource.content_type !== 'video';
 }
 
@@ -803,7 +796,7 @@ export default function LearningsPage() {
         return;
       }
 
-      const extendedResource = selectedResource as ModuleResourceExtended;
+      const extendedResource = selectedResource as ModuleResource;
 
       // Only fetch for PDFs with file_path (uploaded to Supabase Storage)
       if (extendedResource.file_path && extendedResource.content_type !== 'video') {
@@ -1691,7 +1684,7 @@ export default function LearningsPage() {
               {selectedResource && (
                 <div className="flex items-center gap-3 mr-12">
                   {/* PDF View/Download buttons - only show for uploaded PDFs */}
-                  {hasUploadedFile(selectedResource as ModuleResourceExtended) && (
+                  {hasUploadedFile(selectedResource as ModuleResource) && (
                     <>
                       <Button
                         variant="outline"
@@ -1787,7 +1780,7 @@ export default function LearningsPage() {
                       {selectedResource.content_type === 'video' && (
                         <Button
                           onClick={() => {
-                            const url = getDirectViewUrl(selectedResource as ModuleResourceExtended);
+                            const url = getDirectViewUrl(selectedResource as ModuleResource);
                             window.open(url, '_blank');
                           }}
                           variant="outline"
@@ -1795,7 +1788,7 @@ export default function LearningsPage() {
                           className="gap-2 border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
                         >
                           <Youtube className="w-4 h-4" />
-                          {isYouTubeUrl((selectedResource as ModuleResourceExtended).external_url || '')
+                          {isYouTubeUrl((selectedResource as ModuleResource).external_url || '')
                             ? 'Watch on YouTube'
                             : 'Watch in Google Drive'}
                         </Button>
@@ -1832,17 +1825,17 @@ export default function LearningsPage() {
                         {selectedResource.content_type === 'video' ? (
                           <Button
                             onClick={() => {
-                              const url = getDirectViewUrl(selectedResource as ModuleResourceExtended);
+                              const url = getDirectViewUrl(selectedResource as ModuleResource);
                               window.open(url, '_blank');
                             }}
                             className="gap-2 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
                           >
                             <Youtube className="w-4 h-4" />
-                            {isYouTubeUrl((selectedResource as ModuleResourceExtended).external_url || '')
+                            {isYouTubeUrl((selectedResource as ModuleResource).external_url || '')
                               ? 'Watch on YouTube'
                               : 'Watch in Google Drive'}
                           </Button>
-                        ) : hasUploadedFile(selectedResource as ModuleResourceExtended) && pdfSignedUrl ? (
+                        ) : hasUploadedFile(selectedResource as ModuleResource) && pdfSignedUrl ? (
                           <Button
                             onClick={() => window.open(pdfSignedUrl, '_blank')}
                             className="gap-2 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
@@ -1853,7 +1846,7 @@ export default function LearningsPage() {
                         ) : (
                           <Button
                             onClick={() => {
-                              const url = getDirectViewUrl(selectedResource as ModuleResourceExtended);
+                              const url = getDirectViewUrl(selectedResource as ModuleResource);
                               window.open(url, '_blank');
                             }}
                             className="gap-2 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
@@ -1878,7 +1871,7 @@ export default function LearningsPage() {
                 )}
                 <iframe
                   src={(() => {
-                    const extendedResource = selectedResource as ModuleResourceExtended;
+                    const extendedResource = selectedResource as ModuleResource;
 
                     // For PDFs with file_path (uploaded to Supabase Storage), use the signed URL
                     if (hasUploadedFile(extendedResource)) {
@@ -1961,7 +1954,7 @@ export default function LearningsPage() {
           )}
 
           {selectedResource && (() => {
-            const extendedResource = selectedResource as ModuleResourceExtended;
+            const extendedResource = selectedResource as ModuleResource;
             const hasPdf = hasUploadedFile(extendedResource);
             const hasExternalContent = selectedResource.google_drive_id || extendedResource.external_url;
 
