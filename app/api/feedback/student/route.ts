@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 
 // GET - List feedback given by the current student
@@ -8,10 +8,11 @@ export async function GET(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+    const adminClient = await createAdminClient();
     const { searchParams } = new URL(request.url);
     const targetType = searchParams.get('target_type');
 
-    let query = supabase
+    let query = adminClient
       .from('student_feedback')
       .select('*')
       .eq('student_id', user.id)
@@ -36,6 +37,7 @@ export async function POST(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+    const adminClient = await createAdminClient();
     const body = await request.json();
     const { target_type, target_id, rating, comment, week_number } = body;
 
@@ -47,7 +49,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Rating must be 1-5' }, { status: 400 });
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await adminClient
       .from('student_feedback')
       .upsert({
         student_id: user.id,

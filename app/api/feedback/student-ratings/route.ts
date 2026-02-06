@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 
 // GET - Aggregate ratings received by a student from mentors
@@ -8,7 +8,9 @@ export async function GET(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { data: feedback } = await supabase
+    const adminClient = await createAdminClient();
+
+    const { data: feedback } = await adminClient
       .from('mentor_feedback')
       .select('rating, week_number, type')
       .eq('student_id', user.id);

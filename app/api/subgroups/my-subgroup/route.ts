@@ -1,9 +1,10 @@
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 
 // GET - Student's subgroup with mentor + peers
 export async function GET() {
   try {
+    // Auth check via user-scoped client
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -11,8 +12,11 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Use admin client for data queries (bypasses RLS)
+    const adminClient = await createAdminClient();
+
     // Find the student's subgroup membership
-    const { data: membership } = await supabase
+    const { data: membership } = await adminClient
       .from('subgroup_members')
       .select('subgroup_id')
       .eq('user_id', user.id)
@@ -23,8 +27,8 @@ export async function GET() {
       return NextResponse.json({ data: null }); // Not assigned yet
     }
 
-    // Fetch subgroup details
-    const { data: subgroup } = await supabase
+    // Fetch subgroup details with cohort name
+    const { data: subgroup } = await adminClient
       .from('subgroups')
       .select('id, name, cohort_id')
       .eq('id', membership.subgroup_id)
@@ -34,20 +38,19 @@ export async function GET() {
       return NextResponse.json({ data: null });
     }
 
-    // Fetch cohort name
-    const { data: cohort } = await supabase
+    const { data: cohort } = await adminClient
       .from('cohorts')
       .select('name')
       .eq('id', subgroup.cohort_id)
       .single();
 
-    // Fetch members and mentors in parallel (RLS will filter to own subgroup)
+    // Fetch members and mentors in parallel
     const [{ data: members }, { data: mentors }] = await Promise.all([
-      supabase
+      adminClient
         .from('subgroup_members')
         .select('user_id, user:profiles(id, full_name, email, phone, avatar_url, linkedin_url, portfolio_url)')
         .eq('subgroup_id', subgroup.id),
-      supabase
+      adminClient
         .from('subgroup_mentors')
         .select('user_id, user:profiles(id, full_name, email, phone, avatar_url, linkedin_url, portfolio_url)')
         .eq('subgroup_id', subgroup.id),

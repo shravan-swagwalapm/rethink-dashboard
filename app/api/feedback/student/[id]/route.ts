@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function PUT(
@@ -10,6 +10,7 @@ export async function PUT(
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+    const adminClient = await createAdminClient();
     const { id } = await params;
     const body = await request.json();
     const { rating, comment } = body;
@@ -22,7 +23,7 @@ export async function PUT(
     if (rating !== undefined) updateData.rating = rating;
     if (comment !== undefined) updateData.comment = comment || null;
 
-    const { data, error } = await supabase
+    const { data, error } = await adminClient
       .from('student_feedback')
       .update(updateData)
       .eq('id', id)

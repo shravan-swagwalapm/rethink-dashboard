@@ -1,14 +1,18 @@
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 
 export async function GET() {
   try {
+    // Auth check via user-scoped client
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    // Fetch subgroups where this user is a mentor (RLS handles access)
-    const { data: mentorAssignments } = await supabase
+    // Use admin client for data queries (bypasses RLS)
+    const adminClient = await createAdminClient();
+
+    // Fetch subgroups where this user is a mentor
+    const { data: mentorAssignments } = await adminClient
       .from('subgroup_mentors')
       .select('subgroup_id')
       .eq('user_id', user.id);
@@ -20,13 +24,13 @@ export async function GET() {
     const subgroupIds = mentorAssignments.map(a => a.subgroup_id);
 
     // Fetch subgroups with cohort info
-    const { data: subgroups } = await supabase
+    const { data: subgroups } = await adminClient
       .from('subgroups')
       .select('id, name, cohort_id')
       .in('id', subgroupIds);
 
     // Batch fetch members
-    const { data: members } = await supabase
+    const { data: members } = await adminClient
       .from('subgroup_members')
       .select('subgroup_id, user_id, user:profiles(id, full_name, email, avatar_url)')
       .in('subgroup_id', subgroupIds);

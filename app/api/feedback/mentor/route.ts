@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 
 // GET - List feedback given by the current mentor
@@ -8,12 +8,13 @@ export async function GET(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+    const adminClient = await createAdminClient();
     const { searchParams } = new URL(request.url);
     const studentId = searchParams.get('student_id');
     const type = searchParams.get('type');
     const subgroupId = searchParams.get('subgroup_id');
 
-    let query = supabase
+    let query = adminClient
       .from('mentor_feedback')
       .select('*, student:profiles!mentor_feedback_student_id_fkey(id, full_name, email, avatar_url), subgroup:subgroups(id, name)')
       .eq('mentor_id', user.id)
@@ -40,6 +41,7 @@ export async function POST(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+    const adminClient = await createAdminClient();
     const body = await request.json();
     const { student_id, subgroup_id, type, rating, comment, week_number } = body;
 
@@ -55,7 +57,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Type must be daily or weekly' }, { status: 400 });
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await adminClient
       .from('mentor_feedback')
       .upsert({
         mentor_id: user.id,
