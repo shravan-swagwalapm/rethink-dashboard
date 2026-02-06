@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import type { Invoice, Cohort } from '@/types';
+import { formatCurrency } from '@/lib/utils/currency';
 
 interface InvoiceWithCohort extends Invoice {
   cohort?: Cohort;
@@ -102,13 +103,6 @@ export default function StudentInvoicesPage() {
     }
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
 
   const getStatusIcon = (status: string) => {
     switch (status) {

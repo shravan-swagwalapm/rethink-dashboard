@@ -76,6 +76,7 @@ import {
 } from '@/components/ui/tooltip';
 import type { Cohort, InvoiceWithRelations, Profile } from '@/types';
 import { getClient } from '@/lib/supabase/client';
+import { formatCurrency } from '@/lib/utils/currency';
 
 interface InvoiceStats {
   total: number;
@@ -509,13 +510,6 @@ export default function AdminInvoicesPage() {
     );
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
 
   if (loading) {
     return <PageLoader message="Loading invoices..." />;

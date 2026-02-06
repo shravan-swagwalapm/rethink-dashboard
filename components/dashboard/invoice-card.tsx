@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Receipt, ChevronRight, CheckCircle, Clock, AlertCircle, Download, Eye } from 'lucide-react';
 import Link from 'next/link';
 import type { Invoice, Cohort } from '@/types';
+import { formatCurrency } from '@/lib/utils/currency';
 
 interface InvoiceWithCohort extends Invoice {
   cohort?: Cohort;
@@ -19,14 +20,6 @@ interface InvoiceCardProps {
 }
 
 export function InvoiceCard({ invoices, pendingAmount, onDownload, onView }: InvoiceCardProps) {
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
-
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'paid':

@@ -3,40 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { zoomService } from '@/lib/integrations/zoom';
 import { googleCalendar } from '@/lib/integrations/google-calendar';
 import { verifyAdmin } from '@/lib/api/verify-admin';
-
-// Helper to get valid calendar access token
-async function getValidCalendarToken(userId: string): Promise<string | null> {
-  const adminClient = await createAdminClient();
-
-  const { data: tokenData } = await adminClient
-    .from('calendar_tokens')
-    .select('*')
-    .eq('user_id', userId)
-    .single();
-
-  if (!tokenData) return null;
-
-  // Check if token is expired (with 5 min buffer)
-  const expiresAt = new Date(tokenData.expires_at);
-  if (expiresAt.getTime() < Date.now() + 300000) {
-    try {
-      const refreshed = await googleCalendar.refreshAccessToken(tokenData.refresh_token);
-      await adminClient
-        .from('calendar_tokens')
-        .update({
-          access_token: refreshed.accessToken,
-          expires_at: new Date(Date.now() + refreshed.expiresIn * 1000).toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('user_id', userId);
-      return refreshed.accessToken;
-    } catch {
-      return null;
-    }
-  }
-
-  return tokenData.access_token;
-}
+import { getValidCalendarToken } from '@/lib/services/calendar-helpers';
 
 // GET - Fetch sessions and cohorts
 export async function GET() {
