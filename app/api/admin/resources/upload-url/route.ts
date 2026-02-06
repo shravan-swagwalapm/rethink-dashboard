@@ -85,8 +85,31 @@ export async function POST(request: NextRequest) {
       filePath,
     });
 
-    // Generate signed upload URL using admin client
+    // Pre-flight check: verify bucket file_size_limit allows this upload
     const adminClient = await createAdminClient();
+
+    const { data: bucket, error: bucketError } = await adminClient
+      .schema('storage')
+      .from('buckets')
+      .select('file_size_limit')
+      .eq('id', 'resources')
+      .single();
+
+    if (!bucketError && bucket?.file_size_limit && fileSize > bucket.file_size_limit) {
+      const bucketLimitMB = Math.round(bucket.file_size_limit / 1024 / 1024);
+      console.error('[Upload URL] File exceeds bucket limit:', {
+        fileSize: `${(fileSize / 1024 / 1024).toFixed(2)} MB`,
+        bucketLimit: `${bucketLimitMB} MB`,
+      });
+      return NextResponse.json(
+        {
+          error: `File too large for storage. The storage bucket limit is ${bucketLimitMB}MB. Please contact admin to increase the limit via: UPDATE storage.buckets SET file_size_limit = 104857600 WHERE id = 'resources';`,
+        },
+        { status: 400 }
+      );
+    }
+
+    // Generate signed upload URL
     const { data, error } = await adminClient.storage
       .from('resources')
       .createSignedUploadUrl(filePath);

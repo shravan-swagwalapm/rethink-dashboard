@@ -9,13 +9,15 @@ VALUES (
   'resources',
   'resources',
   false, -- Not public, requires authentication
-  52428800, -- 50MB file size limit
+  104857600, -- 100MB file size limit
   ARRAY[
     'application/pdf',
     'application/msword',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     'application/vnd.ms-excel',
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
     'video/mp4',
     'video/quicktime',
     'video/x-msvideo',
@@ -23,13 +25,15 @@ VALUES (
   ]
 )
 ON CONFLICT (id) DO UPDATE SET
-  file_size_limit = 52428800,
+  file_size_limit = 104857600,
   allowed_mime_types = ARRAY[
     'application/pdf',
     'application/msword',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     'application/vnd.ms-excel',
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
     'video/mp4',
     'video/quicktime',
     'video/x-msvideo',

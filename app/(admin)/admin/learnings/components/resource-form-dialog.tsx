@@ -183,8 +183,15 @@ export function ResourceFormDialog({
             console.log('[Large Upload] Step 2: Upload complete!');
             resolve();
           } else {
-            console.error('[Large Upload] Upload failed:', xhr.status, xhr.statusText);
-            reject(new Error(`Upload failed with status ${xhr.status}`));
+            let errorMessage = `Upload failed with status ${xhr.status}`;
+            try {
+              const response = JSON.parse(xhr.responseText);
+              console.error('[Large Upload] Supabase error response:', response);
+              errorMessage = response.error || response.message || response.statusCode || errorMessage;
+            } catch {
+              console.error('[Large Upload] Raw error response:', xhr.responseText);
+            }
+            reject(new Error(errorMessage));
           }
         });
 
@@ -202,6 +209,11 @@ export function ResourceFormDialog({
 
         xhr.open('PUT', uploadUrl);
         xhr.setRequestHeader('Content-Type', file.type);
+        // Supabase API gateway requires apikey header for routing,
+        // even on signed URL endpoints (see uploadToSignedUrl in @supabase/storage-js)
+        const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+        xhr.setRequestHeader('Authorization', `Bearer ${anonKey}`);
+        xhr.setRequestHeader('apikey', anonKey);
         xhr.send(file);
       });
 
