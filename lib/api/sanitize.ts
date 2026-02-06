@@ -8,6 +8,8 @@
  *   %  (LIKE wildcard)
  *   *  (select wildcard)
  *   {  }  (array literals in .cs() / .cd() filters)
+ *   "  (quoted identifiers/values)
+ *   :  (cast operators)
  *
  * Unsanitized user input in .or() template literals can:
  *   - Break filter parsing (malformed queries)
@@ -30,5 +32,5 @@ export function sanitizeFilterValue(value: string): string {
     // Escape SQL LIKE wildcards and backslash
     .replace(/[%_\\]/g, '\\$&')
     // Remove PostgREST structural characters that could break .or() parsing
-    .replace(/[{}(),.*]/g, '');
+    .replace(/[{}(),.*":]/g, '');
 }

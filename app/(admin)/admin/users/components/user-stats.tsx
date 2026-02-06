@@ -1,6 +1,8 @@
 'use client';
 
+import { useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
+import { isAdminRole } from '@/lib/utils/auth';
 import type { UserWithCohort } from '../types';
 
 interface UserStatsProps {
@@ -8,8 +10,20 @@ interface UserStatsProps {
   totalUsers: UserWithCohort[];
 }
 
+function countByRole(users: UserWithCohort[]) {
+  let students = 0, mentors = 0, admins = 0;
+  for (const u of users) {
+    if (u.role === 'student') students++;
+    else if (u.role === 'mentor') mentors++;
+    else if (isAdminRole(u.role)) admins++;
+  }
+  return { students, mentors, admins };
+}
+
 export function UserStats({ filteredUsers, totalUsers }: UserStatsProps) {
   const isFiltered = filteredUsers.length !== totalUsers.length;
+  const filtered = useMemo(() => countByRole(filteredUsers), [filteredUsers]);
+  const total = useMemo(() => countByRole(totalUsers), [totalUsers]);
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -30,10 +44,10 @@ export function UserStats({ filteredUsers, totalUsers }: UserStatsProps) {
         <CardContent className="p-4">
           <p className="text-sm text-muted-foreground">Students</p>
           <p className="text-2xl font-bold">
-            {filteredUsers.filter(u => u.role === 'student').length}
+            {filtered.students}
             {isFiltered && (
               <span className="text-sm font-normal text-muted-foreground ml-2">
-                / {totalUsers.filter(u => u.role === 'student').length}
+                / {total.students}
               </span>
             )}
           </p>
@@ -43,10 +57,10 @@ export function UserStats({ filteredUsers, totalUsers }: UserStatsProps) {
         <CardContent className="p-4">
           <p className="text-sm text-muted-foreground">Mentors</p>
           <p className="text-2xl font-bold">
-            {filteredUsers.filter(u => u.role === 'mentor').length}
+            {filtered.mentors}
             {isFiltered && (
               <span className="text-sm font-normal text-muted-foreground ml-2">
-                / {totalUsers.filter(u => u.role === 'mentor').length}
+                / {total.mentors}
               </span>
             )}
           </p>
@@ -56,10 +70,10 @@ export function UserStats({ filteredUsers, totalUsers }: UserStatsProps) {
         <CardContent className="p-4">
           <p className="text-sm text-muted-foreground">Admins</p>
           <p className="text-2xl font-bold">
-            {filteredUsers.filter(u => ['admin', 'company_user'].includes(u.role)).length}
+            {filtered.admins}
             {isFiltered && (
               <span className="text-sm font-normal text-muted-foreground ml-2">
-                / {totalUsers.filter(u => ['admin', 'company_user'].includes(u.role)).length}
+                / {total.admins}
               </span>
             )}
           </p>

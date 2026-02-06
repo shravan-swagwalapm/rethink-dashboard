@@ -1,5 +1,5 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server';
-import { isAdminRole } from '@/lib/utils/auth';
+import { isAdminRole, ADMIN_ROLES } from '@/lib/utils/auth';
 
 /**
  * Result of admin verification.
@@ -50,7 +50,7 @@ export async function verifyAdmin(): Promise<VerifyAdminResult> {
     .from('user_role_assignments')
     .select('role')
     .eq('user_id', user.id)
-    .in('role', ['admin', 'super_admin', 'company_user'])
+    .in('role', [...ADMIN_ROLES])
     .limit(1)
     .maybeSingle();
 

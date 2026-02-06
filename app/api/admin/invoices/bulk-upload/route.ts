@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
     const { data: cohortStudents } = await adminClient
       .from('profiles')
       .select('id, email, cohort_id')
-      .or(`cohort_id.eq.${cohortId}`);
+      .eq('cohort_id', cohortId);
 
     const { data: roleAssignments } = await adminClient
       .from('user_role_assignments')

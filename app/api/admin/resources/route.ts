@@ -1,36 +1,25 @@
 import { NextResponse } from 'next/server';
-import { createAdminClient, createClient } from '@/lib/supabase/server';
-import { isAdminRole } from '@/lib/utils/auth';
+import { createAdminClient } from '@/lib/supabase/server';
+import { verifyAdmin } from '@/lib/api/verify-admin';
 import { sanitizeFilterValue } from '@/lib/api/sanitize';
 
 // GET: List all resources (admin view - no filtering)
 export async function GET(request: Request) {
-  const supabase = await createClient();
+  const auth = await verifyAdmin();
+  if (!auth.authorized) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
 
   try {
-    // Verify admin access
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (!isAdminRole(profile?.role)) {
-      return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
-    }
+    const adminClient = await createAdminClient();
 
     // Parse query parameters
     const { searchParams } = new URL(request.url);
     const category = searchParams.get('category');
     const search = searchParams.get('search');
 
-    // Build query (admin sees ALL resources)
-    let query = supabase
+    // Build query (admin sees ALL resources via adminClient to bypass RLS)
+    let query = adminClient
       .from('resources')
       .select('*, cohort:cohorts(id, name, tag)')
       .order('created_at', { ascending: false });
@@ -53,26 +42,14 @@ export async function GET(request: Request) {
 
 // POST: Create new resource with file upload
 export async function POST(request: Request) {
-  const supabase = await createClient();
+  const auth = await verifyAdmin();
+  if (!auth.authorized) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
+
   const adminClient = await createAdminClient();
 
   try {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Verify admin role
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (!isAdminRole(profile?.role)) {
-      return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
-    }
-
     const formData = await request.formData();
     const name = formData.get('name') as string;
     const category = formData.get('category') as string;
@@ -144,7 +121,7 @@ export async function POST(request: Request) {
         file_size: fileSize,
         file_type: fileType,
         type: 'file',
-        uploaded_by: user.id,
+        uploaded_by: auth.userId,
       })
       .select()
       .single();
