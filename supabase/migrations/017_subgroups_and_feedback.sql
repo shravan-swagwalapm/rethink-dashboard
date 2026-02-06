@@ -88,7 +88,23 @@ CREATE POLICY "Students can read own subgroup" ON subgroups
     id IN (SELECT subgroup_id FROM subgroup_members WHERE user_id = auth.uid())
   );
 
--- Students: read members of their subgroup
+-- BASE POLICIES: break self-referencing circular dependency
+-- Without these, subgroup_members/subgroup_mentors policies reference themselves
+-- and RLS returns empty results (chicken-and-egg: can't read your row to discover
+-- your subgroup_id, because you need your subgroup_id to read your row)
+
+-- Users can always read their own membership row
+CREATE POLICY "Users can read own membership" ON subgroup_members
+  FOR SELECT USING (user_id = auth.uid());
+
+-- Users can always read their own mentor assignment row
+CREATE POLICY "Users can read own mentor assignment" ON subgroup_mentors
+  FOR SELECT USING (user_id = auth.uid());
+
+-- SUBGROUP-SCOPED POLICIES: now work because base policies above let
+-- the inner subquery find the user's own rows first
+
+-- Students: read members of their subgroup (peers)
 CREATE POLICY "Students can read own subgroup members" ON subgroup_members
   FOR SELECT USING (
     subgroup_id IN (SELECT subgroup_id FROM subgroup_members WHERE user_id = auth.uid())
