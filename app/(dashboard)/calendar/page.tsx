@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { useUser } from '@/hooks/use-user';
+import { useUserContext } from '@/contexts/user-context';
 import { getClient } from '@/lib/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -55,7 +55,7 @@ interface SessionWithRsvp extends Session {
 type TimezoneMode = 'ist' | 'utc' | 'local';
 
 export default function CalendarPage() {
-  const { profile, loading: userLoading, activeCohortId, isAdmin } = useUser();
+  const { profile, loading: userLoading, activeCohortId, isAdmin } = useUserContext();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [sessions, setSessions] = useState<SessionWithRsvp[]>([]);
   const [selectedSession, setSelectedSession] = useState<SessionWithRsvp | null>(null);

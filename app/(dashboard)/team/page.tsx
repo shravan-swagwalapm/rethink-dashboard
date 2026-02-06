@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useUser } from '@/hooks/use-user';
+import { useUserContext } from '@/contexts/user-context';
 import { getClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -46,7 +46,7 @@ interface TeamMember extends Profile {
 }
 
 export default function TeamPage() {
-  const { profile, isMentor, isAdmin, loading: userLoading } = useUser();
+  const { profile, isMentor, isAdmin, loading: userLoading } = useUserContext();
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');

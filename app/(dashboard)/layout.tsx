@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react';
 import { DashboardSidebar } from '@/components/dashboard/sidebar';
 import { DashboardHeader } from '@/components/dashboard/header';
+import { UserProvider } from '@/contexts/user-context';
 
 export default function DashboardLayout({
   children,
@@ -22,19 +23,21 @@ export default function DashboardLayout({
   // Layout does NOT show any loader - each page handles its own loading state
   // This prevents double loading and ensures the full-page loader stays until data is ready
   return (
-    <div className="flex min-h-screen bg-background">
-      <DashboardSidebar
-        mobileOpen={mobileMenuOpen}
-        onMobileClose={handleMobileMenuClose}
-      />
-      <div className="flex-1 flex flex-col min-w-0">
-        <DashboardHeader onMenuClick={handleMobileMenuToggle} />
-        <main className="flex-1 p-4 sm:p-6 overflow-auto">
-          <div className="max-w-7xl mx-auto page-transition">
-            {children}
-          </div>
-        </main>
+    <UserProvider>
+      <div className="flex min-h-screen bg-background">
+        <DashboardSidebar
+          mobileOpen={mobileMenuOpen}
+          onMobileClose={handleMobileMenuClose}
+        />
+        <div className="flex-1 flex flex-col min-w-0">
+          <DashboardHeader onMenuClick={handleMobileMenuToggle} />
+          <main className="flex-1 p-4 sm:p-6 overflow-auto">
+            <div className="max-w-7xl mx-auto page-transition">
+              {children}
+            </div>
+          </main>
+        </div>
       </div>
-    </div>
+    </UserProvider>
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useUser } from '@/hooks/use-user';
+import { UserProvider, useUserContext } from '@/contexts/user-context';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import Link from 'next/link';
@@ -45,7 +45,19 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { profile, isAdmin, loading, signOut, activeRole } = useUser();
+  return (
+    <UserProvider>
+      <AdminLayoutInner>{children}</AdminLayoutInner>
+    </UserProvider>
+  );
+}
+
+function AdminLayoutInner({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const { profile, isAdmin, loading, signOut, activeRole } = useUserContext();
   const router = useRouter();
   const pathname = usePathname();
 

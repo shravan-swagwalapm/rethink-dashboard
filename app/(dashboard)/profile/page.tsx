@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useUser } from '@/hooks/use-user';
+import { useUserContext } from '@/contexts/user-context';
 import { getClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -72,7 +72,7 @@ interface ProfileCard {
 }
 
 export default function ProfilePage() {
-  const { profile, refreshProfile, loading: userLoading } = useUser();
+  const { profile, refreshProfile, loading: userLoading } = useUserContext();
   const [formData, setFormData] = useState({
     full_name: '',
     phone: '',

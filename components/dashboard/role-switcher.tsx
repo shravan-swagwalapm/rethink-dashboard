@@ -1,6 +1,6 @@
 'use client';
 
-import { useUser } from '@/hooks/use-user';
+import { useUserContext } from '@/contexts/user-context';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,7 +35,7 @@ export function RoleSwitcher() {
     availableRoles,
     hasMultipleRoles,
     switchRole
-  } = useUser();
+  } = useUserContext();
 
   // Don't render if only one role
   if (!hasMultipleRoles) return null;

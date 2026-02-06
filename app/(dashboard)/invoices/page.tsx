@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { useUser } from '@/hooks/use-user';
+import { useUserContext } from '@/contexts/user-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -38,7 +38,7 @@ interface InvoiceStats {
 
 export default function StudentInvoicesPage() {
   const router = useRouter();
-  const { profile, loading: userLoading, isAdmin } = useUser();
+  const { profile, loading: userLoading, isAdmin } = useUserContext();
   const [invoices, setInvoices] = useState<InvoiceWithCohort[]>([]);
   const [stats, setStats] = useState<InvoiceStats | null>(null);
   const [loading, setLoading] = useState(true);

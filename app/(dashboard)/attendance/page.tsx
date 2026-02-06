@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useEffect, useState } from 'react';
-import { useUser } from '@/hooks/use-user';
+import { useUserContext } from '@/contexts/user-context';
 import { useSearchParams } from 'next/navigation';
 import { getClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -50,7 +50,7 @@ interface SessionWithAttendance extends Session {
 }
 
 function AttendanceContent() {
-  const { profile, isMentor, isAdmin, loading: userLoading } = useUser();
+  const { profile, isMentor, isAdmin, loading: userLoading } = useUserContext();
   const searchParams = useSearchParams();
   const studentIdFilter = searchParams.get('student');
 

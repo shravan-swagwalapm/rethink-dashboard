@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Mail, Phone, Globe, Linkedin, MapPin, Sparkles, X } from 'lucide-react';
 import { Profile } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useUser } from '@/hooks/use-user';
+import { useUserContext } from '@/contexts/user-context';
 
 interface ProfileCardPreviewModalProps {
   open: boolean;
@@ -14,7 +14,7 @@ interface ProfileCardPreviewModalProps {
 }
 
 export function ProfileCardPreviewModal({ open, onClose, profile }: ProfileCardPreviewModalProps) {
-  const { activeRole } = useUser();
+  const { activeRole } = useUserContext();
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-lg p-0 bg-transparent border-none shadow-none overflow-visible">

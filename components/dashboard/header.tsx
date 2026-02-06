@@ -2,7 +2,7 @@
 
 import { useTheme } from 'next-themes';
 import { useRouter } from 'next/navigation';
-import { useUser } from '@/hooks/use-user';
+import { useUserContext } from '@/contexts/user-context';
 import { useNotifications } from '@/hooks/use-notifications';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -39,7 +39,7 @@ interface DashboardHeaderProps {
 export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
   const { theme, setTheme } = useTheme();
   const router = useRouter();
-  const { profile, signOut, isAdmin, activeRole } = useUser();
+  const { profile, signOut, isAdmin, activeRole } = useUserContext();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
 
   const handleSignOut = () => {

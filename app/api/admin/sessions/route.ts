@@ -77,31 +77,33 @@ export async function GET() {
         .eq('role', 'master'),
     ]);
 
-    // Fetch RSVP counts and attach cohorts/guests for each session
-    const sessionsWithDetails = await Promise.all(
-      (sessions || []).map(async (session) => {
-        const [{ count: yesCount }, { count: noCount }] = await Promise.all([
-          adminClient
-            .from('rsvps')
-            .select('*', { count: 'exact', head: true })
-            .eq('session_id', session.id)
-            .eq('response', 'yes'),
-          adminClient
-            .from('rsvps')
-            .select('*', { count: 'exact', head: true })
-            .eq('session_id', session.id)
-            .eq('response', 'no'),
-        ]);
+    // Batch fetch all RSVPs for all sessions in ONE query instead of 2 per session
+    const sessionIds = (sessions || []).map(s => s.id);
+    const rsvpYesCounts = new Map<string, number>();
+    const rsvpNoCounts = new Map<string, number>();
 
-        return {
-          ...session,
-          rsvp_yes_count: yesCount || 0,
-          rsvp_no_count: noCount || 0,
-          cohorts: (sessionCohorts || []).filter(sc => sc.session_id === session.id),
-          guests: (sessionGuests || []).filter(sg => sg.session_id === session.id),
-        };
-      })
-    );
+    if (sessionIds.length > 0) {
+      const { data: allRsvps } = await adminClient
+        .from('rsvps')
+        .select('session_id, response')
+        .in('session_id', sessionIds);
+
+      for (const rsvp of allRsvps || []) {
+        if (rsvp.response === 'yes') {
+          rsvpYesCounts.set(rsvp.session_id, (rsvpYesCounts.get(rsvp.session_id) || 0) + 1);
+        } else if (rsvp.response === 'no') {
+          rsvpNoCounts.set(rsvp.session_id, (rsvpNoCounts.get(rsvp.session_id) || 0) + 1);
+        }
+      }
+    }
+
+    const sessionsWithDetails = (sessions || []).map((session) => ({
+      ...session,
+      rsvp_yes_count: rsvpYesCounts.get(session.id) || 0,
+      rsvp_no_count: rsvpNoCounts.get(session.id) || 0,
+      cohorts: (sessionCohorts || []).filter(sc => sc.session_id === session.id),
+      guests: (sessionGuests || []).filter(sg => sg.session_id === session.id),
+    }));
 
     return NextResponse.json({
       sessions: sessionsWithDetails,

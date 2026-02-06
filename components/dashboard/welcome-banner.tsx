@@ -1,6 +1,6 @@
 'use client';
 
-import { useUser } from '@/hooks/use-user';
+import { useUserContext } from '@/contexts/user-context';
 import { Card } from '@/components/ui/card';
 import { Sparkles, Zap, TrendingUp, Target, Rocket } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
@@ -12,7 +12,7 @@ interface WelcomeBannerProps {
 }
 
 export function WelcomeBanner({ cohortStartDate, cohortName }: WelcomeBannerProps) {
-  const { profile } = useUser();
+  const { profile } = useUserContext();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {

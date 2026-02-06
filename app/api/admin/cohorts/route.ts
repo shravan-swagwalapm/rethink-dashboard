@@ -19,27 +19,41 @@ export async function GET() {
 
     if (error) throw error;
 
-    // Fetch stats for each cohort
-    const cohortsWithStats = await Promise.all(
-      (cohorts || []).map(async (cohort) => {
-        const [{ count: studentCount }, { count: sessionCount }] = await Promise.all([
-          adminClient
-            .from('profiles')
-            .select('*', { count: 'exact', head: true })
-            .eq('cohort_id', cohort.id),
-          adminClient
-            .from('sessions')
-            .select('*', { count: 'exact', head: true })
-            .eq('cohort_id', cohort.id),
-        ]);
+    // Batch fetch all profiles and sessions for all cohorts in TWO queries instead of 2 per cohort
+    const cohortIds = (cohorts || []).map(c => c.id);
+    const studentCounts = new Map<string, number>();
+    const sessionCounts = new Map<string, number>();
 
-        return {
-          ...cohort,
-          student_count: studentCount || 0,
-          session_count: sessionCount || 0,
-        };
-      })
-    );
+    if (cohortIds.length > 0) {
+      const [{ data: allProfiles }, { data: allSessions }] = await Promise.all([
+        adminClient
+          .from('profiles')
+          .select('cohort_id')
+          .in('cohort_id', cohortIds),
+        adminClient
+          .from('sessions')
+          .select('cohort_id')
+          .in('cohort_id', cohortIds),
+      ]);
+
+      for (const profile of allProfiles || []) {
+        if (profile.cohort_id) {
+          studentCounts.set(profile.cohort_id, (studentCounts.get(profile.cohort_id) || 0) + 1);
+        }
+      }
+
+      for (const session of allSessions || []) {
+        if (session.cohort_id) {
+          sessionCounts.set(session.cohort_id, (sessionCounts.get(session.cohort_id) || 0) + 1);
+        }
+      }
+    }
+
+    const cohortsWithStats = (cohorts || []).map((cohort) => ({
+      ...cohort,
+      student_count: studentCounts.get(cohort.id) || 0,
+      session_count: sessionCounts.get(cohort.id) || 0,
+    }));
 
     return NextResponse.json(cohortsWithStats);
   } catch (error) {

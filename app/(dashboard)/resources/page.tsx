@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { useUser } from '@/hooks/use-user';
+import { useUserContext } from '@/contexts/user-context';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -83,7 +83,7 @@ const getResourceStyles = (category: ResourceCategory) => {
 };
 
 export default function ResourcesPage() {
-  const { profile, loading: userLoading, activeCohortId } = useUser();
+  const { profile, loading: userLoading, activeCohortId } = useUserContext();
   const [activeTab, setActiveTab] = useState<Tab>('video');
   const [resources, setResources] = useState<Resource[]>([]);
   const [loading, setLoading] = useState(true);

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { useUser } from '@/hooks/use-user';
+import { useUserContext } from '@/contexts/user-context';
 import {
   LayoutDashboard,
   Calendar,
@@ -57,7 +57,7 @@ interface DashboardSidebarProps {
 
 export function DashboardSidebar({ mobileOpen, onMobileClose }: DashboardSidebarProps) {
   const pathname = usePathname();
-  const { profile, activeRole } = useUser();
+  const { profile, activeRole } = useUserContext();
   const [collapsed, setCollapsed] = useState(false);
 
   const filteredNavItems = navItems.filter(

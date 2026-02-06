@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { useUser } from '@/hooks/use-user';
+import { useUserContext } from '@/contexts/user-context';
 import { getClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -179,7 +179,7 @@ function getCaseStudyEmbedUrl(docId: string, docUrl: string | null): string {
 }
 
 export default function LearningsPage() {
-  const { profile, loading: userLoading, activeCohortId, isAdmin } = useUser();
+  const { profile, loading: userLoading, activeCohortId, isAdmin } = useUserContext();
   const [modules, setModules] = useState<ModuleWithResources[]>([]);
   const [caseStudies, setCaseStudies] = useState<CaseStudy[]>([]);
   const [loading, setLoading] = useState(true);

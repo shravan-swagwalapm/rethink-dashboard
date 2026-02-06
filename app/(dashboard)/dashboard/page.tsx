@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { useUser } from '@/hooks/use-user';
+import { useUserContext } from '@/contexts/user-context';
 import { getClient } from '@/lib/supabase/client';
 import { WelcomeBanner } from '@/components/dashboard/welcome-banner';
 import { StatsCards } from '@/components/dashboard/stats-cards';
@@ -109,7 +109,7 @@ function getContentTypeLabel(type: ModuleResourceType): string {
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { profile, loading: userLoading, isAdmin, activeCohortId } = useUser();
+  const { profile, loading: userLoading, isAdmin, activeCohortId } = useUserContext();
   const [stats, setStats] = useState<DashboardStats | null>(null);
 
   const [upcomingSessions, setUpcomingSessions] = useState<Session[]>([]);
