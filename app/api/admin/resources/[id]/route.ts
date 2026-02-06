@@ -1,29 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient, createAdminClient } from '@/lib/supabase/server';
-import { isAdminRole } from '@/lib/utils/auth';
-
-// Helper to verify admin access
-async function verifyAdmin() {
-  const supabase = await createClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return { authorized: false, error: 'Unauthorized', status: 401 };
-  }
-
-  const adminClient = await createAdminClient();
-  const { data: profile } = await adminClient
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single();
-
-  if (!isAdminRole(profile?.role)) {
-    return { authorized: false, error: 'Forbidden', status: 403 };
-  }
-
-  return { authorized: true, userId: user.id };
-}
+import { createAdminClient } from '@/lib/supabase/server';
+import { verifyAdmin } from '@/lib/api/verify-admin';
 
 // GET: Fetch single resource by ID
 export async function GET(

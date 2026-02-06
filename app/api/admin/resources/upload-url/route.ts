@@ -1,5 +1,6 @@
-import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { verifyAdmin } from '@/lib/api/verify-admin';
 
 // Route config for larger metadata handling
 export const maxDuration = 30;
@@ -8,30 +9,6 @@ export const dynamic = 'force-dynamic';
 // Constants
 const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
 const SIGNED_URL_EXPIRY = 600; // 10 minutes in seconds
-
-async function verifyAdmin() {
-  const supabase = await createClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return { authorized: false, error: 'Unauthorized', status: 401 };
-  }
-
-  const adminClient = await createAdminClient();
-  const { data: profile } = await adminClient
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single();
-
-  const isAdmin = profile?.role === 'admin' || profile?.role === 'company_user';
-
-  if (!isAdmin) {
-    return { authorized: false, error: 'Forbidden', status: 403 };
-  }
-
-  return { authorized: true, userId: user.id };
-}
 
 /**
  * POST /api/admin/resources/upload-url

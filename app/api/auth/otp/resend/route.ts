@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resendOTP } from '@/lib/integrations/msg91-otp';
+import { checkRateLimit } from '@/lib/services/otp-rate-limiter';
+import { createAdminClient } from '@/lib/supabase/server';
 import { z } from 'zod';
 
 // Validation schema
@@ -40,6 +42,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Resend is only available for phone numbers. For email, please request a new login link.' },
         { status: 400 }
+      );
+    }
+
+    // =====================================================
+    // Check rate limits
+    // =====================================================
+
+    const supabase = await createAdminClient();
+    const rateLimitResult = await checkRateLimit(
+      supabase,
+      normalizedIdentifier,
+      'phone'
+    );
+
+    if (!rateLimitResult.allowed) {
+      return NextResponse.json(
+        { error: rateLimitResult.error },
+        { status: 429 }
       );
     }
 

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { sanitizeFilterValue } from '@/lib/api/sanitize';
 
 export async function GET(request: Request) {
   const supabase = await createClient();
@@ -95,8 +96,8 @@ export async function GET(request: Request) {
 
     // Apply text search if provided (sanitize to prevent injection)
     if (search) {
-      const sanitizedSearch = search.replace(/[%_\\]/g, '\\$&').replace(/[{}]/g, '');
-      query = query.or(`name.ilike.%${sanitizedSearch}%,keywords.cs.{${sanitizedSearch}}`);
+      const safeSearch = sanitizeFilterValue(search);
+      query = query.or(`name.ilike.%${safeSearch}%,keywords.cs.{${safeSearch}}`);
     }
 
     const { data: resources, error } = await query;

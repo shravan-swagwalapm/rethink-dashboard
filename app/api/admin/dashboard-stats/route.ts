@@ -1,7 +1,13 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { verifyAdmin } from '@/lib/api/verify-admin';
 
 export async function GET() {
+  const auth = await verifyAdmin();
+  if (!auth.authorized) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
+
   const supabase = await createClient();
 
   try {

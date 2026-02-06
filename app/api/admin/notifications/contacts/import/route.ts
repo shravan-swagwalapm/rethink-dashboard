@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server';
+import { verifyAdmin } from '@/lib/api/verify-admin';
 import { NextRequest, NextResponse } from 'next/server';
 import Papa from 'papaparse';
+import { sanitizeFilterValue } from '@/lib/api/sanitize';
 
 interface ParsedContact {
   email?: string;
@@ -51,23 +53,12 @@ function validateContact(contact: any, rowIndex: number): { isValid: boolean; er
 // POST - Parse and validate CSV (preview mode)
 export async function POST(request: NextRequest) {
   try {
+    const auth = await verifyAdmin();
+    if (!auth.authorized) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
     const supabase = await createClient();
-
-    // Check if user is admin
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profile?.role !== 'admin') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
 
     const body = await request.json();
     const { csv_content, list_id } = body;
@@ -167,23 +158,12 @@ export async function POST(request: NextRequest) {
 // PUT - Confirm import after preview
 export async function PUT(request: NextRequest) {
   try {
+    const auth = await verifyAdmin();
+    if (!auth.authorized) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
     const supabase = await createClient();
-
-    // Check if user is admin
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profile?.role !== 'admin') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
 
     const body = await request.json();
     const { list_id, contacts } = body;
@@ -215,11 +195,13 @@ export async function PUT(request: NextRequest) {
 
     let existingContacts: any[] = [];
     if (emails.length > 0 || phones.length > 0) {
+      const safeEmails = emails.map((e: string) => sanitizeFilterValue(e));
+      const safePhones = phones.map((p: string) => sanitizeFilterValue(p));
       const { data } = await supabase
         .from('contacts')
         .select('email, phone')
         .eq('list_id', list_id)
-        .or(`email.in.(${emails.join(',')}),phone.in.(${phones.join(',')})`);
+        .or(`email.in.(${safeEmails.join(',')}),phone.in.(${safePhones.join(',')})`);
 
       existingContacts = data || [];
     }

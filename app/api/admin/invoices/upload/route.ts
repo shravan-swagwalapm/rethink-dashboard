@@ -1,29 +1,6 @@
-import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
-
-async function verifyAdmin() {
-  const supabase = await createClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return { authorized: false, error: 'Unauthorized', status: 401 };
-  }
-
-  const adminClient = await createAdminClient();
-  const { data: profile } = await adminClient
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single();
-
-  const isAdmin = profile?.role === 'admin' || profile?.role === 'company_user';
-
-  if (!isAdmin) {
-    return { authorized: false, error: 'Forbidden', status: 403 };
-  }
-
-  return { authorized: true, userId: user.id };
-}
+import { verifyAdmin } from '@/lib/api/verify-admin';
 
 // POST - Upload single invoice PDF and create record
 export async function POST(request: NextRequest) {

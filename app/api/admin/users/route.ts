@@ -1,31 +1,8 @@
-import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { googleCalendar } from '@/lib/integrations/google-calendar';
-
-async function verifyAdmin() {
-  const supabase = await createClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return { authorized: false, error: 'Unauthorized', status: 401 };
-  }
-
-  // Check admin role from database only - no domain-based bypass
-  const adminClient = await createAdminClient();
-  const { data: profile } = await adminClient
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single();
-
-  const isAdmin = profile?.role === 'admin' || profile?.role === 'company_user';
-
-  if (!isAdmin) {
-    return { authorized: false, error: 'Forbidden', status: 403 };
-  }
-
-  return { authorized: true, userId: user.id };
-}
+import { verifyAdmin } from '@/lib/api/verify-admin';
+import { sanitizeFilterValue } from '@/lib/api/sanitize';
 
 // Helper to get valid calendar access token
 async function getValidCalendarToken(userId: string): Promise<string | null> {
@@ -179,7 +156,8 @@ export async function GET(request: NextRequest) {
         .order('full_name', { ascending: true });
 
       if (search.length >= 2) {
-        query = query.or(`full_name.ilike.%${search}%,email.ilike.%${search}%`);
+        const safeSearch = sanitizeFilterValue(search);
+        query = query.or(`full_name.ilike.%${safeSearch}%,email.ilike.%${safeSearch}%`);
       }
 
       const { data, error } = await query.limit(50);

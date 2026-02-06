@@ -1,26 +1,16 @@
 import { createClient } from '@/lib/supabase/server';
+import { verifyAdmin } from '@/lib/api/verify-admin';
 import { NextRequest, NextResponse } from 'next/server';
 
 // GET - Fetch all contact lists or contacts in a specific list
 export async function GET(request: NextRequest) {
   try {
+    const auth = await verifyAdmin();
+    if (!auth.authorized) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
     const supabase = await createClient();
-
-    // Check if user is admin
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profile?.role !== 'admin') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
 
     const { searchParams } = new URL(request.url);
     const listId = searchParams.get('list_id');
@@ -73,23 +63,12 @@ export async function GET(request: NextRequest) {
 // POST - Create contact list OR add contacts to a list
 export async function POST(request: NextRequest) {
   try {
+    const auth = await verifyAdmin();
+    if (!auth.authorized) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
     const supabase = await createClient();
-
-    // Check if user is admin
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profile?.role !== 'admin') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
 
     const body = await request.json();
 
@@ -110,7 +89,7 @@ export async function POST(request: NextRequest) {
           name,
           description: description || null,
           tags: tags || [],
-          created_by: user.id,
+          created_by: auth.userId,
         })
         .select()
         .single();
@@ -180,23 +159,12 @@ export async function POST(request: NextRequest) {
 // PATCH - Update contact list or contact
 export async function PATCH(request: NextRequest) {
   try {
+    const auth = await verifyAdmin();
+    if (!auth.authorized) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
     const supabase = await createClient();
-
-    // Check if user is admin
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profile?.role !== 'admin') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
 
     const body = await request.json();
     const { id, type, ...updates } = body;
@@ -259,23 +227,12 @@ export async function PATCH(request: NextRequest) {
 // DELETE - Delete contact list or contact
 export async function DELETE(request: NextRequest) {
   try {
+    const auth = await verifyAdmin();
+    if (!auth.authorized) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
     const supabase = await createClient();
-
-    // Check if user is admin
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profile?.role !== 'admin') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
 
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');

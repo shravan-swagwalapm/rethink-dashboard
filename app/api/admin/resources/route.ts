@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient, createClient } from '@/lib/supabase/server';
 import { isAdminRole } from '@/lib/utils/auth';
+import { sanitizeFilterValue } from '@/lib/api/sanitize';
 
 // GET: List all resources (admin view - no filtering)
 export async function GET(request: Request) {
@@ -35,7 +36,10 @@ export async function GET(request: Request) {
       .order('created_at', { ascending: false });
 
     if (category) query = query.eq('category', category);
-    if (search) query = query.or(`name.ilike.%${search}%`);
+    if (search) {
+      const safeSearch = sanitizeFilterValue(search);
+      query = query.or(`name.ilike.%${safeSearch}%`);
+    }
 
     const { data: resources, error } = await query;
     if (error) throw error;

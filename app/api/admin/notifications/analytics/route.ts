@@ -1,26 +1,16 @@
 import { createClient } from '@/lib/supabase/server';
+import { verifyAdmin } from '@/lib/api/verify-admin';
 import { NextRequest, NextResponse } from 'next/server';
 
 // GET - Fetch aggregated analytics
 export async function GET(request: NextRequest) {
   try {
+    const auth = await verifyAdmin();
+    if (!auth.authorized) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
     const supabase = await createClient();
-
-    // Check if user is admin
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profile?.role !== 'admin') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
 
     const { searchParams } = new URL(request.url);
     const from = searchParams.get('from') || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();

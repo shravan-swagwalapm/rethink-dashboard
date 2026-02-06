@@ -1,6 +1,7 @@
-import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { verifyAdmin } from '@/lib/api/verify-admin';
 
 // Zod validation schemas
 const linkModulesSchema = z.object({
@@ -16,30 +17,6 @@ const unlinkModulesSchema = z.object({
   data => data.module_ids || data.unlink_all || data.unlink_type,
   { message: 'One of module_ids, unlink_all, or unlink_type is required' }
 );
-
-async function verifyAdmin() {
-  const supabase = await createClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return { authorized: false, error: 'Unauthorized', status: 401, userId: null };
-  }
-
-  const adminClient = await createAdminClient();
-  const { data: profile } = await adminClient
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single();
-
-  const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
-
-  if (!isAdmin) {
-    return { authorized: false, error: 'Forbidden', status: 403, userId: null };
-  }
-
-  return { authorized: true, userId: user.id };
-}
 
 /**
  * POST /api/admin/cohorts/[id]/link-modules

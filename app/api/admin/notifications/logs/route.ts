@@ -1,26 +1,17 @@
 import { createClient } from '@/lib/supabase/server';
+import { verifyAdmin } from '@/lib/api/verify-admin';
 import { NextRequest, NextResponse } from 'next/server';
+import { sanitizeFilterValue } from '@/lib/api/sanitize';
 
 // GET - Fetch logs with filtering & pagination
 export async function GET(request: NextRequest) {
   try {
+    const auth = await verifyAdmin();
+    if (!auth.authorized) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
     const supabase = await createClient();
-
-    // Check if user is admin
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profile?.role !== 'admin') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
 
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get('page') || '1');
@@ -59,7 +50,8 @@ export async function GET(request: NextRequest) {
     }
 
     if (recipient) {
-      query = query.or(`recipient_email.ilike.%${recipient}%,recipient_phone.ilike.%${recipient}%`);
+      const safeRecipient = sanitizeFilterValue(recipient);
+      query = query.or(`recipient_email.ilike.%${safeRecipient}%,recipient_phone.ilike.%${safeRecipient}%`);
     }
 
     if (from) {

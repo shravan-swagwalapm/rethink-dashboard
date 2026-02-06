@@ -14,7 +14,118 @@ export const RATE_LIMIT_CONFIG = {
   WINDOW_MINUTES: 15,
   MAX_REQUESTS_PER_WINDOW: 5,
   BLOCK_DURATION_MINUTES: 30,
+  /** Number of consecutive DB failures before we deny requests (fail-closed) */
+  MAX_DB_FAILURES_BEFORE_DENY: 2,
+  /** Time-to-live for in-memory fallback entries (ms) */
+  FALLBACK_TTL_MS: 15 * 60 * 1000, // 15 minutes
 } as const;
+
+// ---------------------------------------------------------------------------
+// In-memory fallback: tracks per-identifier request counts and consecutive
+// DB errors so that a sustained database outage cannot be exploited to
+// bypass rate limiting entirely (fail-closed after threshold).
+// ---------------------------------------------------------------------------
+
+interface FallbackEntry {
+  /** Consecutive DB failures for this identifier */
+  dbFailures: number;
+  /** Total requests tracked while DB is down */
+  requestCount: number;
+  /** Timestamp of first request in the current in-memory window */
+  windowStart: number;
+}
+
+const fallbackStore = new Map<string, FallbackEntry>();
+
+function getFallbackKey(identifier: string, identifierType: string): string {
+  return `${identifierType}:${identifier}`;
+}
+
+/** Clean up stale entries older than the TTL */
+function pruneStaleEntries(): void {
+  const now = Date.now();
+  for (const [key, entry] of fallbackStore) {
+    if (now - entry.windowStart > RATE_LIMIT_CONFIG.FALLBACK_TTL_MS) {
+      fallbackStore.delete(key);
+    }
+  }
+}
+
+/**
+ * Record a DB failure for the given identifier. Returns the current
+ * consecutive failure count.
+ */
+function recordDbFailure(identifier: string, identifierType: string): number {
+  pruneStaleEntries();
+  const key = getFallbackKey(identifier, identifierType);
+  const existing = fallbackStore.get(key);
+  if (existing) {
+    existing.dbFailures += 1;
+    existing.requestCount += 1;
+    return existing.dbFailures;
+  }
+  fallbackStore.set(key, { dbFailures: 1, requestCount: 1, windowStart: Date.now() });
+  return 1;
+}
+
+/**
+ * Reset the DB failure counter on a successful DB interaction, keeping
+ * the entry for request-count tracking.
+ */
+function resetDbFailures(identifier: string, identifierType: string): void {
+  const key = getFallbackKey(identifier, identifierType);
+  const existing = fallbackStore.get(key);
+  if (existing) {
+    existing.dbFailures = 0;
+  }
+}
+
+/**
+ * Check the in-memory fallback. Returns a RateLimitResult when the
+ * request should be denied, or `null` if the fallback allows it.
+ */
+function checkFallback(identifier: string, identifierType: string): RateLimitResult | null {
+  pruneStaleEntries();
+  const key = getFallbackKey(identifier, identifierType);
+  const entry = fallbackStore.get(key);
+  if (!entry) return null;
+
+  // If the in-memory counter already exceeds the per-window max, deny
+  if (entry.requestCount >= RATE_LIMIT_CONFIG.MAX_REQUESTS_PER_WINDOW) {
+    return {
+      allowed: false,
+      error: 'Too many OTP requests. Please try again later.',
+    };
+  }
+  return null;
+}
+
+/**
+ * Evaluate a DB error and decide whether to allow the request.
+ * Returns `{ allowed: true }` only when consecutive failures are below
+ * the threshold; returns `{ allowed: false }` once the threshold is met.
+ */
+function handleDbError(
+  identifier: string,
+  identifierType: string,
+  context: string
+): RateLimitResult {
+  const failures = recordDbFailure(identifier, identifierType);
+  if (failures >= RATE_LIMIT_CONFIG.MAX_DB_FAILURES_BEFORE_DENY) {
+    console.error(
+      `[RateLimit] ${context}: ${failures} consecutive DB failures for ${identifierType}:${identifier} – denying request (fail-closed)`
+    );
+    return {
+      allowed: false,
+      error: 'Service temporarily unavailable. Please try again later.',
+    };
+  }
+  // First transient failure – allow but log a warning
+  console.warn(
+    `[RateLimit] ${context}: transient DB failure (${failures}/${RATE_LIMIT_CONFIG.MAX_DB_FAILURES_BEFORE_DENY}) – allowing request`
+  );
+  return { allowed: true };
+}
 
 export interface RateLimitResult {
   allowed: boolean;
@@ -46,6 +157,12 @@ export async function checkRateLimit(
   identifierType: 'phone' | 'email'
 ): Promise<RateLimitResult> {
   try {
+    // Check in-memory fallback first (catches abuse during DB outages)
+    const fallbackDeny = checkFallback(identifier, identifierType);
+    if (fallbackDeny) {
+      return fallbackDeny;
+    }
+
     // Fetch existing rate limit record
     const { data: rateLimit, error: fetchError } = await supabase
       .from('otp_rate_limits')
@@ -57,9 +174,11 @@ export async function checkRateLimit(
     if (fetchError && fetchError.code !== 'PGRST116') {
       // PGRST116 = not found, which is okay
       console.error('[RateLimit] Error fetching rate limit:', fetchError);
-      // Fail open - allow request if we can't check rate limit
-      return { allowed: true };
+      return handleDbError(identifier, identifierType, 'Error fetching rate limit');
     }
+
+    // DB read succeeded – reset failure counter
+    resetDbFailures(identifier, identifierType);
 
     // No existing record - create new one
     if (!rateLimit) {
@@ -74,7 +193,7 @@ export async function checkRateLimit(
 
       if (insertError) {
         console.error('[RateLimit] Error creating rate limit record:', insertError);
-        return { allowed: true }; // Fail open
+        return handleDbError(identifier, identifierType, 'Error creating rate limit record');
       }
 
       return {
@@ -120,6 +239,7 @@ export async function checkRateLimit(
 
         if (updateError) {
           console.error('[RateLimit] Error blocking user:', updateError);
+          // Still deny – we know the limit was exceeded from the DB read
         }
 
         return {
@@ -137,7 +257,7 @@ export async function checkRateLimit(
 
       if (updateError) {
         console.error('[RateLimit] Error incrementing counter:', updateError);
-        return { allowed: true }; // Fail open
+        return handleDbError(identifier, identifierType, 'Error incrementing counter');
       }
 
       return {
@@ -158,7 +278,7 @@ export async function checkRateLimit(
 
       if (updateError) {
         console.error('[RateLimit] Error resetting window:', updateError);
-        return { allowed: true }; // Fail open
+        return handleDbError(identifier, identifierType, 'Error resetting window');
       }
 
       return {
@@ -168,8 +288,7 @@ export async function checkRateLimit(
     }
   } catch (error) {
     console.error('[RateLimit] Unexpected error:', error);
-    // Fail open on unexpected errors to prevent service disruption
-    return { allowed: true };
+    return handleDbError(identifier, identifierType, 'Unexpected error');
   }
 }
 
