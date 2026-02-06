@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse, type NextRequest } from 'next/server';
+import { isAdminRole } from '@/lib/utils/auth';
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -82,7 +83,7 @@ export async function updateSession(request: NextRequest) {
       .eq('id', user.id)
       .maybeSingle();
 
-    if (!profile || !['admin', 'company_user'].includes(profile.role)) {
+    if (!profile || !isAdminRole(profile.role)) {
       const url = request.nextUrl.clone();
       url.pathname = '/dashboard';
       return NextResponse.redirect(url);
@@ -103,7 +104,7 @@ export async function updateSession(request: NextRequest) {
       .eq('id', user.id)
       .maybeSingle();
 
-    if (!profile || !['admin', 'company_user', 'mentor'].includes(profile.role)) {
+    if (!profile || !(isAdminRole(profile.role) || profile.role === 'mentor')) {
       const url = request.nextUrl.clone();
       url.pathname = '/dashboard';
       return NextResponse.redirect(url);
