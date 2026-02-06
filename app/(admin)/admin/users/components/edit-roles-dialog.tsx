@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
@@ -29,8 +29,11 @@ export function EditRolesDialog({ user, cohorts, open, onOpenChange, onSaved }: 
   const [roleAssignments, setRoleAssignments] = useState<RoleAssignmentInput[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const handleOpenChange = (newOpen: boolean) => {
-    if (newOpen && user) {
+  // Initialize role assignments when dialog opens
+  // useEffect is needed because Radix Dialog's onOpenChange only fires
+  // on user-initiated dismissals, NOT when the parent sets open={true}
+  useEffect(() => {
+    if (open && user) {
       if (user.role_assignments && user.role_assignments.length > 0) {
         setRoleAssignments(user.role_assignments.map(ra => ({
           role: ra.role,
@@ -43,8 +46,7 @@ export function EditRolesDialog({ user, cohorts, open, onOpenChange, onSaved }: 
         }]);
       }
     }
-    onOpenChange(newOpen);
-  };
+  }, [open, user]);
 
   const addRoleAssignment = () => {
     setRoleAssignments([...roleAssignments, { role: 'student', cohort_id: null }]);
@@ -125,7 +127,7 @@ export function EditRolesDialog({ user, cohorts, open, onOpenChange, onSaved }: 
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Edit Roles</DialogTitle>
