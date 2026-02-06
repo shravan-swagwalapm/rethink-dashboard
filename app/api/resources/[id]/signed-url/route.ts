@@ -34,15 +34,32 @@ export async function GET(
     }
 
     // Verify user has access to this resource
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('cohort_id')
-      .eq('id', user.id)
-      .single();
+    // Check user_role_assignments first (multi-cohort aware), then fallback to legacy profiles.cohort_id
+    let hasAccess = resource.is_global;
 
-    // Check access: global resources OR user's cohort matches (both must be non-null)
-    const hasAccess = resource.is_global ||
-                      (profile?.cohort_id && profile.cohort_id === resource.cohort_id);
+    if (!hasAccess && resource.cohort_id) {
+      // Check if user has ANY role assignment for this resource's cohort
+      const { data: roleAssignment } = await supabase
+        .from('user_role_assignments')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('cohort_id', resource.cohort_id)
+        .limit(1)
+        .maybeSingle();
+
+      if (roleAssignment) {
+        hasAccess = true;
+      } else {
+        // Fallback: check legacy profiles.cohort_id for backward compatibility
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('cohort_id')
+          .eq('id', user.id)
+          .single();
+
+        hasAccess = !!(profile?.cohort_id && profile.cohort_id === resource.cohort_id);
+      }
+    }
 
     if (!hasAccess) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });

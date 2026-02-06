@@ -23,10 +23,10 @@ export async function GET(
     // Await params in Next.js 16
     const { id } = await params;
 
-    // Get resource from module_resources table
+    // Get resource from module_resources table (include module_id for access check)
     const { data: resource, error: resourceError } = await supabase
       .from('module_resources')
-      .select('id, title, file_path, file_type, content_type')
+      .select('id, title, file_path, file_type, content_type, module_id')
       .eq('id', id)
       .single();
 
@@ -40,6 +40,75 @@ export async function GET(
         { error: 'Resource has no uploaded file. It may be a YouTube video or external link.' },
         { status: 400 }
       );
+    }
+
+    // Verify user has access to this module resource
+    // Access chain: module_resources -> learning_modules -> cohort/global/linked
+    let hasAccess = false;
+
+    if (!resource.module_id) {
+      // Orphaned resource (no parent module) — cannot determine cohort restrictions
+      hasAccess = true;
+    } else {
+      // Get parent module to check cohort/global access
+      const { data: module } = await supabase
+        .from('learning_modules')
+        .select('cohort_id, is_global')
+        .eq('id', resource.module_id)
+        .single();
+
+      if (module) {
+        // Global modules are accessible to all authenticated users
+        if (module.is_global) {
+          hasAccess = true;
+        }
+
+        if (!hasAccess) {
+          // Get all cohorts the user belongs to via role assignments
+          const { data: userRoles } = await supabase
+            .from('user_role_assignments')
+            .select('cohort_id')
+            .eq('user_id', user.id);
+
+          const userCohortIds = (userRoles || [])
+            .map(r => r.cohort_id)
+            .filter((id): id is string => id !== null);
+
+          // Check 1: module belongs directly to user's cohort
+          if (module.cohort_id && userCohortIds.includes(module.cohort_id)) {
+            hasAccess = true;
+          }
+
+          // Check 2: module is linked to user's cohort via cross-cohort sharing
+          if (!hasAccess && userCohortIds.length > 0) {
+            const { data: link } = await supabase
+              .from('cohort_module_links')
+              .select('id')
+              .eq('module_id', resource.module_id)
+              .in('cohort_id', userCohortIds)
+              .limit(1)
+              .maybeSingle();
+
+            if (link) hasAccess = true;
+          }
+
+          // Fallback: legacy profiles.cohort_id
+          if (!hasAccess && module.cohort_id) {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('cohort_id')
+              .eq('id', user.id)
+              .single();
+
+            hasAccess = !!(profile?.cohort_id && profile.cohort_id === module.cohort_id);
+          }
+        }
+      }
+      // If module not found (deleted parent), hasAccess remains false
+    }
+
+    if (!hasAccess) {
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
     // Determine expiry based on file type
