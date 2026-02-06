@@ -521,3 +521,74 @@ export interface ApiResponse<T> {
   error?: string;
   message?: string;
 }
+
+// ===== Subgroups & Feedback =====
+
+export type FeedbackType = 'daily' | 'weekly';
+export type FeedbackTargetType = 'mentor' | 'session';
+
+export interface Subgroup {
+  id: string;
+  cohort_id: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SubgroupMember {
+  id: string;
+  subgroup_id: string;
+  user_id: string;
+  created_at: string;
+  user?: Profile;
+}
+
+export interface SubgroupMentor {
+  id: string;
+  subgroup_id: string;
+  user_id: string;
+  created_at: string;
+  user?: Profile;
+}
+
+export interface SubgroupWithDetails extends Subgroup {
+  members?: SubgroupMember[];
+  mentors?: SubgroupMentor[];
+  member_count?: number;
+  mentor_count?: number;
+  cohort?: Cohort;
+}
+
+export interface MentorFeedback {
+  id: string;
+  mentor_id: string;
+  student_id: string;
+  subgroup_id: string;
+  type: FeedbackType;
+  rating: number;
+  comment: string | null;
+  week_number: number | null;
+  feedback_date: string;
+  created_at: string;
+  mentor?: Profile;
+  student?: Profile;
+  subgroup?: Subgroup;
+}
+
+export interface StudentFeedback {
+  id: string;
+  student_id: string;
+  target_type: FeedbackTargetType;
+  target_id: string;
+  rating: number;
+  comment: string | null;
+  week_number: number | null;
+  created_at: string;
+  student?: Profile;
+}
+
+export interface FeedbackAggregate {
+  average_rating: number;
+  total_count: number;
+  by_week?: { week_number: number; average_rating: number; count: number }[];
+}

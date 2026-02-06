@@ -82,6 +82,22 @@ export function EditRolesDialog({ user, cohorts, open, onOpenChange, onSaved }: 
       return;
     }
 
+    // Check for same-cohort mentor+student conflict
+    const cohortRoles = new Map<string, Set<string>>();
+    for (const ra of validAssignments) {
+      if (ra.cohort_id && ['student', 'mentor'].includes(ra.role)) {
+        const roles = cohortRoles.get(ra.cohort_id) || new Set();
+        roles.add(ra.role);
+        cohortRoles.set(ra.cohort_id, roles);
+      }
+    }
+    for (const [, roles] of cohortRoles) {
+      if (roles.has('student') && roles.has('mentor')) {
+        toast.error('A user cannot be both mentor and student for the same cohort');
+        return;
+      }
+    }
+
     setLoading(true);
     try {
       const response = await fetch('/api/admin/users', {

@@ -9,6 +9,7 @@ import {
   Calendar,
   BookOpen,
   FolderOpen,
+  MessageSquare,
   HelpCircle,
   Users,
   BarChart3,
@@ -42,6 +43,9 @@ const navItems: NavItem[] = [
   { label: 'My Learnings', href: '/learnings', icon: BookOpen },
   { label: 'Resources', href: '/resources', icon: FolderOpen },
   { label: 'Invoices', href: '/invoices', icon: Receipt },
+  { label: 'My Subgroup', href: '/my-subgroup', icon: Users },
+  { label: 'My Subgroups', href: '/mentor/subgroups', icon: Users, roles: ['mentor'] },
+  { label: 'Give Feedback', href: '/mentor/feedback', icon: MessageSquare, roles: ['mentor'] },
   { label: 'Team', href: '/team', icon: Users, roles: ['admin', 'company_user', 'mentor'] },
   { label: 'Attendance', href: '/attendance', icon: BarChart3, roles: ['admin', 'company_user', 'mentor'] },
 ];

@@ -119,6 +119,24 @@ export async function PUT(request: NextRequest) {
 
     // Handle role_assignments update (new multi-role mode)
     if (role_assignments !== undefined && Array.isArray(role_assignments)) {
+      // Validate: no user can be both mentor AND student for the same cohort
+      const cohortRoles = new Map<string, Set<string>>();
+      for (const ra of role_assignments as RoleAssignment[]) {
+        if (ra.cohort_id && ['student', 'mentor'].includes(ra.role)) {
+          const roles = cohortRoles.get(ra.cohort_id) || new Set();
+          roles.add(ra.role);
+          cohortRoles.set(ra.cohort_id, roles);
+        }
+      }
+      for (const [, roles] of cohortRoles) {
+        if (roles.has('student') && roles.has('mentor')) {
+          return NextResponse.json(
+            { error: 'A user cannot be both mentor and student for the same cohort' },
+            { status: 400 }
+          );
+        }
+      }
+
       // Delete existing assignments
       await adminClient
         .from('user_role_assignments')

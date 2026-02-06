@@ -12,6 +12,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   LayoutDashboard,
   Users,
+  UserCheck,
   CalendarDays,
   Video,
   FolderOpen,
@@ -30,6 +31,7 @@ const adminNavItems = [
   { label: 'Overview', href: '/admin', icon: LayoutDashboard },
   { label: 'Cohorts', href: '/admin/cohorts', icon: CalendarDays },
   { label: 'Users', href: '/admin/users', icon: Users },
+  { label: 'Mentors', href: '/admin/mentors', icon: UserCheck },
   { label: 'Sessions', href: '/admin/sessions', icon: Video },
   { label: 'Learnings', href: '/admin/learnings', icon: BookOpen },
   { label: 'Resources', href: '/admin/resources', icon: FolderOpen },
