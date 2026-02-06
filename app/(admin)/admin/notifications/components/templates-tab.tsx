@@ -68,7 +68,6 @@ export function TemplatesTab() {
     channel: 'email' as 'email' | 'sms' | 'whatsapp',
   });
   const [htmlPreviewMode, setHtmlPreviewMode] = useState<'desktop' | 'mobile'>('desktop');
-  const htmlFileInputRef = useState<HTMLInputElement | null>(null);
   const [previewTemplate, setPreviewTemplate] = useState<NotificationTemplate | null>(null);
   const [showVariableConfig, setShowVariableConfig] = useState(false);
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -333,6 +333,15 @@ export default function SessionsPage() {
     return <Badge className="bg-green-500/10 text-green-600">Upcoming</Badge>;
   };
 
+  const upcomingCount = useMemo(
+    () => sessions.filter(s => !isPast(parseISO(s.scheduled_at))).length,
+    [sessions]
+  );
+  const avgRsvps = useMemo(
+    () => sessions.length > 0 ? Math.round(sessions.reduce((acc, s) => acc + (s.rsvp_yes_count || 0), 0) / sessions.length) : 0,
+    [sessions]
+  );
+
   if (loading) {
     return <PageLoader message="Loading sessions..." />;
   }
@@ -378,7 +387,7 @@ export default function SessionsPage() {
               <div>
                 <p className="text-xs text-muted-foreground">Upcoming</p>
                 <p className="text-xl font-bold">
-                  {sessions.filter(s => !isPast(parseISO(s.scheduled_at))).length}
+                  {upcomingCount}
                 </p>
               </div>
             </div>
@@ -394,12 +403,7 @@ export default function SessionsPage() {
               <div>
                 <p className="text-xs text-muted-foreground">Avg RSVPs</p>
                 <p className="text-xl font-bold">
-                  {sessions.length > 0
-                    ? Math.round(
-                        sessions.reduce((acc, s) => acc + (s.rsvp_yes_count || 0), 0) /
-                          sessions.length
-                      )
-                    : 0}
+                  {avgRsvps}
                 </p>
               </div>
             </div>

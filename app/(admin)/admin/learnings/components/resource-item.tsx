@@ -35,19 +35,18 @@ export function ResourceItem({
   onEdit,
   onDelete,
 }: ResourceItemProps) {
-  const colorMap = {
-    video: 'purple',
-    slides: 'orange',
-    document: 'blue',
-    link: 'gray',
+  const hoverBorderClass = {
+    video: 'hover:border-purple-500/50 dark:hover:border-purple-500/50',
+    slides: 'hover:border-orange-500/50 dark:hover:border-orange-500/50',
+    document: 'hover:border-blue-500/50 dark:hover:border-blue-500/50',
+    link: 'hover:border-gray-500/50 dark:hover:border-gray-500/50',
   };
-  const color = colorMap[resource.content_type as keyof typeof colorMap] || 'gray';
 
   return (
     <div className={cn(
       "flex items-center gap-4 p-4 rounded-lg border-2 transition-all group",
       "dark:border-gray-700 bg-white dark:bg-gray-900",
-      "hover:border-${color}-500/50 dark:hover:border-${color}-500/50",
+      hoverBorderClass[resource.content_type as keyof typeof hoverBorderClass] || hoverBorderClass.link,
       "shadow-sm hover:shadow-md"
     )}>
       <div className={cn(

@@ -20,7 +20,7 @@ import {
 import { toast } from 'sonner';
 import { RecipientSelector } from '@/components/admin/notifications/recipient-selector';
 import { VariableEditor } from '@/components/admin/notifications/variable-editor';
-import { NotificationTemplate, getChannelIcon, getChannelColor } from '../types';
+import { NotificationTemplate, getChannelIcon } from '../types';
 
 interface ComposeTabProps {
   onNavigateToTemplates?: () => void;

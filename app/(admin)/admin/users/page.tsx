@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { PageLoader } from '@/components/ui/page-loader';
 import { toast } from 'sonner';
@@ -78,7 +78,7 @@ export default function UsersPage() {
     setMultiRoleFilter('all');
   };
 
-  const filteredUsers = users.filter(user => {
+  const filteredUsers = useMemo(() => users.filter(user => {
     const matchesSearch = !searchQuery || (() => {
       const query = searchQuery.toLowerCase();
       return (
@@ -128,7 +128,7 @@ export default function UsersPage() {
 
     return matchesSearch && matchesRole && matchesCohort &&
            matchesPhoneStatus && matchesDateRange && matchesMultiRole;
-  });
+  }), [users, searchQuery, roleFilter, selectedCohorts, phoneStatusFilter, dateRangeFrom, dateRangeTo, multiRoleFilter]);
 
   const handleExportFiltered = () => {
     const exportData = filteredUsers.map(user => ({

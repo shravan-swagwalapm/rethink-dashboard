@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-**Last Updated**: 2026-02-03 (Architecture Analysis & Init Command)
+**Last Updated**: 2026-02-06 (Post-Refactor — Layers 0-4 Complete)
 **Project**: Rethink Dashboard (Educational Platform)
 
 ---
@@ -121,13 +121,25 @@ components/
 └── [feature]/                 # Feature-specific components
 
 lib/
+├── api/                       # Shared API utilities (added in refactor)
+│   ├── verify-admin.ts       # Shared admin auth verification (used by all 26 admin routes)
+│   ├── responses.ts          # Standardized successResponse/errorResponse helpers
+│   └── sanitize.ts           # Input sanitization for PostgREST filters
+├── env.ts                     # Zod-validated environment variables
 ├── supabase/                  # Database clients (server, client, middleware)
 ├── integrations/              # External APIs (MSG91, Resend)
-├── services/                  # Business logic (rate limiting, etc.)
-└── utils/                     # Helpers (phone formatting, date handling)
+├── services/                  # Business logic
+│   ├── otp-rate-limiter.ts   # OTP rate limiting
+│   └── calendar-helpers.ts   # Google Calendar integration helpers
+├── utils/                     # Helpers (phone formatting, date handling)
+│   └── currency.ts           # Shared formatCurrency (INR)
+└── validations/               # Zod schemas (future use)
+
+contexts/
+└── user-context.tsx           # UserProvider — single API call per page load
 
 hooks/
-├── use-user.ts               # Central auth state (user, profile, roles)
+├── use-user.ts               # Central auth state (wrapped by UserContext)
 └── use-notifications.ts      # Real-time notifications
 
 types/
@@ -153,10 +165,12 @@ types/
 - Email domain whitelist enforced
 
 **Critical Auth Files**:
-- `/middleware.ts` - Request-level auth guard
+- `/middleware.ts` - Request-level auth guard (uses `isAdminRole()` from shared auth)
+- `/lib/api/verify-admin.ts` - Shared admin verification for all API routes
 - `/lib/supabase/server.ts` - SSR-safe Supabase client + admin client
-- `/hooks/use-user.ts` - Client-side auth state management
-- `/lib/services/otp-rate-limiter.ts` - Rate limiting logic
+- `/contexts/user-context.tsx` - UserProvider (single API call per page load)
+- `/hooks/use-user.ts` - Client-side auth state management (wrapped by UserContext)
+- `/lib/services/otp-rate-limiter.ts` - Rate limiting logic (fail-closed)
 - `/lib/integrations/msg91-otp.ts` - SMS OTP integration
 
 ### Admin Access Control Pattern
@@ -508,8 +522,7 @@ Changes should only touch what's necessary. Avoid introducing bugs.
 - Animations: Framer Motion 12.29.2
 - Icons: Lucide React
 - Theme: next-themes (dark mode support)
-- Tables: TanStack Table 8.21.3
-- Charts: Recharts 3.7.0
+- Tables: Native HTML tables (TanStack Table removed — not used)
 - Toasts: Sonner 2.0.7
 
 **Backend**:
@@ -557,7 +570,7 @@ Changes should only touch what's necessary. Avoid introducing bugs.
 - [ ] Confirmation dialogs for destructive actions (using AlertDialog)
 - [ ] Toast notifications for user feedback (using Sonner)
 - [ ] Sidebar responsive (collapsible on mobile)
-- [ ] Loading skeletons for data fetching
+- [x] Loading skeletons for data fetching (loading.tsx in both route groups)
 - [ ] Keyboard shortcuts for power users
 
 **Performance**:
@@ -660,6 +673,15 @@ Changes should only touch what's necessary. Avoid introducing bugs.
 - Update 2026-02-02: Client-side vs server-side filtering decision → For <500 records, client-side filtering is instant and simpler. For >1000 records, migrate to server-side with API params pattern
 - Update 2026-02-02: Filter state management - used individual useState for each filter → This is correct pattern (not combined filter object). Matches existing codebase patterns and easier to manage
 
+**Codebase Refactor (2026-02-06)**:
+- Update 2026-02-06: 26 admin routes each had local verifyAdmin() with inconsistent role checks → Extract shared utility (`lib/api/verify-admin.ts`) that checks BOTH `profiles.role` AND `user_role_assignments`. Import in every route. Single source of truth for auth
+- Update 2026-02-06: 11 notification routes excluded `company_user` from admin check → Use `isAdminRole()` from `lib/utils/auth.ts` which includes all admin roles. Never hardcode role arrays inline
+- Update 2026-02-06: `.or()` filter inputs not sanitized (PostgREST injection risk) → Always use `sanitizeFilterValue()` from `lib/api/sanitize.ts` before `.ilike()` or `.or()` calls
+- Update 2026-02-06: 5+ API calls per page load from `useUser()` in multiple components → Wrap with `UserContext` provider in layout, use `useUserContext()` hook. Single fetch per page navigation
+- Update 2026-02-06: N+1 queries in sessions route (200+ DB calls for 100 sessions) → Batch fetch with `.in('session_id', ids)` and group in JS. 3 queries total
+- Update 2026-02-06: 2,438-line notifications page impossible to maintain → Decompose mega-files into tab components. Orchestrator page <200 lines, each tab component self-contained
+- Update 2026-02-06: Unused dependencies (recharts, @tanstack/react-table) bloating bundle → Audit imports before removing. `dompurify` redundant with `isomorphic-dompurify`. @types/* belong in devDependencies
+
 [Claude: Add new entries here after each mistake]
 
 ---
@@ -726,6 +748,16 @@ Changes should only touch what's necessary. Avoid introducing bugs.
 - Spam account detection pattern: Test emails with patterns (aabc, aaabc, aaaabc) → Easy to spot and remove before production use
 - Database cleanup scripts: Created reusable delete/verify scripts → Can audit and clean data safely
 - Match-before-update pattern: Query database → match CSV → generate SQL → verify → execute → Prevents blind updates, shows statistics at each step
+
+**Codebase Refactor Patterns (2026-02-06)**:
+- "Create, Verify, Swap, Delete" methodology: Never modify in-place. Create new files → verify build → swap imports → delete old code → Zero regressions across 107 files changed
+- Shared verifyAdmin() for all admin routes: Single import replaces 26 local copies → Consistent auth, single place to fix bugs, ~500 lines removed
+- UserContext provider wrapping layouts: Single API call per page load instead of 5+ → Faster page transitions, no auth flicker
+- Tab-based component decomposition: Each tab becomes its own file with clear interface → Notifications page: 2,438 → 81 lines orchestrator + 4 focused components
+- Reusable component via mode prop: `FileUploadTab` handles both presentations and PDFs → One component, two use cases, no duplication
+- Cross-tab navigation via callback prop: `onNavigateToTemplates` callback from parent → Clean separation between tab components without shared state
+- useMemo for filtered lists: Wrap expensive filter/sort computations → Users page: 6 filter criteria only recompute when inputs change, not on every dialog open/close
+- countByRole single-pass helper: One loop replaces 6 `.filter()` calls in user-stats → O(n) once instead of O(6n)
 
 [Claude: Add new entries when something works really well]
 

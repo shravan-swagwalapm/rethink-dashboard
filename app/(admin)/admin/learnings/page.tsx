@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -167,13 +167,18 @@ export default function LearningsPage() {
 
   // --- Derived data ---
 
-  const weeks = [...new Set(modules.map(m => m.week_number).filter(Boolean))].sort((a, b) => (a as number) - (b as number));
-  const currentWeekModule = modules.find(m => m.week_number?.toString() === selectedWeek);
+  const weeks = useMemo(() =>
+    [...new Set(modules.map(m => m.week_number).filter(Boolean))].sort((a, b) => (a as number) - (b as number)),
+    [modules]
+  );
+  const currentWeekModule = useMemo(() => modules.find(m => m.week_number?.toString() === selectedWeek), [modules, selectedWeek]);
   const weekResources = currentWeekModule?.resources || [];
-  const recordings = weekResources.filter(r => r.content_type === 'video');
-  const slides = weekResources.filter(r => r.content_type === 'slides');
-  const documents = weekResources.filter(r => r.content_type === 'document');
-  const weekCaseStudies = caseStudies.filter(cs => cs.week_number?.toString() === selectedWeek);
+  const { recordings, slides, documents } = useMemo(() => ({
+    recordings: weekResources.filter(r => r.content_type === 'video'),
+    slides: weekResources.filter(r => r.content_type === 'slides'),
+    documents: weekResources.filter(r => r.content_type === 'document'),
+  }), [weekResources]);
+  const weekCaseStudies = useMemo(() => caseStudies.filter(cs => cs.week_number?.toString() === selectedWeek), [caseStudies, selectedWeek]);
 
   // --- Module CRUD ---
 
