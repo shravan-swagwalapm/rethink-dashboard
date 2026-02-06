@@ -268,3 +268,49 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to update user' }, { status: 500 });
   }
 }
+
+// DELETE - Remove a user and all associated data
+export async function DELETE(request: NextRequest) {
+  const auth = await verifyAdmin();
+  if (!auth.authorized) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
+
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
+    }
+
+    // Prevent self-deletion
+    if (id === auth.userId) {
+      return NextResponse.json({ error: 'You cannot delete your own account' }, { status: 400 });
+    }
+
+    const adminClient = await createAdminClient();
+
+    // Delete role assignments first (no FK cascade from profiles)
+    await adminClient
+      .from('user_role_assignments')
+      .delete()
+      .eq('user_id', id);
+
+    // Delete the profile (cascades to subgroup_members, subgroup_mentors, feedback via FK)
+    const { error } = await adminClient
+      .from('profiles')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+
+    // Also delete the auth user from Supabase Auth
+    await adminClient.auth.admin.deleteUser(id);
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    return NextResponse.json({ error: 'Failed to delete user' }, { status: 500 });
+  }
+}

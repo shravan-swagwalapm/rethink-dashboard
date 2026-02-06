@@ -223,6 +223,7 @@ export default function UsersPage() {
         cohorts={cohorts}
         activeFilterCount={activeFilterCount}
         onEditRoles={handleEditRoles}
+        onDeleted={() => fetchData(true)}
       />
     </div>
   );
