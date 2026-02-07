@@ -18,7 +18,8 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { RefreshCw, Calculator, CheckCircle2, Clock, Minus, Video, Loader2, Plus, Eye } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { RefreshCw, Calculator, CheckCircle2, Clock, Minus, Video, Loader2, Plus, Eye, Info } from 'lucide-react';
 import { AttendancePreviewDialog } from './attendance-preview-dialog';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
@@ -42,6 +43,7 @@ interface ZoomMeeting {
   countsForStudents: boolean;
   actualDurationMinutes: number;
   hasAttendance: boolean;
+  uniqueParticipantCount: number | null;
   isProperSession: boolean;
 }
 
@@ -224,10 +226,12 @@ export function MeetingsManagerTab({ cohorts }: MeetingsManagerTabProps) {
         );
       }
 
-      // Update meeting status
+      // Update meeting status + unique count
       setMeetings((prev) =>
         prev.map((m) =>
-          m.zoomId === meeting.zoomId ? { ...m, hasAttendance: true } : m
+          m.zoomId === meeting.zoomId
+            ? { ...m, hasAttendance: true, uniqueParticipantCount: result.imported + result.unmatched }
+            : m
         )
       );
       return true;
@@ -377,7 +381,22 @@ export function MeetingsManagerTab({ cohorts }: MeetingsManagerTabProps) {
                       <TableHead className="sticky left-0 bg-background z-10 min-w-[200px]">Title</TableHead>
                       <TableHead>Date</TableHead>
                       <TableHead>Duration</TableHead>
-                      <TableHead>Participants</TableHead>
+                      <TableHead>
+                        <Tooltip>
+                          <TooltipTrigger className="flex items-center gap-1">
+                            Zoom Joins <Info className="w-3 h-3 text-muted-foreground" />
+                          </TooltipTrigger>
+                          <TooltipContent>Total join events from Zoom. Includes rejoins and device switches.</TooltipContent>
+                        </Tooltip>
+                      </TableHead>
+                      <TableHead>
+                        <Tooltip>
+                          <TooltipTrigger className="flex items-center gap-1">
+                            Unique <Info className="w-3 h-3 text-muted-foreground" />
+                          </TooltipTrigger>
+                          <TooltipContent>Deduplicated participants after attendance calculation.</TooltipContent>
+                        </Tooltip>
+                      </TableHead>
                       <TableHead>Cohort</TableHead>
                       <TableHead>Counts</TableHead>
                       <TableHead>Status</TableHead>
@@ -403,6 +422,9 @@ export function MeetingsManagerTab({ cohorts }: MeetingsManagerTabProps) {
                           </TableCell>
                           <TableCell className="text-sm">
                             {meeting.participantCount}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {meeting.uniqueParticipantCount ?? '—'}
                           </TableCell>
                           <TableCell>
                             <Select

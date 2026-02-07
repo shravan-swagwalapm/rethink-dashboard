@@ -41,16 +41,18 @@ export async function GET() {
 
     // Get attendance calculation status for linked sessions
     const linkedSessionIds = (linkedSessions || []).map((s) => s.id);
-    const { data: attendanceCounts } = linkedSessionIds.length > 0
+    const { data: attendanceRecords } = linkedSessionIds.length > 0
       ? await supabase
           .from('attendance')
           .select('session_id')
           .in('session_id', linkedSessionIds)
       : { data: [] };
 
-    const sessionsWithAttendance = new Set(
-      (attendanceCounts || []).map((a) => a.session_id)
-    );
+    // Build both: existence check + count per session
+    const attendanceCountBySession = new Map<string, number>();
+    for (const a of attendanceRecords || []) {
+      attendanceCountBySession.set(a.session_id, (attendanceCountBySession.get(a.session_id) || 0) + 1);
+    }
 
     // Build response
     const enrichedMeetings = meetings.map((m) => {
@@ -67,7 +69,8 @@ export async function GET() {
         cohortId: linkedSession?.cohort_id || null,
         countsForStudents: linkedSession?.counts_for_students || false,
         actualDurationMinutes: linkedSession?.actual_duration_minutes || linkedSession?.duration_minutes || m.duration,
-        hasAttendance: linkedSession ? sessionsWithAttendance.has(linkedSession.id) : false,
+        hasAttendance: linkedSession ? attendanceCountBySession.has(linkedSession.id) : false,
+        uniqueParticipantCount: linkedSession ? (attendanceCountBySession.get(linkedSession.id) || null) : null,
         isProperSession: linkedSession ? !!linkedSession.cohort_id : false,
       };
     });
