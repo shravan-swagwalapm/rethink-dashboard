@@ -68,6 +68,7 @@ export async function GET() {
         countsForStudents: linkedSession?.counts_for_students || false,
         actualDurationMinutes: linkedSession?.actual_duration_minutes || linkedSession?.duration_minutes || m.duration,
         hasAttendance: linkedSession ? sessionsWithAttendance.has(linkedSession.id) : false,
+        isProperSession: linkedSession ? !!linkedSession.cohort_id : false,
       };
     });
 
@@ -93,7 +94,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { zoomMeetingId, sessionId, cohortId, topic, countsForStudents, actualDurationMinutes } = body;
+    const { zoomMeetingId, sessionId, cohortId, topic, countsForStudents, actualDurationMinutes, scheduledAt, title } = body;
 
     if (!zoomMeetingId) {
       return NextResponse.json({ error: 'zoomMeetingId is required' }, { status: 400 });
@@ -112,6 +113,12 @@ export async function POST(request: NextRequest) {
       if (actualDurationMinutes) {
         updateData.actual_duration_minutes = actualDurationMinutes;
       }
+      if (cohortId !== undefined) {
+        updateData.cohort_id = cohortId || null;
+      }
+      if (title) {
+        updateData.title = title;
+      }
 
       const { error } = await supabase
         .from('sessions')
@@ -127,7 +134,7 @@ export async function POST(request: NextRequest) {
         title: topic || 'Zoom Meeting',
         zoom_meeting_id: zoomMeetingId,
         cohort_id: cohortId || null,
-        scheduled_at: new Date().toISOString(),
+        scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : new Date().toISOString(),
         duration_minutes: actualDurationMinutes || 60,
         actual_duration_minutes: actualDurationMinutes || null,
         counts_for_students: countsForStudents ?? true,

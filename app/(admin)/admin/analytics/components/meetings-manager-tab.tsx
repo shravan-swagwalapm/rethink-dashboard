@@ -15,7 +15,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { RefreshCw, Calculator, CheckCircle2, Clock, Minus, Video, Loader2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { RefreshCw, Calculator, CheckCircle2, Clock, Minus, Video, Loader2, Plus } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -38,6 +41,7 @@ interface ZoomMeeting {
   countsForStudents: boolean;
   actualDurationMinutes: number;
   hasAttendance: boolean;
+  isProperSession: boolean;
 }
 
 interface MeetingsManagerTabProps {
@@ -45,15 +49,23 @@ interface MeetingsManagerTabProps {
 }
 
 function getStatusBadge(meeting: ZoomMeeting) {
-  if (meeting.hasAttendance) {
+  if (meeting.hasAttendance && meeting.isProperSession) {
     return (
       <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-200">
         <CheckCircle2 className="w-3 h-3 mr-1" />
-        Calculated
+        Complete
       </Badge>
     );
   }
-  if (meeting.countsForStudents && meeting.linkedSessionId) {
+  if (meeting.hasAttendance && !meeting.isProperSession) {
+    return (
+      <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-200">
+        <Clock className="w-3 h-3 mr-1" />
+        Needs Session
+      </Badge>
+    );
+  }
+  if (meeting.linkedSessionId && !meeting.hasAttendance) {
     return (
       <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-200">
         <Clock className="w-3 h-3 mr-1" />
@@ -64,7 +76,7 @@ function getStatusBadge(meeting: ZoomMeeting) {
   return (
     <Badge variant="outline" className="bg-gray-500/10 text-gray-500 border-gray-200">
       <Minus className="w-3 h-3 mr-1" />
-      Excluded
+      Zoom Only
     </Badge>
   );
 }
@@ -75,6 +87,11 @@ export function MeetingsManagerTab({ cohorts }: MeetingsManagerTabProps) {
   const [synced, setSynced] = useState(false);
   const [calculatingIds, setCalculatingIds] = useState<Set<string>>(new Set());
   const [calculatingAll, setCalculatingAll] = useState(false);
+  const [createSessionMeeting, setCreateSessionMeeting] = useState<ZoomMeeting | null>(null);
+  const [createSessionTitle, setCreateSessionTitle] = useState('');
+  const [createSessionCohortId, setCreateSessionCohortId] = useState('');
+  const [createSessionCounts, setCreateSessionCounts] = useState(true);
+  const [creatingSession, setCreatingSession] = useState(false);
 
   const syncFromZoom = useCallback(async () => {
     setLoading(true);
@@ -158,6 +175,7 @@ export function MeetingsManagerTab({ cohorts }: MeetingsManagerTabProps) {
             topic: meeting.topic,
             countsForStudents: true,
             actualDurationMinutes: meeting.actualDurationMinutes || meeting.duration,
+            scheduledAt: meeting.date,
           }),
         });
         if (!linkRes.ok) {
@@ -248,6 +266,42 @@ export function MeetingsManagerTab({ cohorts }: MeetingsManagerTabProps) {
       toast.success(`Calculated ${success} meetings successfully`);
     }
   }, [meetings, calculateAttendance]);
+
+  const openCreateSessionDialog = useCallback((meeting: ZoomMeeting) => {
+    setCreateSessionMeeting(meeting);
+    setCreateSessionTitle(meeting.topic);
+    setCreateSessionCohortId('');
+    setCreateSessionCounts(true);
+  }, []);
+
+  const handleCreateSession = useCallback(async () => {
+    if (!createSessionMeeting || !createSessionCohortId) return;
+
+    setCreatingSession(true);
+    try {
+      const res = await fetch('/api/admin/analytics/sync-zoom', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          zoomMeetingId: createSessionMeeting.zoomId,
+          sessionId: createSessionMeeting.linkedSessionId,
+          cohortId: createSessionCohortId,
+          title: createSessionTitle,
+          countsForStudents: createSessionCounts,
+        }),
+      });
+
+      if (!res.ok) throw new Error('Failed to create session');
+
+      setCreateSessionMeeting(null);
+      await syncFromZoom();
+      toast.success('Session created and linked to cohort');
+    } catch {
+      toast.error('Failed to create session');
+    } finally {
+      setCreatingSession(false);
+    }
+  }, [createSessionMeeting, createSessionCohortId, createSessionTitle, createSessionCounts, syncFromZoom]);
 
   const pendingCount = meetings.filter(
     (m) => m.countsForStudents && !m.hasAttendance
@@ -351,6 +405,7 @@ export function MeetingsManagerTab({ cohorts }: MeetingsManagerTabProps) {
                             <Select
                               value={meeting.cohortId || 'none'}
                               onValueChange={(value) => updateCohort(meeting, value)}
+                              disabled={!meeting.isProperSession}
                             >
                               <SelectTrigger className="w-[140px] h-8 text-xs">
                                 <SelectValue placeholder="Assign..." />
@@ -376,22 +431,51 @@ export function MeetingsManagerTab({ cohorts }: MeetingsManagerTabProps) {
                           </TableCell>
                           <TableCell>{getStatusBadge(meeting)}</TableCell>
                           <TableCell>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => calculateAttendance(meeting)}
-                              disabled={isCalculating}
-                              className="gap-1.5 h-8 text-xs"
-                            >
-                              {isCalculating ? (
-                                <Loader2 className="w-3 h-3 animate-spin" />
-                              ) : meeting.hasAttendance ? (
-                                <RefreshCw className="w-3 h-3" />
-                              ) : (
-                                <Calculator className="w-3 h-3" />
+                            <div className="flex items-center gap-1.5">
+                              {!meeting.hasAttendance && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => calculateAttendance(meeting)}
+                                  disabled={isCalculating}
+                                  className="gap-1.5 h-8 text-xs"
+                                >
+                                  {isCalculating ? (
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                  ) : (
+                                    <Calculator className="w-3 h-3" />
+                                  )}
+                                  Calculate
+                                </Button>
                               )}
-                              {meeting.hasAttendance ? 'Recalculate' : 'Calculate'}
-                            </Button>
+                              {meeting.hasAttendance && !meeting.isProperSession && (
+                                <Button
+                                  size="sm"
+                                  variant="default"
+                                  onClick={() => openCreateSessionDialog(meeting)}
+                                  className="gap-1.5 h-8 text-xs"
+                                >
+                                  <Plus className="w-3 h-3" />
+                                  Create Session
+                                </Button>
+                              )}
+                              {meeting.hasAttendance && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => calculateAttendance(meeting)}
+                                  disabled={isCalculating}
+                                  className="gap-1.5 h-8 text-xs"
+                                >
+                                  {isCalculating ? (
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                  ) : (
+                                    <RefreshCw className="w-3 h-3" />
+                                  )}
+                                  Recalculate
+                                </Button>
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       );
@@ -403,6 +487,68 @@ export function MeetingsManagerTab({ cohorts }: MeetingsManagerTabProps) {
           </CardContent>
         </Card>
       </motion.div>
+
+      {/* Create Session Dialog */}
+      <Dialog open={!!createSessionMeeting} onOpenChange={(open) => !open && setCreateSessionMeeting(null)}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Create Session for Cohort</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="session-title">Title</Label>
+              <Input
+                id="session-title"
+                value={createSessionTitle}
+                onChange={(e) => setCreateSessionTitle(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Date</Label>
+              <Input
+                value={createSessionMeeting ? format(new Date(createSessionMeeting.date), 'MMM d, yyyy') : ''}
+                disabled
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="session-cohort">Cohort</Label>
+              <Select value={createSessionCohortId} onValueChange={setCreateSessionCohortId}>
+                <SelectTrigger id="session-cohort">
+                  <SelectValue placeholder="Select a cohort..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {cohorts.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="session-counts">Counts for attendance</Label>
+              <Switch
+                id="session-counts"
+                checked={createSessionCounts}
+                onCheckedChange={setCreateSessionCounts}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateSessionMeeting(null)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateSession}
+              disabled={!createSessionCohortId || creatingSession}
+              className="gap-2"
+            >
+              {creatingSession && <Loader2 className="w-4 h-4 animate-spin" />}
+              Create Session
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
