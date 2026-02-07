@@ -145,18 +145,46 @@ export function MeetingsManagerTab({ cohorts }: MeetingsManagerTabProps) {
   }, [syncFromZoom]);
 
   const calculateAttendance = useCallback(async (meeting: ZoomMeeting, silent = false): Promise<boolean> => {
-    if (!meeting.linkedSessionId) {
-      if (!silent) toast.error('Link this meeting to a session first');
-      return false;
-    }
-
     setCalculatingIds((prev) => new Set(prev).add(meeting.zoomId));
     try {
+      // Auto-create a session if one doesn't exist yet
+      let sessionId = meeting.linkedSessionId;
+      if (!sessionId) {
+        const linkRes = await fetch('/api/admin/analytics/sync-zoom', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            zoomMeetingId: meeting.zoomId,
+            topic: meeting.topic,
+            countsForStudents: true,
+            actualDurationMinutes: meeting.actualDurationMinutes || meeting.duration,
+          }),
+        });
+        if (!linkRes.ok) {
+          if (!silent) toast.error('Failed to create session for this meeting');
+          return false;
+        }
+        // Re-sync to get the new session ID
+        const syncRes = await fetch('/api/admin/analytics/sync-zoom');
+        if (syncRes.ok) {
+          const syncData = await syncRes.json();
+          const updated = (syncData.meetings || []).find((m: ZoomMeeting) => m.zoomId === meeting.zoomId);
+          if (updated?.linkedSessionId) {
+            sessionId = updated.linkedSessionId;
+            setMeetings(syncData.meetings);
+          }
+        }
+        if (!sessionId) {
+          if (!silent) toast.error('Failed to link meeting to a session');
+          return false;
+        }
+      }
+
       const res = await fetch('/api/admin/analytics/calculate-attendance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sessionId: meeting.linkedSessionId,
+          sessionId,
           zoomMeetingUuid: meeting.uuid,
           actualDurationMinutes: meeting.actualDurationMinutes,
         }),
@@ -196,7 +224,7 @@ export function MeetingsManagerTab({ cohorts }: MeetingsManagerTabProps) {
 
   const calculateAllPending = useCallback(async () => {
     const pending = meetings.filter(
-      (m) => m.countsForStudents && m.linkedSessionId && !m.hasAttendance
+      (m) => m.countsForStudents && !m.hasAttendance
     );
     if (pending.length === 0) {
       toast.info('No pending meetings to calculate');
@@ -222,7 +250,7 @@ export function MeetingsManagerTab({ cohorts }: MeetingsManagerTabProps) {
   }, [meetings, calculateAttendance]);
 
   const pendingCount = meetings.filter(
-    (m) => m.countsForStudents && m.linkedSessionId && !m.hasAttendance
+    (m) => m.countsForStudents && !m.hasAttendance
   ).length;
 
   return (
@@ -352,7 +380,7 @@ export function MeetingsManagerTab({ cohorts }: MeetingsManagerTabProps) {
                               size="sm"
                               variant="outline"
                               onClick={() => calculateAttendance(meeting)}
-                              disabled={isCalculating || !meeting.linkedSessionId}
+                              disabled={isCalculating}
                               className="gap-1.5 h-8 text-xs"
                             >
                               {isCalculating ? (
