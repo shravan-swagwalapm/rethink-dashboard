@@ -74,8 +74,9 @@ export async function GET() {
     return NextResponse.json({ meetings: enrichedMeetings });
   } catch (error) {
     console.error('Error syncing Zoom meetings:', error);
+    const message = error instanceof Error ? error.message : 'Failed to sync Zoom meetings';
     return NextResponse.json(
-      { error: 'Failed to sync Zoom meetings' },
+      { error: message },
       { status: 500 }
     );
   }
