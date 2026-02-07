@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -116,6 +116,11 @@ export function MeetingsManagerTab({ cohorts }: MeetingsManagerTabProps) {
       setLoading(false);
     }
   }, []);
+
+  // Auto-fetch meetings on mount so data persists across tab switches and refreshes
+  useEffect(() => {
+    syncFromZoom();
+  }, [syncFromZoom]);
 
   const toggleCountsForStudents = useCallback(async (meeting: ZoomMeeting, value: boolean) => {
     try {
