@@ -244,6 +244,9 @@ export class ZoomService {
   }> {
     const token = await this.getAccessToken();
 
+    // Reports API requires a real user ID (not "me"), so resolve it first
+    const userId = await this.resolveUserId(token);
+
     const params = new URLSearchParams({
       from: options.from,
       to: options.to,
@@ -257,7 +260,7 @@ export class ZoomService {
 
     // Use Reports API — supports from/to date range and returns participants_count
     const response = await fetch(
-      `https://api.zoom.us/v2/report/users/me/meetings?${params}`,
+      `https://api.zoom.us/v2/report/users/${userId}/meetings?${params}`,
       {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -275,6 +278,23 @@ export class ZoomService {
       meetings: data.meetings || [],
       nextPageToken: data.next_page_token,
     };
+  }
+
+  /**
+   * Resolve "me" to an actual Zoom user ID (needed for Reports API)
+   */
+  private async resolveUserId(token: string): Promise<string> {
+    const response = await fetch('https://api.zoom.us/v2/users/me', {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to resolve Zoom user: ${error}`);
+    }
+
+    const data = await response.json();
+    return data.id;
   }
 
   /**
