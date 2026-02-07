@@ -174,9 +174,11 @@ export default function LearningsPage() {
   const [selectedCaseStudy, setSelectedCaseStudy] = useState<{
     caseStudy: CaseStudy;
     type: 'problem' | 'solution';
-    signedUrl: string;
+    signedUrl: string | null;
+    solutionId?: string;
     title: string;
   } | null>(null);
+  const [caseStudyLoading, setCaseStudyLoading] = useState(false);
   const [activeWeek, setActiveWeek] = useState<string>('');
 
   // New state for tracking features
@@ -858,35 +860,56 @@ export default function LearningsPage() {
     }
   };
 
-  const handleCaseStudyClick = async (
+  const handleCaseStudyClick = (
     caseStudy: CaseStudy,
     type: 'problem' | 'solution',
     solutionId?: string,
     solutionTitle?: string
   ) => {
-    try {
-      let url = `/api/case-studies/${caseStudy.id}/signed-url?type=${type}`;
-      if (type === 'solution' && solutionId) {
-        url += `&solutionId=${solutionId}`;
-      }
-      const res = await fetch(url);
-      if (!res.ok) throw new Error('Failed to load document');
-      const data = await res.json();
-      if (data.signedUrl) {
-        setSelectedCaseStudy({
-          caseStudy,
-          type,
-          signedUrl: data.signedUrl,
-          title: type === 'problem'
-            ? `Problem: ${caseStudy.title}`
-            : solutionTitle || 'Solution',
-        });
-      }
-    } catch (error) {
-      console.error('Failed to load document:', error);
-      toast.error('Failed to load document');
-    }
+    // Open the modal immediately (signedUrl fetched in background via useEffect)
+    setSelectedCaseStudy({
+      caseStudy,
+      type,
+      signedUrl: null,
+      solutionId,
+      title: type === 'problem'
+        ? `Problem: ${caseStudy.title}`
+        : solutionTitle || 'Solution',
+    });
   };
+
+  // Fetch signed URL for case study PDFs in background (matches presentations pattern)
+  useEffect(() => {
+    if (!selectedCaseStudy) {
+      setCaseStudyLoading(false);
+      return;
+    }
+    if (selectedCaseStudy.signedUrl) return; // Already loaded
+
+    const fetchSignedUrl = async () => {
+      setCaseStudyLoading(true);
+      try {
+        let url = `/api/case-studies/${selectedCaseStudy.caseStudy.id}/signed-url?type=${selectedCaseStudy.type}`;
+        if (selectedCaseStudy.type === 'solution' && selectedCaseStudy.solutionId) {
+          url += `&solutionId=${selectedCaseStudy.solutionId}`;
+        }
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('Failed to load document');
+        const data = await res.json();
+        if (data.signedUrl) {
+          setSelectedCaseStudy(prev => prev ? { ...prev, signedUrl: data.signedUrl } : null);
+        }
+      } catch (error) {
+        console.error('Failed to load document:', error);
+        toast.error('Failed to load document');
+        setSelectedCaseStudy(null);
+      } finally {
+        setCaseStudyLoading(false);
+      }
+    };
+
+    fetchSignedUrl();
+  }, [selectedCaseStudy?.caseStudy?.id, selectedCaseStudy?.type, selectedCaseStudy?.solutionId]);
 
   // Show full-page loader until BOTH auth AND data are ready
   // This prevents flash of empty content
@@ -2101,12 +2124,19 @@ export default function LearningsPage() {
               </div>
             </div>
             <div className="flex-1 bg-gray-900">
-              <iframe
-                src={selectedCaseStudy.signedUrl}
-                className="w-full h-full"
-                style={{ height: 'calc(95vh - 65px)' }}
-                title={selectedCaseStudy.title}
-              />
+              {caseStudyLoading || !selectedCaseStudy.signedUrl ? (
+                <div className="flex flex-col items-center justify-center h-full gap-3" style={{ height: 'calc(95vh - 65px)' }}>
+                  <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
+                  <p className="text-sm text-gray-400">Loading document...</p>
+                </div>
+              ) : (
+                <iframe
+                  src={selectedCaseStudy.signedUrl}
+                  className="w-full h-full"
+                  style={{ height: 'calc(95vh - 65px)' }}
+                  title={selectedCaseStudy.title}
+                />
+              )}
             </div>
           </DialogContent>
         </Dialog>
