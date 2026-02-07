@@ -255,6 +255,14 @@ export async function POST(request: NextRequest) {
     if (body.type === 'module') {
       const isGlobal = body.is_global === true;
 
+      // Validate: non-global modules must have a cohort_id
+      if (!isGlobal && !body.cohort_id) {
+        return NextResponse.json(
+          { error: 'Non-global modules must have a cohort_id' },
+          { status: 400 }
+        );
+      }
+
       const { data: module, error } = await adminClient
         .from('learning_modules')
         .insert({
@@ -278,6 +286,20 @@ export async function POST(request: NextRequest) {
     // Create a module resource
     if (body.type === 'resource') {
       const contentType = body.content_type;
+
+      // Validate: resources must have a valid content source
+      if (contentType === 'video' && !body.external_url && !body.url) {
+        return NextResponse.json(
+          { error: 'Video resources require a YouTube URL' },
+          { status: 400 }
+        );
+      }
+      if (contentType !== 'video' && !body.file_path && !body.url && !body.external_url) {
+        return NextResponse.json(
+          { error: 'Resources require either a PDF file or external URL' },
+          { status: 400 }
+        );
+      }
 
       // Build insert data based on content type
       const insertData: Record<string, unknown> = {
@@ -309,8 +331,6 @@ export async function POST(request: NextRequest) {
         insertData.google_drive_id = googleDriveId;
         insertData.external_url = body.url;
       }
-
-      console.log('Creating resource:', { module_id: body.module_id, title: body.title, contentType, insertData });
 
       const { data: resource, error } = await adminClient
         .from('module_resources')
