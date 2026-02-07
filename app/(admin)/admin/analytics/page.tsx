@@ -1,87 +1,81 @@
 'use client';
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { LineChart, Download, BarChart3, Users, TrendingUp } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { TrendingUp, Video, Users } from 'lucide-react';
+import { OverviewTab } from './components/overview-tab';
+import { MeetingsManagerTab } from './components/meetings-manager-tab';
+import { StudentAttendanceTab } from './components/student-attendance-tab';
+
+interface Cohort {
+  id: string;
+  name: string;
+}
 
 export default function AdminAnalyticsPage() {
+  const [activeTab, setActiveTab] = useState('overview');
+  const [cohorts, setCohorts] = useState<Cohort[]>([]);
+
+  // Fetch cohorts once for all tabs
+  useEffect(() => {
+    async function fetchCohorts() {
+      try {
+        const res = await fetch('/api/admin/cohorts');
+        if (res.ok) {
+          const data = await res.json();
+          setCohorts(
+            (data.cohorts || data || []).map((c: { id: string; name: string }) => ({
+              id: c.id,
+              name: c.name,
+            }))
+          );
+        }
+      } catch (error) {
+        console.error('Failed to fetch cohorts:', error);
+      }
+    }
+    fetchCohorts();
+  }, []);
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Analytics Dashboard</h1>
-          <p className="text-muted-foreground">
-            View performance metrics and insights
-          </p>
-        </div>
-        <Button variant="outline" className="gap-2">
-          <Download className="w-4 h-4" />
-          Export Report
-        </Button>
+      {/* Header */}
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Attendance Analytics</h1>
+        <p className="text-muted-foreground mt-1">
+          Track Zoom attendance, manage meetings, and monitor student engagement
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
-                <Users className="w-6 h-6 text-primary" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Active Students</p>
-                <p className="text-2xl font-bold">0</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-grid">
+          <TabsTrigger value="overview" className="gap-2">
+            <TrendingUp className="w-4 h-4" />
+            Overview
+          </TabsTrigger>
+          <TabsTrigger value="meetings" className="gap-2">
+            <Video className="w-4 h-4" />
+            Meetings
+          </TabsTrigger>
+          <TabsTrigger value="students" className="gap-2">
+            <Users className="w-4 h-4" />
+            Students
+          </TabsTrigger>
+        </TabsList>
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-green-500/10 flex items-center justify-center">
-                <TrendingUp className="w-6 h-6 text-green-500" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Avg Attendance</p>
-                <p className="text-2xl font-bold">0%</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <TabsContent value="overview">
+          <OverviewTab cohorts={cohorts} />
+        </TabsContent>
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center">
-                <BarChart3 className="w-6 h-6 text-purple-500" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Sessions Completed</p>
-                <p className="text-2xl font-bold">0</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+        <TabsContent value="meetings">
+          <MeetingsManagerTab cohorts={cohorts} />
+        </TabsContent>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <LineChart className="w-5 h-5" />
-            Attendance Trends
-          </CardTitle>
-          <CardDescription>
-            Track attendance patterns over time
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-12 text-muted-foreground">
-            <LineChart className="w-12 h-12 mx-auto mb-4 opacity-50" />
-            <p className="text-lg font-medium">No analytics data yet</p>
-            <p className="text-sm">Data will appear once sessions are completed</p>
-          </div>
-        </CardContent>
-      </Card>
+        <TabsContent value="students">
+          <StudentAttendanceTab cohorts={cohorts} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

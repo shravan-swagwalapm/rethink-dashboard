@@ -43,6 +43,7 @@ const navItems: NavItem[] = [
   { label: 'My Learnings', href: '/learnings', icon: BookOpen },
   { label: 'Resources', href: '/resources', icon: FolderOpen },
   { label: 'Invoices', href: '/invoices', icon: Receipt },
+  { label: 'Analytics', href: '/analytics', icon: BarChart3 },
   { label: 'My Subgroup', href: '/my-subgroup', icon: Users },
   { label: 'My Subgroups', href: '/mentor/subgroups', icon: Users, roles: ['mentor'] },
   { label: 'Give Feedback', href: '/mentor/feedback', icon: MessageSquare, roles: ['mentor'] },
