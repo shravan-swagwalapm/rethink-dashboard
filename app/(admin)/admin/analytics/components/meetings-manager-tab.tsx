@@ -18,7 +18,8 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { RefreshCw, Calculator, CheckCircle2, Clock, Minus, Video, Loader2, Plus } from 'lucide-react';
+import { RefreshCw, Calculator, CheckCircle2, Clock, Minus, Video, Loader2, Plus, Eye } from 'lucide-react';
+import { AttendancePreviewDialog } from './attendance-preview-dialog';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -92,6 +93,8 @@ export function MeetingsManagerTab({ cohorts }: MeetingsManagerTabProps) {
   const [createSessionCohortId, setCreateSessionCohortId] = useState('');
   const [createSessionCounts, setCreateSessionCounts] = useState(true);
   const [creatingSession, setCreatingSession] = useState(false);
+  const [previewSessionId, setPreviewSessionId] = useState<string | null>(null);
+  const [previewTopic, setPreviewTopic] = useState('');
 
   const syncFromZoom = useCallback(async () => {
     setLoading(true);
@@ -448,6 +451,20 @@ export function MeetingsManagerTab({ cohorts }: MeetingsManagerTabProps) {
                                   Calculate
                                 </Button>
                               )}
+                              {meeting.hasAttendance && meeting.linkedSessionId && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => {
+                                    setPreviewSessionId(meeting.linkedSessionId);
+                                    setPreviewTopic(meeting.topic);
+                                  }}
+                                  className="gap-1.5 h-8 text-xs"
+                                >
+                                  <Eye className="w-3 h-3" />
+                                  View Attendance
+                                </Button>
+                              )}
                               {meeting.hasAttendance && !meeting.isProperSession && (
                                 <Button
                                   size="sm"
@@ -549,6 +566,13 @@ export function MeetingsManagerTab({ cohorts }: MeetingsManagerTabProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Attendance Preview Dialog */}
+      <AttendancePreviewDialog
+        sessionId={previewSessionId}
+        meetingTopic={previewTopic}
+        onClose={() => setPreviewSessionId(null)}
+      />
     </div>
   );
 }
