@@ -399,12 +399,24 @@ export interface CaseStudy {
   week_number: number;
   title: string;
   description: string | null;
-  problem_doc_id: string | null;
-  problem_doc_url: string | null;
-  solution_doc_id: string | null;
-  solution_doc_url: string | null;
+  problem_file_path: string | null;
+  problem_file_size: number | null;
   solution_visible: boolean;
   due_date: string | null;
+  order_index: number;
+  created_at: string;
+  // Joined data (populated by API)
+  solutions?: CaseStudySolution[];
+}
+
+export interface CaseStudySolution {
+  id: string;
+  case_study_id: string;
+  title: string;
+  subgroup_id: string | null;
+  subgroup_name?: string;
+  file_path: string;
+  file_size: number | null;
   order_index: number;
   created_at: string;
 }

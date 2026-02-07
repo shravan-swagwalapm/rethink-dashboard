@@ -127,22 +127,22 @@ export function CaseStudySection({
                         <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">{caseStudy.description}</p>
                       )}
                       <div className="flex items-center gap-4 text-sm">
-                        {caseStudy.problem_doc_url && (
+                        {caseStudy.problem_file_path && (
                           <button
                             onClick={() => onPreviewProblem(caseStudy)}
                             className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium flex items-center gap-1.5 transition-colors"
                           >
                             <FileText className="w-4 h-4" />
-                            Problem
+                            Problem PDF
                           </button>
                         )}
-                        {caseStudy.solution_doc_url && (
+                        {caseStudy.solutions && caseStudy.solutions.length > 0 && (
                           <button
                             onClick={() => onPreviewSolution(caseStudy)}
                             className="text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 font-medium flex items-center gap-1.5 transition-colors"
                           >
                             <FileText className="w-4 h-4" />
-                            Solution
+                            {caseStudy.solutions.length} Solution{caseStudy.solutions.length !== 1 ? 's' : ''}
                           </button>
                         )}
                         {caseStudy.due_date && (

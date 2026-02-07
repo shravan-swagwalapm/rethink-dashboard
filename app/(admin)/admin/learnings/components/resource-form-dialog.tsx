@@ -28,6 +28,7 @@ import {
   Youtube,
 } from 'lucide-react';
 import { isYouTubeUrl } from '@/lib/utils/youtube-url';
+import { compressPdf } from '@/lib/utils/compress-pdf';
 import type { ModuleResource } from '@/types';
 import { cn } from '@/lib/utils';
 import { getContentTypeLabel, GLOBAL_LIBRARY_ID, DIRECT_UPLOAD_THRESHOLD } from '../utils';
@@ -111,21 +112,25 @@ export function ResourceFormDialog({
     }
   ): Promise<{ success: boolean; resource?: any; error?: string }> => {
     try {
+      // Compress PDF before upload (smart size-based compression)
+      let fileToUpload = file;
+      if (file.type === 'application/pdf') {
+        setUploadStatus('requesting-url'); // Reuse status for "Optimizing..."
+        setUploadProgressPercent(0);
+        const compressionResult = await compressPdf(file);
+        fileToUpload = compressionResult.file;
+      }
+
       setUploadStatus('requesting-url');
       setUploadProgressPercent(0);
-
-      console.log('[Large Upload] Step 1: Requesting upload URL...', {
-        fileName: file.name,
-        fileSize: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
-      });
 
       const urlResponse = await fetch('/api/admin/resources/upload-url', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          filename: file.name,
-          fileSize: file.size,
-          contentType: file.type,
+          filename: fileToUpload.name,
+          fileSize: fileToUpload.size,
+          contentType: fileToUpload.type,
           cohortId: cohortId === GLOBAL_LIBRARY_ID ? 'global' : cohortId,
         }),
       });
@@ -153,19 +158,12 @@ export function ResourceFormDialog({
 
       const { uploadUrl, filePath, expiresAt } = await urlResponse.json();
 
-      console.log('[Large Upload] Step 1: Upload URL received', {
-        filePath,
-        expiresAt,
-      });
-
       const expiresIn = new Date(expiresAt).getTime() - Date.now();
       if (expiresIn < 60000) {
         throw new Error('Upload URL expired. Please try again.');
       }
 
       setUploadStatus('uploading');
-
-      console.log('[Large Upload] Step 2: Uploading to Supabase Storage...');
 
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
@@ -174,13 +172,11 @@ export function ResourceFormDialog({
           if (e.lengthComputable) {
             const percent = Math.round((e.loaded / e.total) * 100);
             setUploadProgressPercent(percent);
-            console.log(`[Large Upload] Upload progress: ${percent}%`);
           }
         });
 
         xhr.addEventListener('load', () => {
           if (xhr.status >= 200 && xhr.status < 300) {
-            console.log('[Large Upload] Step 2: Upload complete!');
             resolve();
           } else {
             let errorMessage = `Upload failed with status ${xhr.status}`;
@@ -208,19 +204,17 @@ export function ResourceFormDialog({
         xhr.timeout = 600000;
 
         xhr.open('PUT', uploadUrl);
-        xhr.setRequestHeader('Content-Type', file.type);
+        xhr.setRequestHeader('Content-Type', fileToUpload.type);
         // Supabase API gateway requires apikey header for routing,
         // even on signed URL endpoints (see uploadToSignedUrl in @supabase/storage-js)
         const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
         xhr.setRequestHeader('Authorization', `Bearer ${anonKey}`);
         xhr.setRequestHeader('apikey', anonKey);
-        xhr.send(file);
+        xhr.send(fileToUpload);
       });
 
       setUploadStatus('confirming');
       setUploadProgressPercent(100);
-
-      console.log('[Large Upload] Step 3: Confirming upload and creating DB record...');
 
       const confirmResponse = await fetch('/api/admin/resources/confirm-upload', {
         method: 'POST',
@@ -231,7 +225,7 @@ export function ResourceFormDialog({
           title: metadata.title,
           contentType: metadata.contentType,
           fileType: 'pdf',
-          fileSize: file.size,
+          fileSize: fileToUpload.size,
           sessionNumber: metadata.sessionNumber,
           orderIndex: metadata.orderIndex,
           durationSeconds: metadata.durationSeconds,
@@ -256,8 +250,6 @@ export function ResourceFormDialog({
       }
 
       const { resource } = await confirmResponse.json();
-
-      console.log('[Large Upload] Step 3: Complete! Resource created:', resource.id);
 
       setUploadStatus('complete');
       return { success: true, resource };
@@ -306,12 +298,6 @@ export function ResourceFormDialog({
 
       if (selectedFile && formData.content_type !== 'video') {
         if (selectedFile.size > DIRECT_UPLOAD_THRESHOLD) {
-          console.log('[Upload] Using direct upload for large file:', {
-            fileName: selectedFile.name,
-            fileSize: `${(selectedFile.size / 1024 / 1024).toFixed(2)} MB`,
-            threshold: `${(DIRECT_UPLOAD_THRESHOLD / 1024 / 1024).toFixed(0)} MB`,
-          });
-
           const result = await uploadLargeFile(
             selectedFile,
             selectedCohort,
@@ -335,13 +321,15 @@ export function ResourceFormDialog({
           return;
 
         } else {
-          console.log('[Upload] Using standard upload for small file:', {
-            fileName: selectedFile.name,
-            fileSize: `${(selectedFile.size / 1024 / 1024).toFixed(2)} MB`,
-          });
+          // Compress PDF before upload (smart size-based compression)
+          let fileToUpload: File = selectedFile;
+          if (selectedFile.type === 'application/pdf') {
+            const compressionResult = await compressPdf(selectedFile);
+            fileToUpload = compressionResult.file;
+          }
 
           const uploadFormData = new FormData();
-          uploadFormData.append('file', selectedFile);
+          uploadFormData.append('file', fileToUpload);
           uploadFormData.append('cohort_id', selectedCohort === GLOBAL_LIBRARY_ID ? 'global' : selectedCohort);
 
           const uploadResponse = await fetch('/api/admin/resources/upload', {
@@ -421,8 +409,15 @@ export function ResourceFormDialog({
       let fileSize: number | null = null;
 
       if (selectedFile && formData.content_type !== 'video') {
+        // Compress PDF before upload (smart size-based compression)
+        let fileToUpload: File = selectedFile;
+        if (selectedFile.type === 'application/pdf') {
+          const compressionResult = await compressPdf(selectedFile);
+          fileToUpload = compressionResult.file;
+        }
+
         const uploadFormData = new FormData();
-        uploadFormData.append('file', selectedFile);
+        uploadFormData.append('file', fileToUpload);
         uploadFormData.append('cohort_id', selectedCohort === GLOBAL_LIBRARY_ID ? 'global' : selectedCohort);
 
         const uploadResponse = await fetch('/api/admin/resources/upload', {

@@ -16,6 +16,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { FileUploadItem, generateId, formatFileSize, MAX_FILE_SIZE } from '../types';
+import { compressPdf } from '@/lib/utils/compress-pdf';
 
 interface FileUploadTabProps {
   mode: 'presentation' | 'pdf';
@@ -100,8 +101,18 @@ export function FileUploadTab({ mode, isGlobalMode, selectedCohortId, onUploadCo
       ));
 
       try {
+        // Compress PDF files before upload (smart size-based compression)
+        let fileToUpload: File = item.file;
+        if (item.file.type === 'application/pdf') {
+          setFileQueue(prev => prev.map(f =>
+            f.id === item.id ? { ...f, status: 'uploading' as const, progress: 0 } : f
+          ));
+          const compressionResult = await compressPdf(item.file);
+          fileToUpload = compressionResult.file;
+        }
+
         const formData = new FormData();
-        formData.append('file', item.file);
+        formData.append('file', fileToUpload);
         formData.append('name', item.name);
         const ext = item.name.split('.').pop()?.toLowerCase();
         let category = 'pdf';

@@ -39,7 +39,7 @@ import {
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { isYouTubeUrl, getYouTubeEmbedUrl, getYouTubeWatchUrl } from '@/lib/utils/youtube-url';
-import type { LearningModule, ModuleResource, ModuleResourceType, CaseStudy, ResourceProgress, ResourceFavorite } from '@/types';
+import type { LearningModule, ModuleResource, ModuleResourceType, CaseStudy, CaseStudySolution, ResourceProgress, ResourceFavorite } from '@/types';
 
 interface ModuleWithResources extends LearningModule {
   resources: ModuleResource[];
@@ -163,20 +163,6 @@ function hasUploadedFile(resource: ModuleResource): boolean {
   return !!resource.file_path && resource.content_type !== 'video';
 }
 
-// Get embed URL for case study docs
-function getCaseStudyEmbedUrl(docId: string, docUrl: string | null): string {
-  if (docId) {
-    // Check if it's a presentation, doc, or generic file
-    if (docUrl?.includes('presentation')) {
-      return `https://docs.google.com/presentation/d/${docId}/embed?start=false&loop=false`;
-    }
-    if (docUrl?.includes('document')) {
-      return `https://docs.google.com/document/d/${docId}/preview`;
-    }
-    return `https://drive.google.com/file/d/${docId}/preview`;
-  }
-  return docUrl || '';
-}
 
 export default function LearningsPage() {
   const { profile, loading: userLoading, activeCohortId, isAdmin } = useUserContext();
@@ -185,7 +171,12 @@ export default function LearningsPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedResource, setSelectedResource] = useState<ModuleResource | null>(null);
-  const [selectedCaseStudy, setSelectedCaseStudy] = useState<{ caseStudy: CaseStudy; type: 'problem' | 'solution' } | null>(null);
+  const [selectedCaseStudy, setSelectedCaseStudy] = useState<{
+    caseStudy: CaseStudy;
+    type: 'problem' | 'solution';
+    signedUrl: string;
+    title: string;
+  } | null>(null);
   const [activeWeek, setActiveWeek] = useState<string>('');
 
   // New state for tracking features
@@ -313,7 +304,31 @@ export default function LearningsPage() {
 
         const { data: caseStudiesData } = await caseStudyQuery;
 
-        setCaseStudies(caseStudiesData || []);
+        // Fetch solutions for case studies that have solutions visible
+        const csIds = (caseStudiesData || []).filter((cs: any) => cs.solution_visible).map((cs: any) => cs.id);
+        let solutionsMap: Record<string, CaseStudySolution[]> = {};
+
+        if (csIds.length > 0) {
+          const { data: solData } = await supabase
+            .from('case_study_solutions')
+            .select('*, subgroups(name)')
+            .in('case_study_id', csIds)
+            .order('order_index');
+
+          for (const s of (solData || [])) {
+            const mapped = { ...s, subgroup_name: (s as any).subgroups?.name || null };
+            delete (mapped as any).subgroups;
+            if (!solutionsMap[s.case_study_id]) solutionsMap[s.case_study_id] = [];
+            solutionsMap[s.case_study_id].push(mapped as CaseStudySolution);
+          }
+        }
+
+        const enrichedCaseStudies = (caseStudiesData || []).map((cs: any) => ({
+          ...cs,
+          solutions: solutionsMap[cs.id] || [],
+        }));
+
+        setCaseStudies(enrichedCaseStudies);
 
         // Set initial active week
         if (modulesWithResources.length > 0) {
@@ -537,9 +552,7 @@ export default function LearningsPage() {
       handleResourceClick(result.resource);
     } else if (result.caseStudy) {
       // For case studies, open the problem doc by default
-      if (result.caseStudy.problem_doc_url) {
-        handleCaseStudyClick(result.caseStudy, 'problem');
-      }
+      handleCaseStudyClick(result.caseStudy, 'problem');
     }
   };
 
@@ -806,7 +819,6 @@ export default function LearningsPage() {
           if (response.ok) {
             const data = await response.json();
             setPdfSignedUrl(data.url);
-            console.log('[Learnings] PDF signed URL fetched:', { title: selectedResource.title, url: data.url });
           } else {
             console.error('[Learnings] Failed to fetch signed URL:', response.status);
             setPdfSignedUrl(null);
@@ -846,11 +858,33 @@ export default function LearningsPage() {
     }
   };
 
-  const handleCaseStudyClick = (caseStudy: CaseStudy, type: 'problem' | 'solution') => {
-    if (type === 'problem' && caseStudy.problem_doc_url) {
-      setSelectedCaseStudy({ caseStudy, type });
-    } else if (type === 'solution' && caseStudy.solution_visible && caseStudy.solution_doc_url) {
-      setSelectedCaseStudy({ caseStudy, type });
+  const handleCaseStudyClick = async (
+    caseStudy: CaseStudy,
+    type: 'problem' | 'solution',
+    solutionId?: string,
+    solutionTitle?: string
+  ) => {
+    try {
+      let url = `/api/case-studies/${caseStudy.id}/signed-url?type=${type}`;
+      if (type === 'solution' && solutionId) {
+        url += `&solutionId=${solutionId}`;
+      }
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Failed to load document');
+      const data = await res.json();
+      if (data.signedUrl) {
+        setSelectedCaseStudy({
+          caseStudy,
+          type,
+          signedUrl: data.signedUrl,
+          title: type === 'problem'
+            ? `Problem: ${caseStudy.title}`
+            : solutionTitle || 'Solution',
+        });
+      }
+    } catch (error) {
+      console.error('Failed to load document:', error);
+      toast.error('Failed to load document');
     }
   };
 
@@ -1059,12 +1093,17 @@ export default function LearningsPage() {
           </div>
         ) : (
           <div className="grid gap-3">
-            {filtered.map((cs) => (
-              <div
-                key={cs.id}
-                className="p-4 rounded-xl border-2 border-emerald-500/20 bg-white dark:bg-gray-900/80 hover:border-emerald-500/40 hover:shadow-lg hover:shadow-emerald-500/10 transition-all duration-300"
-              >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            {filtered.map((cs) => {
+              const solutions = cs.solutions || [];
+              const hasSolutions = solutions.length > 0;
+              const hasProblem = !!cs.problem_file_path;
+
+              return (
+                <div
+                  key={cs.id}
+                  className="p-4 rounded-xl border-2 border-emerald-500/20 bg-white dark:bg-gray-900/80 hover:border-emerald-500/40 hover:shadow-lg hover:shadow-emerald-500/10 transition-all duration-300"
+                >
+                  {/* Title, description, due date */}
                   <div className="space-y-1.5">
                     <h4 className="font-semibold text-gray-900 dark:text-white">{cs.title}</h4>
                     {cs.description && (
@@ -1077,8 +1116,10 @@ export default function LearningsPage() {
                       </div>
                     )}
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {cs.problem_doc_url && (
+
+                  {/* Action buttons */}
+                  <div className="flex flex-wrap items-center gap-2 mt-3">
+                    {hasProblem && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -1086,28 +1127,61 @@ export default function LearningsPage() {
                         className="h-9 text-xs border-2 border-gray-300 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800"
                       >
                         <FileQuestion className="w-4 h-4 mr-1.5" />
-                        Problem
+                        View Problem
                       </Button>
                     )}
-                    {cs.solution_visible && cs.solution_doc_url ? (
+
+                    {/* Single solution: simple button */}
+                    {cs.solution_visible && hasSolutions && solutions.length === 1 && (
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleCaseStudyClick(cs, 'solution')}
+                        onClick={() => handleCaseStudyClick(
+                          cs,
+                          'solution',
+                          solutions[0].id,
+                          solutions[0].subgroup_name || solutions[0].title
+                        )}
                         className="h-9 text-xs text-emerald-500 border-2 border-emerald-500/30 hover:border-emerald-500/50 hover:bg-emerald-500/10"
                       >
                         <CheckCircle2 className="w-4 h-4 mr-1.5" />
-                        Solution
+                        View Solution
                       </Button>
-                    ) : cs.solution_doc_url && (
-                      <Badge variant="secondary" className="h-9 text-xs bg-gray-500/10 border border-gray-500/20 text-gray-400 flex items-center">
-                        Solution pending
-                      </Badge>
+                    )}
+
+                    {/* Solutions not visible yet */}
+                    {!cs.solution_visible && (
+                      <span className="text-xs text-gray-400 dark:text-gray-500 ml-1">
+                        Solutions will be available soon
+                      </span>
                     )}
                   </div>
+
+                  {/* Multiple solutions: tab bar */}
+                  {cs.solution_visible && hasSolutions && solutions.length > 1 && (
+                    <>
+                      <div className="border-t border-gray-200 dark:border-gray-700 mt-3" />
+                      <div className="flex gap-1 border-b border-gray-200 dark:border-gray-700 mt-3 overflow-x-auto">
+                        {solutions.map((sol) => (
+                          <button
+                            key={sol.id}
+                            onClick={() => handleCaseStudyClick(
+                              cs,
+                              'solution',
+                              sol.id,
+                              sol.subgroup_name || sol.title
+                            )}
+                            className="px-3 py-1.5 text-sm font-medium rounded-t-lg transition-colors whitespace-nowrap text-gray-600 dark:text-gray-400 hover:text-emerald-500 hover:bg-emerald-500/5"
+                          >
+                            {sol.subgroup_name || sol.title}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -1881,27 +1955,13 @@ export default function LearningsPage() {
 
                     // For PDFs with file_path (uploaded to Supabase Storage), use the signed URL
                     if (hasUploadedFile(extendedResource)) {
-                      console.log('[Learnings] Loading PDF via signed URL:', {
-                        title: selectedResource.title,
-                        file_path: extendedResource.file_path,
-                        signed_url: pdfSignedUrl ? 'loaded' : 'pending'
-                      });
                       return pdfSignedUrl || '';
                     }
 
                     // For videos and legacy content, use getEmbedUrl
-                    const url = getEmbedUrl(extendedResource);
-                    console.log('[Learnings] Loading iframe:', {
-                      title: selectedResource.title,
-                      google_drive_id: selectedResource.google_drive_id,
-                      external_url: extendedResource.external_url,
-                      content_type: selectedResource.content_type,
-                      iframe_url: url
-                    });
-                    return url;
+                    return getEmbedUrl(extendedResource);
                   })()}
                   onLoad={() => {
-                    console.log('[Learnings] Iframe loaded successfully');
                     // For PDFs, add delay to ensure PDF viewer has fully rendered and painted content
                     const hasPdf = hasUploadedFile(selectedResource as ModuleResource);
                     if (hasPdf) {
@@ -2029,55 +2089,28 @@ export default function LearningsPage() {
       </Dialog>
 
       {/* Case Study Viewer Modal */}
-      <Dialog open={!!selectedCaseStudy} onOpenChange={() => setSelectedCaseStudy(null)}>
-        <DialogContent className="max-w-5xl max-h-[90vh]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 pr-8">
-              {selectedCaseStudy?.type === 'problem' ? (
-                <FileQuestion className="w-5 h-5 text-emerald-500" />
-              ) : (
-                <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-              )}
-              {selectedCaseStudy?.caseStudy.title} - {selectedCaseStudy?.type === 'problem' ? 'Problem' : 'Solution'}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="aspect-video bg-muted rounded-lg overflow-hidden">
-            {selectedCaseStudy && (
-              <iframe
-                src={getCaseStudyEmbedUrl(
-                  selectedCaseStudy.type === 'problem'
-                    ? selectedCaseStudy.caseStudy.problem_doc_id || ''
-                    : selectedCaseStudy.caseStudy.solution_doc_id || '',
-                  selectedCaseStudy.type === 'problem'
-                    ? selectedCaseStudy.caseStudy.problem_doc_url
-                    : selectedCaseStudy.caseStudy.solution_doc_url
-                )}
-                className="w-full h-full"
-                allow="autoplay; fullscreen"
-                allowFullScreen
-              />
-            )}
-          </div>
-          {selectedCaseStudy && (
-            <div className="flex justify-end">
-              <Button variant="outline" size="sm" asChild>
-                <a
-                  href={
-                    selectedCaseStudy.type === 'problem'
-                      ? selectedCaseStudy.caseStudy.problem_doc_url || ''
-                      : selectedCaseStudy.caseStudy.solution_doc_url || ''
-                  }
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <ExternalLink className="w-4 h-4 mr-2" />
-                  Open in new tab
-                </a>
-              </Button>
+      {selectedCaseStudy && (
+        <Dialog open={!!selectedCaseStudy} onOpenChange={() => setSelectedCaseStudy(null)}>
+          <DialogContent className="max-w-[95vw] w-[95vw] max-h-[95vh] h-[95vh] sm:max-w-[95vw] p-0 gap-0 overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b dark:border-gray-800">
+              <div className="flex items-center gap-2">
+                <FileText className="w-5 h-5 text-emerald-500" />
+                <h3 className="font-semibold text-lg dark:text-white">
+                  {selectedCaseStudy.title}
+                </h3>
+              </div>
             </div>
-          )}
-        </DialogContent>
-      </Dialog>
+            <div className="flex-1 bg-gray-900">
+              <iframe
+                src={selectedCaseStudy.signedUrl}
+                className="w-full h-full"
+                style={{ height: 'calc(95vh - 65px)' }}
+                title={selectedCaseStudy.title}
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

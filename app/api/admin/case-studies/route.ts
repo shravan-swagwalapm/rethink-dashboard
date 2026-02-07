@@ -2,26 +2,7 @@ import { createAdminClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdmin } from '@/lib/api/verify-admin';
 
-// Helper to extract Google Drive ID from URL
-function extractGoogleDriveId(url: string): string | null {
-  if (!url) return null;
-
-  // Match patterns like /d/{ID}/ or id={ID}
-  const patterns = [
-    /\/d\/([a-zA-Z0-9_-]+)/,
-    /id=([a-zA-Z0-9_-]+)/,
-    /folders\/([a-zA-Z0-9_-]+)/,
-  ];
-
-  for (const pattern of patterns) {
-    const match = url.match(pattern);
-    if (match) return match[1];
-  }
-
-  return null;
-}
-
-// GET - List case studies
+// GET - List case studies with solutions
 export async function GET(request: NextRequest) {
   const auth = await verifyAdmin();
   if (!auth.authorized) {
@@ -53,7 +34,45 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error;
 
-    return NextResponse.json({ caseStudies: caseStudies || [] });
+    const csList = caseStudies || [];
+
+    // Fetch solutions for all returned case studies
+    if (csList.length > 0) {
+      const ids = csList.map((cs) => cs.id);
+
+      const { data: solutions, error: solError } = await adminClient
+        .from('case_study_solutions')
+        .select('*, subgroups(name)')
+        .in('case_study_id', ids)
+        .order('order_index', { ascending: true });
+
+      if (solError) {
+        console.error('Error fetching solutions:', solError);
+      }
+
+      // Flatten subgroup_name and group solutions by case_study_id
+      const solutionsByCs: Record<string, Array<Record<string, unknown>>> = {};
+      for (const sol of solutions || []) {
+        const { subgroups, ...rest } = sol as Record<string, unknown> & { subgroups?: { name: string } | null };
+        const mapped = {
+          ...rest,
+          subgroup_name: subgroups?.name || null,
+        };
+        const csId = rest.case_study_id as string;
+        if (!solutionsByCs[csId]) solutionsByCs[csId] = [];
+        solutionsByCs[csId].push(mapped);
+      }
+
+      // Attach solutions to each case study
+      const enriched = csList.map((cs) => ({
+        ...cs,
+        solutions: solutionsByCs[cs.id] || [],
+      }));
+
+      return NextResponse.json({ caseStudies: enriched });
+    }
+
+    return NextResponse.json({ caseStudies: [] });
   } catch (error) {
     console.error('Error fetching case studies:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -74,8 +93,8 @@ export async function POST(request: NextRequest) {
       week_number,
       title,
       description,
-      problem_doc_url,
-      solution_doc_url,
+      problem_file_path,
+      problem_file_size,
       solution_visible,
       due_date,
       order_index,
@@ -97,10 +116,8 @@ export async function POST(request: NextRequest) {
         week_number,
         title,
         description: description || null,
-        problem_doc_id: extractGoogleDriveId(problem_doc_url),
-        problem_doc_url: problem_doc_url || null,
-        solution_doc_id: extractGoogleDriveId(solution_doc_url),
-        solution_doc_url: solution_doc_url || null,
+        problem_file_path: problem_file_path || null,
+        problem_file_size: problem_file_size || null,
         solution_visible: solution_visible || false,
         due_date: due_date || null,
         order_index: order_index || 0,
@@ -140,14 +157,8 @@ export async function PUT(request: NextRequest) {
     if (updates.title !== undefined) updateData.title = updates.title;
     if (updates.description !== undefined) updateData.description = updates.description;
     if (updates.week_number !== undefined) updateData.week_number = updates.week_number;
-    if (updates.problem_doc_url !== undefined) {
-      updateData.problem_doc_url = updates.problem_doc_url;
-      updateData.problem_doc_id = extractGoogleDriveId(updates.problem_doc_url);
-    }
-    if (updates.solution_doc_url !== undefined) {
-      updateData.solution_doc_url = updates.solution_doc_url;
-      updateData.solution_doc_id = extractGoogleDriveId(updates.solution_doc_url);
-    }
+    if (updates.problem_file_path !== undefined) updateData.problem_file_path = updates.problem_file_path;
+    if (updates.problem_file_size !== undefined) updateData.problem_file_size = updates.problem_file_size;
     if (updates.solution_visible !== undefined) updateData.solution_visible = updates.solution_visible;
     if (updates.due_date !== undefined) updateData.due_date = updates.due_date;
     if (updates.order_index !== undefined) updateData.order_index = updates.order_index;
@@ -168,7 +179,7 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-// DELETE - Delete case study
+// DELETE - Delete case study and clean up storage files
 export async function DELETE(request: NextRequest) {
   const auth = await verifyAdmin();
   if (!auth.authorized) {
@@ -185,6 +196,53 @@ export async function DELETE(request: NextRequest) {
 
     const adminClient = await createAdminClient();
 
+    // Fetch case study's problem file path
+    const { data: caseStudy, error: csError } = await adminClient
+      .from('case_studies')
+      .select('problem_file_path')
+      .eq('id', id)
+      .single();
+
+    if (csError) throw csError;
+
+    // Fetch all solution file paths for this case study
+    const { data: solutions, error: solError } = await adminClient
+      .from('case_study_solutions')
+      .select('file_path')
+      .eq('case_study_id', id);
+
+    if (solError) {
+      console.error('Error fetching solutions for deletion:', solError);
+    }
+
+    // Collect all files to delete from storage
+    const filesToDelete: string[] = [];
+
+    if (caseStudy?.problem_file_path) {
+      filesToDelete.push(caseStudy.problem_file_path);
+    }
+
+    if (solutions) {
+      for (const sol of solutions) {
+        if (sol.file_path) {
+          filesToDelete.push(sol.file_path);
+        }
+      }
+    }
+
+    // Delete files from Supabase Storage
+    if (filesToDelete.length > 0) {
+      const { error: storageError } = await adminClient.storage
+        .from('resources')
+        .remove(filesToDelete);
+
+      if (storageError) {
+        console.error('Error deleting storage files:', storageError);
+        // Continue with DB deletion even if storage cleanup fails
+      }
+    }
+
+    // Delete the case study (cascades to solutions via FK)
     const { error } = await adminClient
       .from('case_studies')
       .delete()

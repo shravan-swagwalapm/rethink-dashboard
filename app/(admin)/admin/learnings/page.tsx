@@ -38,7 +38,7 @@ import type { ModuleFormData } from './components/module-form-dialog';
 import { ResourceFormDialog } from './components/resource-form-dialog';
 import type { ResourceFormData } from './components/resource-form-dialog';
 import { CaseStudyFormDialog } from './components/case-study-form-dialog';
-import type { CaseStudyFormData } from './components/case-study-form-dialog';
+import type { CaseStudyFormData, PendingSolution } from './components/case-study-form-dialog';
 import { ResourceSection } from './components/resource-section';
 import { CaseStudySection } from './components/case-study-section';
 
@@ -266,7 +266,7 @@ export default function LearningsPage() {
 
   // --- Case Study CRUD ---
 
-  const handleSaveCaseStudy = async (data: CaseStudyFormData) => {
+  const handleSaveCaseStudy = async (data: CaseStudyFormData, pendingSolutions?: PendingSolution[]) => {
     if (!data.title.trim()) {
       toast.error('Title is required');
       return;
@@ -274,6 +274,8 @@ export default function LearningsPage() {
 
     setSaving(true);
     try {
+      let caseStudyId: string | null = null;
+
       if (editingCaseStudy) {
         const response = await fetch('/api/admin/case-studies', {
           method: 'PUT',
@@ -282,13 +284,14 @@ export default function LearningsPage() {
             id: editingCaseStudy.id,
             title: data.title,
             description: data.description,
-            problem_doc_url: data.problem_doc_url,
-            solution_doc_url: data.solution_doc_url,
+            problem_file_path: data.problem_file_path,
+            problem_file_size: data.problem_file_size,
             solution_visible: data.solution_visible,
             due_date: data.due_date || null,
           }),
         });
         if (!response.ok) throw new Error('Failed to update case study');
+        caseStudyId = editingCaseStudy.id;
         toast.success('Case study updated');
       } else {
         const response = await fetch('/api/admin/case-studies', {
@@ -299,14 +302,43 @@ export default function LearningsPage() {
             week_number: parseInt(selectedWeek),
             title: data.title,
             description: data.description,
-            problem_doc_url: data.problem_doc_url,
-            solution_doc_url: data.solution_doc_url,
+            problem_file_path: data.problem_file_path,
+            problem_file_size: data.problem_file_size,
             solution_visible: data.solution_visible,
             due_date: data.due_date || null,
           }),
         });
         if (!response.ok) throw new Error('Failed to create case study');
+        const result = await response.json();
+        caseStudyId = result.caseStudy?.id || null;
         toast.success('Case study created');
+      }
+
+      // Create any pending solutions
+      if (caseStudyId && pendingSolutions && pendingSolutions.length > 0) {
+        for (const sol of pendingSolutions) {
+          try {
+            const solResponse = await fetch(`/api/admin/case-studies/${caseStudyId}/solutions`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                title: sol.title,
+                file_path: sol.file_path,
+                file_size: sol.file_size,
+                subgroup_id: sol.subgroup_id,
+              }),
+            });
+            if (!solResponse.ok) {
+              console.error('Failed to create solution:', sol.title);
+              toast.error(`Failed to save solution: ${sol.title}`);
+            } else {
+              toast.success(`Solution added: ${sol.title}`);
+            }
+          } catch (err) {
+            console.error('Error creating solution:', err);
+            toast.error(`Failed to save solution: ${sol.title}`);
+          }
+        }
       }
 
       setShowCaseStudyForm(false);
@@ -622,8 +654,35 @@ export default function LearningsPage() {
             onEdit={openEditCaseStudy}
             onDelete={handleDeleteCaseStudy}
             onToggleVisibility={toggleSolutionVisibility}
-            onPreviewProblem={(cs) => setPreviewCaseStudy({ url: cs.problem_doc_url!, title: 'Problem Statement' })}
-            onPreviewSolution={(cs) => setPreviewCaseStudy({ url: cs.solution_doc_url!, title: 'Solution' })}
+            onPreviewProblem={async (cs) => {
+              if (!cs.problem_file_path) return;
+              try {
+                const res = await fetch(`/api/case-studies/${cs.id}/signed-url?type=problem`);
+                const data = await res.json();
+                if (data.signedUrl) {
+                  setPreviewCaseStudy({ url: data.signedUrl, title: `Problem: ${cs.title}` });
+                } else {
+                  toast.error('Failed to load problem document');
+                }
+              } catch {
+                toast.error('Failed to load problem document');
+              }
+            }}
+            onPreviewSolution={async (cs) => {
+              if (!cs.solutions || cs.solutions.length === 0) return;
+              const firstSolution = cs.solutions[0];
+              try {
+                const res = await fetch(`/api/case-studies/${cs.id}/signed-url?type=solution&solutionId=${firstSolution.id}`);
+                const data = await res.json();
+                if (data.signedUrl) {
+                  setPreviewCaseStudy({ url: data.signedUrl, title: `Solution: ${firstSolution.title}` });
+                } else {
+                  toast.error('Failed to load solution document');
+                }
+              } catch {
+                toast.error('Failed to load solution document');
+              }
+            }}
           />
         </div>
       )}
@@ -667,6 +726,7 @@ export default function LearningsPage() {
         editingCaseStudy={editingCaseStudy}
         onSave={handleSaveCaseStudy}
         saving={saving}
+        cohortId={selectedCohort}
       />
 
       {/* Resource Preview Modal */}
@@ -693,7 +753,7 @@ export default function LearningsPage() {
           <div className="flex-1 min-h-0 bg-white dark:bg-black rounded-lg overflow-hidden">
             {previewCaseStudy && (
               <iframe
-                src={previewCaseStudy.url.replace('/edit', '/preview').replace('/view', '/preview')}
+                src={previewCaseStudy.url}
                 className="w-full h-full"
                 allowFullScreen
               />
