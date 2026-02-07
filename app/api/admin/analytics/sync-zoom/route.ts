@@ -61,7 +61,7 @@ export async function GET() {
         topic: m.topic,
         date: m.start_time,
         duration: m.duration,
-        participantCount: m.participants_count,
+        participantCount: m.participants_count || 0,
         linkedSessionId: linkedSession?.id || null,
         linkedSessionTitle: linkedSession?.title || null,
         cohortId: linkedSession?.cohort_id || null,
