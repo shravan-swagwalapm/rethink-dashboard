@@ -17,17 +17,29 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const cohortId = searchParams.get('cohort_id');
 
-    // Active students count
-    let studentQuery = supabase
+    // Active students count — check both role_assignments and legacy profiles
+    let raQuery = supabase
       .from('user_role_assignments')
-      .select('*', { count: 'exact', head: true })
+      .select('user_id')
       .eq('role', 'student');
+    if (cohortId) raQuery = raQuery.eq('cohort_id', cohortId);
 
-    if (cohortId) {
-      studentQuery = studentQuery.eq('cohort_id', cohortId);
-    }
+    let profileQuery = supabase
+      .from('profiles')
+      .select('id')
+      .eq('role', 'student');
+    if (cohortId) profileQuery = profileQuery.eq('cohort_id', cohortId);
 
-    const { count: activeStudents } = await studentQuery;
+    const [{ data: raStudents }, { data: profileStudents }] = await Promise.all([
+      raQuery,
+      profileQuery,
+    ]);
+
+    const allStudentIds = new Set([
+      ...(raStudents?.map(r => r.user_id) ?? []),
+      ...(profileStudents?.map(r => r.id) ?? []),
+    ]);
+    const activeStudents = allStudentIds.size;
 
     // Sessions that count for students
     let sessionsQuery = supabase
