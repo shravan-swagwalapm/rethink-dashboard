@@ -226,11 +226,10 @@ export default function DashboardPage() {
               .select('*')
               .eq('id', activeCohortId)
               .single(),
-            // Fetch stats - count all members in cohort (using multi-role table)
-            supabase
-              .from('user_role_assignments')
-              .select('*', { count: 'exact', head: true })
-              .eq('cohort_id', activeCohortId),
+            // Fetch cohort student count via API (bypasses RLS)
+            fetch(`/api/analytics?view=leaderboard&cohort_id=${activeCohortId}`)
+              .then(r => r.ok ? r.json() : { leaderboard: [] })
+              .catch(() => ({ leaderboard: [] })),
             // Fetch attendance
             supabase
               .from('attendance')
@@ -275,7 +274,7 @@ export default function DashboardPage() {
               .then(r => r.ok ? r.json() : { recent: [] })
               .catch(() => ({ recent: [] })),
             // Fetch cohort avg attendance (from leaderboard API)
-            fetch('/api/analytics?view=leaderboard')
+            fetch(`/api/analytics?view=leaderboard&cohort_id=${activeCohortId}`)
               .then(r => r.ok ? r.json() : { cohortAvg: null })
               .catch(() => ({ cohortAvg: null })),
           ]);
@@ -297,7 +296,7 @@ export default function DashboardPage() {
 
           // Set stats
           setStats({
-            total_students: studentsCountResult.count || 0,
+            total_students: studentsCountResult.leaderboard?.length || 0,
             attendance_percentage: Math.round(avgAttendance),
             current_rank: rankingResult.data?.rank || null,
             total_resources: resourcesCountResult.count || 0,

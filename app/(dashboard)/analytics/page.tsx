@@ -221,7 +221,7 @@ function SessionCard({ session }: { session: AttendanceSession }) {
 // ─── Student View ───
 
 function StudentView() {
-  const { user } = useUserContext();
+  const { user, activeCohortId } = useUserContext();
   const [attendance, setAttendance] = useState<AttendanceSession[]>([]);
   const [stats, setStats] = useState<AttendanceStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -236,7 +236,8 @@ function StudentView() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const res = await fetch('/api/analytics');
+        const cohortParam = activeCohortId ? `?cohort_id=${activeCohortId}` : '';
+        const res = await fetch(`/api/analytics${cohortParam}`);
         if (res.ok) {
           const data = await res.json();
           setAttendance(data.attendance || []);
@@ -249,13 +250,14 @@ function StudentView() {
       }
     }
     fetchData();
-  }, []);
+  }, [activeCohortId]);
 
   // Fetch leaderboard data separately
   useEffect(() => {
     async function fetchLeaderboard() {
       try {
-        const res = await fetch('/api/analytics?view=leaderboard');
+        const cohortParam = activeCohortId ? `&cohort_id=${activeCohortId}` : '';
+        const res = await fetch(`/api/analytics?view=leaderboard${cohortParam}`);
         if (res.ok) {
           const data = await res.json();
           setLeaderboard(data.leaderboard || []);
@@ -269,7 +271,7 @@ function StudentView() {
       }
     }
     fetchLeaderboard();
-  }, []);
+  }, [activeCohortId]);
 
   // Sort leaderboard by selected session or overall
   const sortedLeaderboard = useMemo(() => {

@@ -25,21 +25,40 @@ export async function GET(request: NextRequest) {
       .select('role, cohort_id')
       .eq('user_id', user.id);
 
-    const studentRole = roleAssignments?.find((r) => r.role === 'student');
-    const mentorRole = roleAssignments?.find((r) => r.role === 'mentor');
+    // Also check legacy profile for fallback
+    const { data: profile } = await adminClient
+      .from('profiles')
+      .select('role, cohort_id')
+      .eq('id', user.id)
+      .single();
+
+    // Respect explicit cohort_id from client (active role's cohort)
+    const requestedCohortId = searchParams.get('cohort_id');
+
+    const studentRoles = roleAssignments?.filter((r) => r.role === 'student') ?? [];
+    const mentorRoles = roleAssignments?.filter((r) => r.role === 'mentor') ?? [];
+
+    // Find the matching role for the requested cohort, or fall back to first
+    const studentRole = requestedCohortId
+      ? studentRoles.find(r => r.cohort_id === requestedCohortId) || studentRoles[0]
+      : studentRoles[0];
+    const mentorRole = requestedCohortId
+      ? mentorRoles.find(r => r.cohort_id === requestedCohortId) || mentorRoles[0]
+      : mentorRoles[0];
 
     // Mentor view — return team attendance data
     if (view === 'mentor' && mentorRole) {
-      return await getMentorTeamAttendance(adminClient, mentorRole.cohort_id);
+      return await getMentorTeamAttendance(adminClient, requestedCohortId || mentorRole.cohort_id);
     }
 
     // Student leaderboard — cohort-wide attendance for ranking table
-    if (view === 'leaderboard' && studentRole?.cohort_id) {
-      return await getLeaderboard(adminClient, user.id, studentRole.cohort_id);
+    const leaderboardCohortId = requestedCohortId || studentRole?.cohort_id;
+    if (view === 'leaderboard' && leaderboardCohortId) {
+      return await getLeaderboard(adminClient, user.id, leaderboardCohortId);
     }
 
     // Student view — return own attendance
-    const cohortId = studentRole?.cohort_id || mentorRole?.cohort_id;
+    const cohortId = requestedCohortId || studentRole?.cohort_id || mentorRole?.cohort_id || profile?.cohort_id;
 
     if (!cohortId) {
       return NextResponse.json({ attendance: [], stats: null, sessions: [] });
