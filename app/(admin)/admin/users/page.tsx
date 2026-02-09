@@ -94,9 +94,13 @@ export default function UsersPage() {
       if (selectedCohorts.includes('no_cohort')) {
         if (!user.cohort_id) return true;
       }
-      const userCohortIds = user.role_assignments
+      const assignmentCohorts = user.role_assignments
         ?.map(ra => ra.cohort_id)
-        .filter(Boolean) || [user.cohort_id].filter(Boolean);
+        .filter(Boolean) ?? [];
+      // Merge both sources: role_assignments (primary) + profiles.cohort_id (legacy fallback)
+      const userCohortIds = assignmentCohorts.length > 0
+        ? assignmentCohorts
+        : [user.cohort_id].filter(Boolean);
 
       return userCohortIds.some(cohortId => selectedCohorts.includes(cohortId as string));
     })();
