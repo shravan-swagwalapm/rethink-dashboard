@@ -25,10 +25,11 @@ export async function GET() {
     const sessionCounts = new Map<string, number>();
 
     if (cohortIds.length > 0) {
-      const [{ data: allProfiles }, { data: allSessions }] = await Promise.all([
+      const [{ data: allRoleAssignments }, { data: allSessions }] = await Promise.all([
         adminClient
-          .from('profiles')
+          .from('user_role_assignments')
           .select('cohort_id')
+          .eq('role', 'student')
           .in('cohort_id', cohortIds),
         adminClient
           .from('sessions')
@@ -36,9 +37,9 @@ export async function GET() {
           .in('cohort_id', cohortIds),
       ]);
 
-      for (const profile of allProfiles || []) {
-        if (profile.cohort_id) {
-          studentCounts.set(profile.cohort_id, (studentCounts.get(profile.cohort_id) || 0) + 1);
+      for (const assignment of allRoleAssignments || []) {
+        if (assignment.cohort_id) {
+          studentCounts.set(assignment.cohort_id, (studentCounts.get(assignment.cohort_id) || 0) + 1);
         }
       }
 
@@ -123,15 +124,16 @@ export async function PUT(request: NextRequest) {
 
     const adminClient = await createAdminClient();
 
+    const updateData: Record<string, unknown> = {};
+    if (name !== undefined) updateData.name = name?.trim();
+    if (tag !== undefined) updateData.tag = tag?.trim().toUpperCase();
+    if (start_date !== undefined) updateData.start_date = start_date || null;
+    if (end_date !== undefined) updateData.end_date = end_date || null;
+    if (status !== undefined) updateData.status = status;
+
     const { data, error } = await adminClient
       .from('cohorts')
-      .update({
-        name: name?.trim(),
-        tag: tag?.trim().toUpperCase(),
-        start_date: start_date || null,
-        end_date: end_date || null,
-        status,
-      })
+      .update(updateData)
       .eq('id', id)
       .select()
       .single();

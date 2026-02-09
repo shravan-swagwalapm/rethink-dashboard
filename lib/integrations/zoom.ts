@@ -195,6 +195,15 @@ export class ZoomService {
     if (options.startTime) body.start_time = options.startTime;
     if (options.duration) body.duration = options.duration;
     if (options.agenda) body.agenda = options.agenda;
+    // Preserve meeting settings on update (matches createMeeting settings)
+    body.settings = {
+      host_video: true,
+      participant_video: true,
+      join_before_host: true,
+      mute_upon_entry: true,
+      waiting_room: false,
+      auto_recording: 'cloud',
+    };
 
     const response = await fetch(`https://api.zoom.us/v2/meetings/${meetingId}`, {
       method: 'PATCH',

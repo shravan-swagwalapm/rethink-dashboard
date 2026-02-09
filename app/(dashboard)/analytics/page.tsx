@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useUserContext } from '@/contexts/user-context';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -38,8 +38,16 @@ import {
   Users,
   AlertTriangle,
   BarChart3,
+  Trophy,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { format } from 'date-fns';
 
 // ─── Types ───
@@ -72,6 +80,22 @@ interface MentorStudent {
   sessionsTotal: number;
   avgPercentage: number;
   sessions: AttendanceSession[];
+}
+
+interface LeaderboardEntry {
+  userId: string;
+  name: string;
+  avatarUrl: string | null;
+  avgPercentage: number;
+  sessionsAttended: number;
+  sessionsTotal: number;
+  sessionPercentages: Record<string, number>;
+}
+
+interface LeaderboardSession {
+  id: string;
+  title: string;
+  date: string;
 }
 
 // ─── Helpers ───
@@ -197,9 +221,17 @@ function SessionCard({ session }: { session: AttendanceSession }) {
 // ─── Student View ───
 
 function StudentView() {
+  const { user } = useUserContext();
   const [attendance, setAttendance] = useState<AttendanceSession[]>([]);
   const [stats, setStats] = useState<AttendanceStats | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Leaderboard state
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [leaderboardSessions, setLeaderboardSessions] = useState<LeaderboardSession[]>([]);
+  const [selectedSession, setSelectedSession] = useState<string>('overall');
+  const [cohortAvg, setCohortAvg] = useState<number>(0);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(true);
 
   useEffect(() => {
     async function fetchData() {
@@ -218,6 +250,39 @@ function StudentView() {
     }
     fetchData();
   }, []);
+
+  // Fetch leaderboard data separately
+  useEffect(() => {
+    async function fetchLeaderboard() {
+      try {
+        const res = await fetch('/api/analytics?view=leaderboard');
+        if (res.ok) {
+          const data = await res.json();
+          setLeaderboard(data.leaderboard || []);
+          setLeaderboardSessions(data.sessions || []);
+          setCohortAvg(data.cohortAvg || 0);
+        }
+      } catch (error) {
+        console.error('Failed to fetch leaderboard:', error);
+      } finally {
+        setLeaderboardLoading(false);
+      }
+    }
+    fetchLeaderboard();
+  }, []);
+
+  // Sort leaderboard by selected session or overall
+  const sortedLeaderboard = useMemo(() => {
+    if (selectedSession === 'overall') {
+      return [...leaderboard].sort((a, b) => b.avgPercentage - a.avgPercentage);
+    }
+    // Sort by specific session's attendance
+    return [...leaderboard].sort((a, b) => {
+      const aVal = a.sessionPercentages[selectedSession] ?? -1;
+      const bVal = b.sessionPercentages[selectedSession] ?? -1;
+      return bVal - aVal;
+    });
+  }, [leaderboard, selectedSession]);
 
   const chartData = attendance
     .filter((a) => a.attended)
@@ -418,6 +483,127 @@ function StudentView() {
           ))}
         </div>
       </div>
+
+      {/* Cohort Leaderboard */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+      >
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Trophy className="w-4 h-4" />
+                  Cohort Leaderboard
+                </CardTitle>
+                <CardDescription>
+                  {cohortAvg > 0 && `Cohort avg: ${cohortAvg}% · `}
+                  {sortedLeaderboard.length} students
+                </CardDescription>
+              </div>
+              <Select value={selectedSession} onValueChange={setSelectedSession}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Filter by session" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="overall">Overall</SelectItem>
+                  {leaderboardSessions.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {leaderboardLoading ? (
+              <div className="space-y-3">
+                {[...Array(5)].map((_, i) => (
+                  <Skeleton key={i} className="h-12 w-full rounded-lg" />
+                ))}
+              </div>
+            ) : sortedLeaderboard.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Trophy className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p className="text-sm">No leaderboard data yet</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-16">Rank</TableHead>
+                    <TableHead>Student</TableHead>
+                    <TableHead className="text-right">
+                      {selectedSession === 'overall' ? 'Avg Attendance' : 'Attendance'}
+                    </TableHead>
+                    {selectedSession === 'overall' && (
+                      <TableHead className="text-right hidden sm:table-cell">Sessions</TableHead>
+                    )}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sortedLeaderboard.map((entry, index) => {
+                    const isCurrentUser = entry.userId === user?.id;
+                    const displayPercentage =
+                      selectedSession === 'overall'
+                        ? entry.avgPercentage
+                        : entry.sessionPercentages[selectedSession] ?? 0;
+                    const wasPresent =
+                      selectedSession === 'overall'
+                        ? entry.sessionsAttended > 0
+                        : selectedSession in entry.sessionPercentages;
+
+                    return (
+                      <TableRow
+                        key={entry.userId}
+                        className={
+                          isCurrentUser
+                            ? 'bg-primary/5 border-l-2 border-l-primary font-medium'
+                            : ''
+                        }
+                      >
+                        <TableCell className="font-bold text-muted-foreground">
+                          {index + 1}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2.5">
+                            <Avatar className="w-7 h-7">
+                              <AvatarImage src={entry.avatarUrl || ''} alt={entry.name} />
+                              <AvatarFallback className="text-xs">
+                                {entry.name.charAt(0).toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className={isCurrentUser ? 'font-semibold' : ''}>
+                              {entry.name}
+                              {isCurrentUser && (
+                                <span className="text-xs text-primary ml-1.5">(You)</span>
+                              )}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {wasPresent
+                            ? getAttendanceBadge(displayPercentage)
+                            : <Badge variant="outline" className="bg-gray-500/10 text-gray-500 border-gray-200">Absent</Badge>
+                          }
+                        </TableCell>
+                        {selectedSession === 'overall' && (
+                          <TableCell className="text-right text-sm text-muted-foreground hidden sm:table-cell">
+                            {entry.sessionsAttended} / {entry.sessionsTotal}
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
     </div>
   );
 }

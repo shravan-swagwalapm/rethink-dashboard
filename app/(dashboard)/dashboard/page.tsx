@@ -218,6 +218,7 @@ export default function DashboardPage() {
             resourcesResult,
             invoicesResult,
             learningAssetsResult,
+            leaderboardResult,
           ] = await Promise.all([
             // Fetch cohort info
             supabase
@@ -225,9 +226,9 @@ export default function DashboardPage() {
               .select('*')
               .eq('id', activeCohortId)
               .single(),
-            // Fetch stats - count all users in cohort
+            // Fetch stats - count all members in cohort (using multi-role table)
             supabase
-              .from('profiles')
+              .from('user_role_assignments')
               .select('*', { count: 'exact', head: true })
               .eq('cohort_id', activeCohortId),
             // Fetch attendance
@@ -247,11 +248,11 @@ export default function DashboardPage() {
               .from('resources')
               .select('*', { count: 'exact', head: true })
               .eq('cohort_id', activeCohortId),
-            // Fetch upcoming sessions
+            // Fetch upcoming sessions (via session_cohorts junction table)
             supabase
               .from('sessions')
-              .select('*')
-              .eq('cohort_id', activeCohortId)
+              .select('*, session_cohorts!inner(cohort_id)')
+              .eq('session_cohorts.cohort_id', activeCohortId)
               .gte('scheduled_at', new Date().toISOString())
               .order('scheduled_at', { ascending: true })
               .limit(3),
@@ -273,6 +274,10 @@ export default function DashboardPage() {
             fetch(`/api/learnings/recent?cohort_id=${activeCohortId}&limit=4`)
               .then(r => r.ok ? r.json() : { recent: [] })
               .catch(() => ({ recent: [] })),
+            // Fetch cohort avg attendance (from leaderboard API)
+            fetch('/api/analytics?view=leaderboard')
+              .then(r => r.ok ? r.json() : { cohortAvg: null })
+              .catch(() => ({ cohortAvg: null })),
           ]);
 
           // Process cohort data
@@ -296,6 +301,7 @@ export default function DashboardPage() {
             attendance_percentage: Math.round(avgAttendance),
             current_rank: rankingResult.data?.rank || null,
             total_resources: resourcesCountResult.count || 0,
+            cohort_avg: leaderboardResult.cohortAvg ?? null,
           });
 
           // Set sessions, modules, and resources

@@ -51,6 +51,11 @@ export function RoleSwitcher() {
           <ActiveIcon className="h-4 w-4" />
           <span className="hidden sm:inline">
             {activeRoleAssignment?.role ? roleLabels[activeRoleAssignment.role] : 'Role'}
+            {activeRoleAssignment?.cohort && (
+              <span className="text-muted-foreground font-normal ml-1">
+                ({activeRoleAssignment.cohort.name})
+              </span>
+            )}
           </span>
           <ChevronDown className="h-4 w-4 opacity-50" />
         </Button>
@@ -70,11 +75,11 @@ export function RoleSwitcher() {
             >
               <Icon className="h-4 w-4" />
               <div className="flex-1">
-                <div className="font-medium">{roleLabels[roleAssignment.role]}</div>
+                <span className="font-medium">{roleLabels[roleAssignment.role]}</span>
                 {roleAssignment.cohort && (
-                  <div className="text-xs text-muted-foreground">
-                    {roleAssignment.cohort.name}
-                  </div>
+                  <span className="text-muted-foreground ml-1.5">
+                    · {roleAssignment.cohort.name}
+                  </span>
                 )}
               </div>
               {isActive && <Check className="h-4 w-4 text-primary" />}

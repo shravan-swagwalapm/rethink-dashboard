@@ -1,8 +1,8 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
 // GET - Student's subgroup with mentor + peers
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     // Auth check via user-scoped client
     const supabase = await createClient();
@@ -15,13 +15,25 @@ export async function GET() {
     // Use admin client for data queries (bypasses RLS)
     const adminClient = await createAdminClient();
 
-    // Find the student's subgroup membership
-    const { data: membership } = await adminClient
+    // Optional cohort_id filter for multi-cohort students
+    const { searchParams } = new URL(request.url);
+    const cohortId = searchParams.get('cohort_id');
+
+    // Find the student's subgroup membership (filtered by cohort if provided)
+    // Use !inner join so the cohort filter excludes parent rows (not just nullifies the join)
+    let membershipQuery = adminClient
       .from('subgroup_members')
-      .select('subgroup_id')
-      .eq('user_id', user.id)
-      .limit(1)
-      .single();
+      .select(cohortId
+        ? 'subgroup_id, subgroup:subgroups!inner(cohort_id)'
+        : 'subgroup_id, subgroup:subgroups(cohort_id)')
+      .eq('user_id', user.id);
+
+    if (cohortId) {
+      membershipQuery = membershipQuery.eq('subgroup.cohort_id', cohortId);
+    }
+
+    const { data: memberships } = await membershipQuery.limit(1);
+    const membership = memberships?.[0];
 
     if (!membership) {
       return NextResponse.json({ data: null }); // Not assigned yet

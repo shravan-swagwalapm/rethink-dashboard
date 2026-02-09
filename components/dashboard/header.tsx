@@ -43,22 +43,17 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
 
   const handleSignOut = () => {
-    console.log('handleSignOut: Starting sign out...');
-
     // Force redirect after 2 seconds no matter what
     const forceRedirectTimeout = setTimeout(() => {
-      console.log('handleSignOut: Force redirecting after timeout...');
       window.location.href = '/login?signedout=1';
     }, 2000);
 
     signOut()
       .then(() => {
-        console.log('handleSignOut: Sign out complete, redirecting...');
         clearTimeout(forceRedirectTimeout);
         window.location.href = '/login?signedout=1';
       })
-      .catch((error) => {
-        console.error('handleSignOut: Error:', error);
+      .catch(() => {
         clearTimeout(forceRedirectTimeout);
         window.location.href = '/login?signedout=1';
       });
@@ -234,7 +229,6 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={() => {
-                  console.log('Sign out clicked!');
                   handleSignOut();
                 }}
                 className="text-destructive focus:text-destructive cursor-pointer"

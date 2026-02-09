@@ -46,7 +46,7 @@ interface TeamMember extends Profile {
 }
 
 export default function TeamPage() {
-  const { profile, isMentor, isAdmin, loading: userLoading } = useUserContext();
+  const { profile, isMentor, isAdmin, activeCohortId, loading: userLoading } = useUserContext();
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -61,19 +61,57 @@ export default function TeamPage() {
       const supabase = getClient();
 
       try {
-        // Fetch team members assigned to this mentor
-        let query = supabase
-          .from('profiles')
-          .select('*')
-          .eq('role', 'student');
+        let members: Profile[] = [];
 
         if (isMentor && !isAdmin) {
-          query = query.eq('mentor_id', profile.id);
+          // Fetch students from mentor's subgroups via API (uses admin client, bypasses RLS)
+          const subgroupRes = await fetch('/api/subgroups/mentor-subgroups');
+          const subgroupData = await subgroupRes.json();
+
+          // Extract unique student IDs from all subgroups
+          const studentIds = new Set<string>();
+          for (const sg of subgroupData.data || []) {
+            for (const m of sg.members || []) {
+              studentIds.add(m.user_id);
+            }
+          }
+
+          if (studentIds.size > 0) {
+            const { data, error } = await supabase
+              .from('profiles')
+              .select('*')
+              .in('id', Array.from(studentIds))
+              .order('full_name', { ascending: true });
+            if (error) throw error;
+            members = data || [];
+          }
+        } else {
+          // Admin: show all students in the active cohort (or all if no cohort)
+          if (activeCohortId) {
+            const res = await fetch(`/api/admin/cohorts/${activeCohortId}/students`).catch(() => null);
+            if (res?.ok) {
+              const data = await res.json();
+              members = data || [];
+            } else {
+              // Fallback: query profiles directly
+              const { data, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('role', 'student')
+                .order('full_name', { ascending: true });
+              if (error) throw error;
+              members = data || [];
+            }
+          } else {
+            const { data, error } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('role', 'student')
+              .order('full_name', { ascending: true });
+            if (error) throw error;
+            members = data || [];
+          }
         }
-
-        const { data: members, error } = await query.order('full_name', { ascending: true });
-
-        if (error) throw error;
 
         // Fetch rankings for all members
         const memberIds = members?.map((m: Profile) => m.id) || [];
@@ -121,7 +159,7 @@ export default function TeamPage() {
     } else if (!userLoading) {
       setLoading(false);
     }
-  }, [profile, isMentor, isAdmin, userLoading]);
+  }, [profile, isMentor, isAdmin, userLoading, activeCohortId]);
 
   // Filter team members based on search
   const filteredMembers = searchQuery

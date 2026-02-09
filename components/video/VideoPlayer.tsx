@@ -51,14 +51,11 @@ export function VideoPlayer({
   useEffect(() => {
     let mounted = true;
 
-    console.log('[VideoPlayer] Starting Video.js import...');
-
     // Use require instead of dynamic import for better reliability
     const loadVideoJs = async () => {
       try {
         const videojsModule = await import('video.js');
         if (mounted) {
-          console.log('[VideoPlayer] Video.js loaded successfully');
           setVideojs(() => videojsModule.default);
           setIsVideoJsReady(true);
         }
@@ -85,7 +82,6 @@ export function VideoPlayer({
         setIsLoading(true);
         // Use iframe embed (false) instead of direct streaming (true) to avoid 403/404 errors
         const result = getGoogleDriveVideoUrl(googleDriveId, false);
-        console.log('[VideoPlayer] Video URL generated:', result);
         setVideoUrl(result.url);
         setUseIframe(result.method === 'iframe');
         setError(null);
@@ -128,12 +124,6 @@ export function VideoPlayer({
   // Initialize Video.js player
   useEffect(() => {
     if (!videoRef.current || !videoUrl || !isVideoJsReady || !videojs) {
-      console.log('[VideoPlayer] Waiting for player initialization...', {
-        hasVideoRef: !!videoRef.current,
-        hasVideoUrl: !!videoUrl,
-        isVideoJsReady,
-        hasVideojs: !!videojs
-      });
       return;
     }
 
@@ -146,8 +136,6 @@ export function VideoPlayer({
         setError('Video player initialization failed. Please try refreshing.');
         return;
       }
-
-      console.log('[VideoPlayer] Initializing Video.js player...');
 
     try {
       const player = videojs(videoRef.current, {
@@ -183,13 +171,9 @@ export function VideoPlayer({
 
       playerRef.current = player;
 
-      console.log('[VideoPlayer] Player initialized successfully');
-
       // Resume from last position
       player.ready(() => {
-        console.log('[VideoPlayer] Player ready');
         if (progress && progress.last_position_seconds > 5) {
-          console.log('[VideoPlayer] Resuming from', progress.last_position_seconds);
           player.currentTime(progress.last_position_seconds);
         }
 

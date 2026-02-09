@@ -18,14 +18,23 @@ export async function GET(
 
     const adminClient = await createAdminClient();
 
-    // Get user's profile to check role
-    const { data: profile } = await adminClient
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
+    // Check admin access via BOTH legacy profiles.role AND user_role_assignments
+    const [{ data: profile }, { data: roleAssignment }] = await Promise.all([
+      adminClient
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .maybeSingle(),
+      adminClient
+        .from('user_role_assignments')
+        .select('role')
+        .eq('user_id', user.id)
+        .in('role', ['admin', 'company_user'])
+        .limit(1)
+        .maybeSingle(),
+    ]);
 
-    const isAdmin = profile?.role === 'admin' || profile?.role === 'company_user';
+    const isAdmin = profile?.role === 'admin' || profile?.role === 'company_user' || !!roleAssignment;
 
     // Fetch the invoice
     const { data: invoice, error: invoiceError } = await adminClient

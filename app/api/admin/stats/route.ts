@@ -22,8 +22,8 @@ export async function GET() {
       { data: attendance },
     ] = await Promise.all([
       adminClient.from('profiles').select('*', { count: 'exact', head: true }),
-      adminClient.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'student'),
-      adminClient.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'mentor'),
+      adminClient.from('user_role_assignments').select('*', { count: 'exact', head: true }).eq('role', 'student'),
+      adminClient.from('user_role_assignments').select('*', { count: 'exact', head: true }).eq('role', 'mentor'),
       adminClient.from('cohorts').select('*', { count: 'exact', head: true }).eq('status', 'active'),
       adminClient.from('sessions').select('*', { count: 'exact', head: true }).gte('scheduled_at', new Date().toISOString()),
       adminClient.from('support_tickets').select('*', { count: 'exact', head: true }).eq('status', 'open'),

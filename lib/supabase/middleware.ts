@@ -77,34 +77,57 @@ export async function updateSession(request: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    const { data: profile } = await adminSupabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .maybeSingle();
+    // Check BOTH profiles.role AND user_role_assignments for admin access
+    const [{ data: profile }, { data: roleAssignment }] = await Promise.all([
+      adminSupabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .maybeSingle(),
+      adminSupabase
+        .from('user_role_assignments')
+        .select('role')
+        .eq('user_id', user.id)
+        .in('role', ['admin', 'company_user'])
+        .limit(1)
+        .maybeSingle(),
+    ]);
 
-    if (!profile || !isAdminRole(profile.role)) {
+    const hasAdminAccess = (profile && isAdminRole(profile.role)) || !!roleAssignment;
+
+    if (!hasAdminAccess) {
       const url = request.nextUrl.clone();
       url.pathname = '/dashboard';
       return NextResponse.redirect(url);
     }
   }
 
-  // Mentor-only routes
-  if (user && (pathname.startsWith('/dashboard/team') || pathname.startsWith('/dashboard/attendance'))) {
-    // Use service role client to bypass RLS for role check
+  // Mentor-only routes (correct paths: /team, /attendance, /mentor/*)
+  if (user && (pathname.startsWith('/team') || pathname.startsWith('/attendance') || pathname.startsWith('/mentor/'))) {
     const adminSupabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    const { data: profile } = await adminSupabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .maybeSingle();
+    // Check BOTH profiles.role AND user_role_assignments
+    const [{ data: profile }, { data: roleAssignment }] = await Promise.all([
+      adminSupabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .maybeSingle(),
+      adminSupabase
+        .from('user_role_assignments')
+        .select('role')
+        .eq('user_id', user.id)
+        .in('role', ['admin', 'company_user', 'mentor'])
+        .limit(1)
+        .maybeSingle(),
+    ]);
 
-    if (!profile || !(isAdminRole(profile.role) || profile.role === 'mentor')) {
+    const hasMentorAccess = (profile && (isAdminRole(profile.role) || profile.role === 'mentor')) || !!roleAssignment;
+
+    if (!hasMentorAccess) {
       const url = request.nextUrl.clone();
       url.pathname = '/dashboard';
       return NextResponse.redirect(url);

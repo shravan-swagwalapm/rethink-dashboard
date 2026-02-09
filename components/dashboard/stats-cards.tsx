@@ -12,6 +12,7 @@ interface StatsCardsProps {
     attendance_percentage: number;
     current_rank: number | null;
     total_resources: number;
+    cohort_avg?: number | null;
   };
   loading?: boolean;
 }
@@ -193,7 +194,9 @@ export function StatsCards({ stats, loading }: StatsCardsProps) {
       title: 'Attendance',
       value: stats?.attendance_percentage || 0,
       icon: TrendingUp,
-      description: 'Session attendance rate',
+      description: stats?.cohort_avg != null
+        ? `Cohort avg: ${Math.round(stats.cohort_avg)}%`
+        : 'Session attendance rate',
       trend: stats?.attendance_percentage && stats.attendance_percentage >= 75 ? 'up' : 'down',
     },
     {

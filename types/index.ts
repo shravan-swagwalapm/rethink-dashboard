@@ -525,6 +525,7 @@ export interface DashboardStats {
   attendance_percentage: number;
   current_rank: number | null;
   total_resources: number;
+  cohort_avg: number | null;
 }
 
 // API Response types

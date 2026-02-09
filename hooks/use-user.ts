@@ -213,10 +213,20 @@ export function useUser() {
     if (!user) return false;
 
     try {
+      // Must include role_assignments join (same as /api/me) to preserve multi-role state
       const supabase = getClient();
       const { data: profileData, error } = await supabase
         .from('profiles')
-        .select('*')
+        .select(`
+          *,
+          role_assignments:user_role_assignments(
+            id,
+            role,
+            cohort_id,
+            cohort:cohorts(id, name, tag, status),
+            created_at
+          )
+        `)
         .eq('id', user.id)
         .maybeSingle();
 

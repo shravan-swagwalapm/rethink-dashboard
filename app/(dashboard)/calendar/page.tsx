@@ -73,24 +73,29 @@ export default function CalendarPage() {
       const end = endOfMonth(currentMonth);
 
       try {
+        // FILTERING LOGIC:
+        // - Admin role: Show ALL sessions from all cohorts
+        // - Student/Mentor role: Show ONLY sessions for active cohort
+        //   Uses session_cohorts junction table for proper multi-cohort support
+        if (!isAdmin && !activeCohortId) {
+          setLoading(false);
+          return;
+        }
+
+        const selectClause = (!isAdmin && activeCohortId)
+          ? '*, session_cohorts!inner(cohort_id)'
+          : '*';
+
         let query = supabase
           .from('sessions')
-          .select('*')
+          .select(selectClause)
           .gte('scheduled_at', start.toISOString())
           .lte('scheduled_at', end.toISOString())
           .order('scheduled_at', { ascending: true });
 
-        // FILTERING LOGIC:
-        // - Admin role: Show ALL sessions from all cohorts
-        // - Student role: Show ONLY sessions for active cohort
         if (!isAdmin) {
-          if (!activeCohortId) {
-            setLoading(false);
-            return;
-          }
-          query = query.eq('cohort_id', activeCohortId);
+          query = query.eq('session_cohorts.cohort_id', activeCohortId);
         }
-        // Admin: no cohort filter (shows all sessions)
 
         const { data: sessionsData, error: sessionsError } = await query;
 

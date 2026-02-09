@@ -28,8 +28,9 @@ interface ViewerState {
 
 const LOG_PREFIX = '[UniversalViewer]';
 
-function log(message: string, data?: unknown) {
-  console.log(`${LOG_PREFIX} ${message}`, data !== undefined ? data : '');
+// Debug logging disabled for production — enable by uncommenting console.log
+function log(_message: string, _data?: unknown) {
+  // console.log(`${LOG_PREFIX} ${_message}`, _data !== undefined ? _data : '');
 }
 
 function logError(message: string, error?: unknown) {

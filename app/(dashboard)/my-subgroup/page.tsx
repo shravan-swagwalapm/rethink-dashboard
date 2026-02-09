@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useUserContext } from '@/contexts/user-context';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -18,6 +19,7 @@ interface SubgroupData {
 }
 
 export default function MySubgroupPage() {
+  const { activeCohortId } = useUserContext();
   const [data, setData] = useState<SubgroupData | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
@@ -25,7 +27,9 @@ export default function MySubgroupPage() {
 
   const fetchData = useCallback(async () => {
     try {
-      const res = await fetch('/api/subgroups/my-subgroup');
+      const params = new URLSearchParams();
+      if (activeCohortId) params.set('cohort_id', activeCohortId);
+      const res = await fetch(`/api/subgroups/my-subgroup?${params.toString()}`);
       if (!res.ok) throw new Error('Failed to fetch');
       const result = await res.json();
       setData(result.data);
@@ -34,7 +38,7 @@ export default function MySubgroupPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [activeCohortId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 

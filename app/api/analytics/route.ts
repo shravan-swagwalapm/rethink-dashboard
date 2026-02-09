@@ -33,6 +33,11 @@ export async function GET(request: NextRequest) {
       return await getMentorTeamAttendance(adminClient, mentorRole.cohort_id);
     }
 
+    // Student leaderboard — cohort-wide attendance for ranking table
+    if (view === 'leaderboard' && studentRole?.cohort_id) {
+      return await getLeaderboard(adminClient, user.id, studentRole.cohort_id);
+    }
+
     // Student view — return own attendance
     const cohortId = studentRole?.cohort_id || mentorRole?.cohort_id;
 
@@ -261,4 +266,106 @@ async function getMentorTeamAttendance(supabase: any, cohortId: string | null) {
   students.sort((a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name));
 
   return NextResponse.json({ students, sessions });
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function getLeaderboard(supabase: any, _currentUserId: string, cohortId: string) {
+  // Get countable sessions for this cohort
+  const { data: sessions } = await supabase
+    .from('sessions')
+    .select('id, title, scheduled_at, duration_minutes, actual_duration_minutes')
+    .eq('counts_for_students', true)
+    .eq('cohort_id', cohortId)
+    .lt('scheduled_at', new Date().toISOString())
+    .order('scheduled_at', { ascending: true });
+
+  if (!sessions || sessions.length === 0) {
+    return NextResponse.json({ leaderboard: [], sessions: [], cohortAvg: 0 });
+  }
+
+  const sessionIds = sessions.map((s: { id: string }) => s.id);
+
+  // Get all students in this cohort
+  const { data: studentAssignments } = await supabase
+    .from('user_role_assignments')
+    .select('user_id')
+    .eq('role', 'student')
+    .eq('cohort_id', cohortId);
+
+  const studentIds = (studentAssignments || []).map((s: { user_id: string }) => s.user_id);
+
+  if (studentIds.length === 0) {
+    return NextResponse.json({ leaderboard: [], sessions, cohortAvg: 0 });
+  }
+
+  // Get profiles for names/avatars
+  const { data: profiles } = await supabase
+    .from('profiles')
+    .select('id, full_name, avatar_url')
+    .in('id', studentIds);
+
+  const profileMap = new Map(
+    (profiles || []).map((p: { id: string; full_name: string; avatar_url: string | null }) => [p.id, p])
+  );
+
+  // Get all attendance records for these sessions and students
+  const { data: attendanceRecords } = await supabase
+    .from('attendance')
+    .select('session_id, user_id, attendance_percentage')
+    .in('session_id', sessionIds)
+    .in('user_id', studentIds);
+
+  // Build per-student leaderboard entries
+  const leaderboard = studentIds.map((sid: string) => {
+    const profile = profileMap.get(sid) as { id: string; full_name: string; avatar_url: string | null } | undefined;
+    const studentRecords = (attendanceRecords || []).filter((a: { user_id: string }) => a.user_id === sid);
+
+    const sessionsAttended = studentRecords.length;
+    const avgPercentage =
+      sessionsAttended > 0
+        ? Math.round(
+            (studentRecords.reduce((sum: number, a: { attendance_percentage: number }) => sum + (a.attendance_percentage || 0), 0) /
+              sessionsAttended) *
+              100
+          ) / 100
+        : 0;
+
+    // Per-session percentages (for session filter)
+    const sessionPercentages: Record<string, number> = {};
+    for (const record of studentRecords) {
+      sessionPercentages[(record as { session_id: string }).session_id] = (record as { attendance_percentage: number }).attendance_percentage || 0;
+    }
+
+    return {
+      userId: sid,
+      name: profile?.full_name || 'Unknown',
+      avatarUrl: profile?.avatar_url || null,
+      avgPercentage,
+      sessionsAttended,
+      sessionsTotal: sessions.length,
+      sessionPercentages,
+    };
+  });
+
+  // Sort by overall avgPercentage descending
+  leaderboard.sort((a: { avgPercentage: number }, b: { avgPercentage: number }) => b.avgPercentage - a.avgPercentage);
+
+  // Compute cohort average
+  const cohortAvg =
+    leaderboard.length > 0
+      ? Math.round(
+          (leaderboard.reduce((sum: number, s: { avgPercentage: number }) => sum + s.avgPercentage, 0) /
+            leaderboard.length) *
+            100
+        ) / 100
+      : 0;
+
+  // Session list for filter dropdown
+  const sessionList = sessions.map((s: { id: string; title: string; scheduled_at: string }) => ({
+    id: s.id,
+    title: s.title,
+    date: s.scheduled_at,
+  }));
+
+  return NextResponse.json({ leaderboard, sessions: sessionList, cohortAvg });
 }

@@ -205,6 +205,9 @@ export default function LearningsPage() {
       try {
         let modulesData: LearningModule[] | null = null;
         let modulesError: any = null;
+        // Cohort override state — hoisted for use by both modules AND case studies
+        let cohortLinkType: string | null = null;
+        let linkedCohortId: string | null = null;
 
         // OVERRIDE MODEL LOGIC:
         // - Admin role: Show ONLY global library
@@ -227,15 +230,19 @@ export default function LearningsPage() {
           }
 
           // Step 1: Fetch cohort state to determine active link
-          const { data: cohort } = await supabase
+          const { data: cohortData } = await supabase
             .from('cohorts')
             .select('id, active_link_type, linked_cohort_id')
             .eq('id', activeCohortId)
             .single();
 
-          if (!cohort) {
+          if (!cohortData) {
             throw new Error('Cohort not found');
           }
+
+          // Store for reuse by case studies query below
+          cohortLinkType = cohortData.active_link_type;
+          linkedCohortId = cohortData.linked_cohort_id;
 
           // Step 2: Query modules based on active link type (OVERRIDE logic)
           let query = supabase
@@ -244,7 +251,7 @@ export default function LearningsPage() {
             .order('week_number', { ascending: true })
             .order('order_index', { ascending: true });
 
-          switch (cohort.active_link_type) {
+          switch (cohortData.active_link_type) {
             case 'global':
               // ONLY global modules (overrides own)
               query = query.eq('is_global', true);
@@ -252,8 +259,8 @@ export default function LearningsPage() {
 
             case 'cohort':
               // ONLY modules from linked cohort (overrides own)
-              if (cohort.linked_cohort_id) {
-                query = query.eq('cohort_id', cohort.linked_cohort_id);
+              if (cohortData.linked_cohort_id) {
+                query = query.eq('cohort_id', cohortData.linked_cohort_id);
               } else {
                 // Fallback if linked_cohort_id is missing
                 query = query.eq('cohort_id', activeCohortId);
@@ -291,7 +298,7 @@ export default function LearningsPage() {
 
         setModules(modulesWithResources);
 
-        // Fetch case studies with same filtering logic
+        // Fetch case studies with override linking logic (same pattern as modules)
         let caseStudyQuery = supabase
           .from('case_studies')
           .select('*')
@@ -301,7 +308,26 @@ export default function LearningsPage() {
         if (isAdmin) {
           caseStudyQuery = caseStudyQuery.is('cohort_id', null);
         } else if (activeCohortId) {
-          caseStudyQuery = caseStudyQuery.eq('cohort_id', activeCohortId);
+          // Use the same override linking logic as modules
+          switch (cohortLinkType) {
+            case 'global':
+              // Global case studies (cohort_id is null)
+              caseStudyQuery = caseStudyQuery.is('cohort_id', null);
+              break;
+            case 'cohort':
+              // Case studies from linked cohort
+              if (linkedCohortId) {
+                caseStudyQuery = caseStudyQuery.eq('cohort_id', linkedCohortId);
+              } else {
+                caseStudyQuery = caseStudyQuery.eq('cohort_id', activeCohortId);
+              }
+              break;
+            case 'own':
+            default:
+              // Own cohort's case studies
+              caseStudyQuery = caseStudyQuery.eq('cohort_id', activeCohortId);
+              break;
+          }
         }
 
         const { data: caseStudiesData } = await caseStudyQuery;

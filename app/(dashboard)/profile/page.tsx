@@ -72,7 +72,7 @@ interface ProfileCard {
 }
 
 export default function ProfilePage() {
-  const { profile, refreshProfile, loading: userLoading } = useUserContext();
+  const { profile, refreshProfile, loading: userLoading, activeRole } = useUserContext();
   const [formData, setFormData] = useState({
     full_name: '',
     phone: '',
@@ -407,7 +407,7 @@ export default function ProfilePage() {
               <CardTitle className="text-xl">{profile?.full_name || 'User'}</CardTitle>
               <CardDescription>{profile?.email}</CardDescription>
               <Badge variant="secondary" className="mt-2 capitalize">
-                {profile?.role}
+                {activeRole || profile?.role}
               </Badge>
             </div>
           </div>

@@ -374,27 +374,13 @@ export function ResourcePreviewModal({
               src={(() => {
                 // For PDFs with file_path (uploaded to Supabase Storage), use the signed URL
                 if (hasPdf) {
-                  console.log('[ResourcePreview] Loading PDF via signed URL:', {
-                    title: resource.title,
-                    file_path: resource.file_path,
-                    signed_url: pdfSignedUrl ? 'loaded' : 'pending',
-                  });
                   return pdfSignedUrl || '';
                 }
 
                 // For videos and legacy content, use getEmbedUrl
-                const url = getEmbedUrl(resource);
-                console.log('[ResourcePreview] Loading iframe:', {
-                  title: resource.title,
-                  google_drive_id: resource.google_drive_id,
-                  external_url: resource.external_url,
-                  content_type: resource.content_type,
-                  iframe_url: url,
-                });
-                return url;
+                return getEmbedUrl(resource);
               })()}
               onLoad={() => {
-                console.log('[ResourcePreview] Iframe loaded successfully');
                 // For PDFs, add delay to ensure PDF viewer has fully rendered and painted content
                 // Using requestAnimationFrame ensures we wait for actual paint cycles
                 if (hasPdf) {

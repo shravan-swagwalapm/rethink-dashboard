@@ -50,7 +50,7 @@ interface SessionWithAttendance extends Session {
 }
 
 function AttendanceContent() {
-  const { profile, isMentor, isAdmin, loading: userLoading } = useUserContext();
+  const { profile, isMentor, isAdmin, activeCohortId, loading: userLoading } = useUserContext();
   const searchParams = useSearchParams();
   const studentIdFilter = searchParams.get('student');
 
@@ -61,7 +61,8 @@ function AttendanceContent() {
 
   useEffect(() => {
     const fetchAttendanceData = async () => {
-      if (!profile?.cohort_id) {
+      const cohortId = activeCohortId || profile?.cohort_id;
+      if (!cohortId) {
         setLoading(false);
         return;
       }
@@ -73,7 +74,7 @@ function AttendanceContent() {
         const { data: sessionsData, error: sessionsError } = await supabase
           .from('sessions')
           .select('*')
-          .eq('cohort_id', profile.cohort_id)
+          .eq('cohort_id', cohortId)
           .lte('scheduled_at', new Date().toISOString())
           .order('scheduled_at', { ascending: false });
 
@@ -89,16 +90,12 @@ function AttendanceContent() {
           `)
           .in('session_id', sessionIds);
 
-        // Get team members count
+        // Get team members count (using user_role_assignments)
         let studentsQuery = supabase
-          .from('profiles')
-          .select('id')
+          .from('user_role_assignments')
+          .select('user_id')
           .eq('role', 'student')
-          .eq('cohort_id', profile.cohort_id);
-
-        if (isMentor && !isAdmin) {
-          studentsQuery = studentsQuery.eq('mentor_id', profile.id);
-        }
+          .eq('cohort_id', cohortId);
 
         const { data: studentsData } = await studentsQuery;
         const totalStudents = studentsData?.length || 0;
@@ -139,7 +136,7 @@ function AttendanceContent() {
     } else if (!userLoading) {
       setLoading(false);
     }
-  }, [profile, isMentor, isAdmin, userLoading, studentIdFilter, selectedSession]);
+  }, [profile, isMentor, isAdmin, userLoading, studentIdFilter, activeCohortId]);
 
   const selectedSessionData = sessions.find(s => s.id === selectedSession);
 
