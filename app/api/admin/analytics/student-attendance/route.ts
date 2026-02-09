@@ -37,19 +37,33 @@ export async function GET(request: NextRequest) {
 
     const sessionIds = sessions.map((s) => s.id);
 
-    // Get students in this cohort
-    let studentsQuery = supabase
+    // Get students in this cohort — check both role_assignments and legacy profiles
+    let raQuery = supabase
       .from('user_role_assignments')
       .select('user_id')
       .eq('role', 'student')
       .eq('cohort_id', cohortId);
 
+    let profileQuery = supabase
+      .from('profiles')
+      .select('id')
+      .eq('role', 'student')
+      .eq('cohort_id', cohortId);
+
     if (userId) {
-      studentsQuery = studentsQuery.eq('user_id', userId);
+      raQuery = raQuery.eq('user_id', userId);
+      profileQuery = profileQuery.eq('id', userId);
     }
 
-    const { data: studentAssignments } = await studentsQuery;
-    const studentIds = (studentAssignments || []).map((s) => s.user_id);
+    const [{ data: raStudents }, { data: profileStudents }] = await Promise.all([
+      raQuery,
+      profileQuery,
+    ]);
+
+    const studentIds = [...new Set([
+      ...(raStudents?.map(s => s.user_id) ?? []),
+      ...(profileStudents?.map(s => s.id) ?? []),
+    ])];
 
     if (studentIds.length === 0) {
       return NextResponse.json({ students: [], sessions });
