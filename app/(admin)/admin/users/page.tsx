@@ -88,21 +88,50 @@ export default function UsersPage() {
       );
     })();
 
-    const matchesRole = roleFilter === 'all' || user.role === roleFilter;
+    // Combined role + cohort filter: validates that role and cohort match
+    // the SAME role_assignment row, not independently
+    const matchesRoleAndCohort = (() => {
+      const hasRoleFilter = roleFilter !== 'all';
+      const hasCohortFilter = selectedCohorts.length > 0;
 
-    const matchesCohort = selectedCohorts.length === 0 || (() => {
-      if (selectedCohorts.includes('no_cohort')) {
-        if (!user.cohort_id) return true;
+      if (!hasRoleFilter && !hasCohortFilter) return true;
+
+      const assignments = user.role_assignments ?? [];
+      const cohortIds = selectedCohorts.filter(id => id !== 'no_cohort');
+      const wantsNoCohort = selectedCohorts.includes('no_cohort');
+
+      // Both filters active: role AND cohort must match the same assignment
+      if (hasRoleFilter && hasCohortFilter) {
+        if (assignments.length > 0) {
+          return assignments.some(ra =>
+            ra.role === roleFilter &&
+            (cohortIds.includes(ra.cohort_id as string) || (wantsNoCohort && !ra.cohort_id))
+          );
+        }
+        // Legacy fallback: no role_assignments
+        return user.role === roleFilter &&
+          (cohortIds.includes(user.cohort_id as string) || (wantsNoCohort && !user.cohort_id));
       }
-      const assignmentCohorts = user.role_assignments
-        ?.map(ra => ra.cohort_id)
-        .filter(Boolean) ?? [];
-      // Merge both sources: role_assignments (primary) + profiles.cohort_id (legacy fallback)
-      const userCohortIds = assignmentCohorts.length > 0
-        ? assignmentCohorts
-        : [user.cohort_id].filter(Boolean);
 
-      return userCohortIds.some(cohortId => selectedCohorts.includes(cohortId as string));
+      // Role filter only: user has any assignment with that role
+      if (hasRoleFilter) {
+        if (assignments.length > 0) {
+          return assignments.some(ra => ra.role === roleFilter);
+        }
+        return user.role === roleFilter;
+      }
+
+      // Cohort filter only: user has any assignment in that cohort
+      if (hasCohortFilter) {
+        if (assignments.length > 0) {
+          return assignments.some(ra =>
+            cohortIds.includes(ra.cohort_id as string) || (wantsNoCohort && !ra.cohort_id)
+          );
+        }
+        return cohortIds.includes(user.cohort_id as string) || (wantsNoCohort && !user.cohort_id);
+      }
+
+      return true;
     })();
 
     const matchesPhoneStatus = (() => {
@@ -130,7 +159,7 @@ export default function UsersPage() {
       return true;
     })();
 
-    return matchesSearch && matchesRole && matchesCohort &&
+    return matchesSearch && matchesRoleAndCohort &&
            matchesPhoneStatus && matchesDateRange && matchesMultiRole;
   }), [users, searchQuery, roleFilter, selectedCohorts, phoneStatusFilter, dateRangeFrom, dateRangeTo, multiRoleFilter]);
 

@@ -13,9 +13,19 @@ interface UserStatsProps {
 function countByRole(users: UserWithCohort[]) {
   let students = 0, mentors = 0, admins = 0;
   for (const u of users) {
-    if (u.role === 'student') students++;
-    else if (u.role === 'mentor') mentors++;
-    else if (isAdminRole(u.role)) admins++;
+    const assignments = u.role_assignments ?? [];
+    if (assignments.length > 0) {
+      // Use role_assignments for accurate multi-role counting
+      const roles = new Set(assignments.map(ra => ra.role));
+      if (roles.has('student')) students++;
+      if (roles.has('mentor')) mentors++;
+      if ([...roles].some(r => isAdminRole(r))) admins++;
+    } else {
+      // Legacy fallback for users without role_assignments
+      if (u.role === 'student') students++;
+      else if (u.role === 'mentor') mentors++;
+      else if (isAdminRole(u.role)) admins++;
+    }
   }
   return { students, mentors, admins };
 }
