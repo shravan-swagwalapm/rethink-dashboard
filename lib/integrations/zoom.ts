@@ -166,7 +166,9 @@ export class ZoomService {
           join_before_host: true,
           mute_upon_entry: true,
           waiting_room: false,
-          auto_recording: 'cloud',
+          auto_recording: 'none',
+          meeting_authentication: false,
+          approval_type: 0,
         },
       }),
     });
@@ -202,7 +204,9 @@ export class ZoomService {
       join_before_host: true,
       mute_upon_entry: true,
       waiting_room: false,
-      auto_recording: 'cloud',
+      auto_recording: 'none',
+      meeting_authentication: false,
+      approval_type: 0,
     };
 
     const response = await fetch(`https://api.zoom.us/v2/meetings/${meetingId}`, {
