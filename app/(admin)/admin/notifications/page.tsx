@@ -8,29 +8,29 @@ import {
   Send,
   BarChart3,
   Settings,
+  Bell,
 } from 'lucide-react';
 import { TemplatesTab } from './components/templates-tab';
 import { ContactsTab } from './components/contacts-tab';
 import { ComposeTab } from './components/compose-tab';
 import { LogsTab } from './components/logs-tab';
 import { IntegrationSettings } from '@/components/admin/notifications/integration-settings';
+import { MotionContainer, MotionItem, MotionFadeIn } from '@/components/ui/motion';
+import { PageHeader } from '@/components/ui/page-header';
 
 export default function AdminNotificationsPage() {
   const [activeTab, setActiveTab] = useState('templates');
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight dark:text-white">Notifications</h1>
-          <p className="text-muted-foreground dark:text-gray-400 mt-1">
-            Manage templates, send notifications, and track delivery
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        icon={Bell}
+        title="Notifications"
+        description="Send SMS and email campaigns"
+      />
 
       {/* Tabs */}
+      <MotionFadeIn delay={0.1}>
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-grid">
           <TabsTrigger value="templates" className="gap-2">
@@ -75,6 +75,7 @@ export default function AdminNotificationsPage() {
           <IntegrationSettings />
         </TabsContent>
       </Tabs>
+      </MotionFadeIn>
     </div>
   );
 }

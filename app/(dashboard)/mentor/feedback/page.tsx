@@ -13,7 +13,9 @@ import { PageLoader } from '@/components/ui/page-loader';
 import { useUserContext } from '@/contexts/user-context';
 import { toast } from 'sonner';
 import { Loader2, MessageSquare, Star } from 'lucide-react';
+import { PageHeader } from '@/components/ui/page-header';
 import { format } from 'date-fns';
+import { MotionFadeIn } from '@/components/ui/motion';
 import type { Profile, FeedbackAggregate } from '@/types';
 
 interface MentorSubgroup {
@@ -132,11 +134,13 @@ export default function MentorFeedbackPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Give Feedback</h1>
-        <p className="text-muted-foreground">Rate and comment on your students&apos; performance</p>
-      </div>
+      <PageHeader
+        icon={MessageSquare}
+        title="Feedback"
+        description="Review and manage student feedback"
+      />
 
+      <MotionFadeIn delay={0.1}>
       {/* My Ratings Summary */}
       {myRatings && myRatings.total_count > 0 && (
         <Card>
@@ -264,6 +268,7 @@ export default function MentorFeedbackPage() {
           </CardContent>
         </Card>
       )}
+      </MotionFadeIn>
     </div>
   );
 }

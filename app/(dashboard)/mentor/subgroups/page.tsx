@@ -9,6 +9,8 @@ import { ProfileDetailSheet } from '@/components/ui/profile-detail-sheet';
 import { useUserContext } from '@/contexts/user-context';
 import { toast } from 'sonner';
 import { Users } from 'lucide-react';
+import { PageHeader } from '@/components/ui/page-header';
+import { MotionFadeIn, MotionContainer, MotionItem } from '@/components/ui/motion';
 import type { Profile } from '@/types';
 
 interface MentorSubgroup {
@@ -64,13 +66,16 @@ export default function MentorSubgroupsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">My Subgroups</h1>
-        <p className="text-muted-foreground">Students assigned to your subgroups</p>
-      </div>
+      <PageHeader
+        icon={Users}
+        title="Subgroups"
+        description="Manage your mentor subgroups"
+      />
 
+      <MotionContainer className="space-y-6">
       {subgroups.map((sg) => (
-        <Card key={sg.id}>
+        <MotionItem key={sg.id}>
+        <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span>{sg.name}</span>
@@ -104,7 +109,9 @@ export default function MentorSubgroupsPage() {
             )}
           </CardContent>
         </Card>
+        </MotionItem>
       ))}
+      </MotionContainer>
 
       <ProfileDetailSheet
         profile={selectedProfile}

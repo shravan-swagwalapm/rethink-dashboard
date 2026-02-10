@@ -23,7 +23,9 @@ import {
   ChevronRight,
   Clock,
 } from 'lucide-react';
+import { PageHeader } from '@/components/ui/page-header';
 import { cn } from '@/lib/utils';
+import { MotionContainer, MotionItem, MotionFadeIn } from '@/components/ui/motion';
 import { format } from 'date-fns';
 import type { Resource, ResourceCategory } from '@/types';
 import { VideoThumbnail } from '@/components/resources/video-thumbnail';
@@ -45,12 +47,12 @@ const getResourceStyles = (category: ResourceCategory) => {
   switch (category) {
     case 'video':
       return {
-        gradient: 'from-purple-500 to-purple-600',
-        border: 'border-purple-500/20 hover:border-purple-500/40',
-        shadow: 'shadow-lg shadow-purple-500/25',
-        glow: 'hover:shadow-purple-500/10',
-        badge: 'bg-purple-500/10 border-purple-500/20 text-purple-400',
-        iconBg: 'bg-gradient-to-br from-purple-500 to-purple-600'
+        gradient: 'from-teal-500 to-teal-600',
+        border: 'border-teal-500/20 hover:border-teal-500/40',
+        shadow: 'shadow-lg shadow-teal-500/25',
+        glow: 'hover:shadow-teal-500/10',
+        badge: 'bg-teal-500/10 border-teal-500/20 text-teal-400',
+        iconBg: 'bg-gradient-to-br from-teal-500 to-teal-600'
       };
     case 'presentation':
       return {
@@ -200,21 +202,12 @@ export default function ResourcesPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header with dark futuristic gradient */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-gray-950 via-purple-950 to-fuchsia-950 p-8 shadow-2xl border border-purple-500/10">
-        {/* Dark purple glow effect */}
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(168,85,247,0.15),transparent)] pointer-events-none" />
-
-        {/* Subtle grid pattern overlay */}
-        <div className="absolute inset-0 opacity-5" style={{ backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
-
-        <div className="relative z-10">
-          <h1 className="text-3xl font-bold text-white mb-2 drop-shadow-lg">Learning Resources</h1>
-          <p className="text-gray-100 font-medium">
-            Access course materials, videos, and documents
-          </p>
-        </div>
-      </div>
+      {/* Header */}
+      <PageHeader
+        icon={FileText}
+        title="Resources"
+        description="Browse learning materials and resources"
+      />
 
       {/* Tabs Navigation */}
       <div className="flex items-center gap-4 overflow-x-auto pb-2">
@@ -230,7 +223,7 @@ export default function ResourcesPage() {
               className={cn(
                 'flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all whitespace-nowrap border',
                 isActive
-                  ? 'bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white shadow-[0_0_20px_rgba(168,85,247,0.5)] border-purple-500/50'
+                  ? 'bg-gradient-to-r from-teal-600 to-teal-600 text-white shadow-[0_0_20px_rgba(168,85,247,0.5)] border-teal-500/50'
                   : 'bg-gray-950 text-gray-300 border-gray-800 hover:bg-gray-900 hover:text-white hover:border-gray-700'
               )}
             >
@@ -239,10 +232,7 @@ export default function ResourcesPage() {
               {isActive && count > 0 && (
                 <Badge
                   variant="secondary"
-                  className={cn(
-                    "ml-2 border",
-                    getResourceStyles(tab.value).badge
-                  )}
+                  className="ml-2 border bg-teal-900/60 border-teal-800/50 text-white"
                 >
                   {count} {count === 1 ? 'item' : 'items'}
                 </Badge>
@@ -283,14 +273,14 @@ export default function ResourcesPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-3">
+        <MotionContainer className="space-y-3">
           {resources.map((resource) => {
             const styles = getResourceStyles(activeTab);
             const Icon = TABS.find(t => t.value === activeTab)?.icon || FileText;
 
             return (
+              <MotionItem key={resource.id}>
               <div
-                key={resource.id}
                 className={cn(
                   "relative w-full flex items-center gap-3 md:gap-4 p-3 md:p-4 rounded-xl transition-all duration-300 group cursor-pointer",
                   "border-2 bg-white dark:bg-gray-900/80 backdrop-blur-sm",
@@ -319,7 +309,7 @@ export default function ResourcesPage() {
                 {/* Content */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <p className="font-semibold text-gray-900 dark:text-white truncate group-hover:text-purple-500 dark:group-hover:text-purple-400 transition-colors text-sm md:text-base">
+                    <p className="font-semibold text-gray-900 dark:text-white truncate group-hover:text-teal-500 dark:group-hover:text-teal-400 transition-colors text-sm md:text-base">
                       {resource.name}
                     </p>
                   </div>
@@ -417,7 +407,7 @@ export default function ResourcesPage() {
                       }}
                       className={cn(
                         "w-8 h-8 md:w-9 md:h-9 rounded-lg flex items-center justify-center transition-all border",
-                        "bg-purple-500/10 border-purple-500/30 text-purple-500 hover:bg-purple-500/20"
+                        "bg-teal-500/10 border-teal-500/30 text-teal-500 hover:bg-teal-500/20"
                       )}
                       title="Open video"
                     >
@@ -429,11 +419,12 @@ export default function ResourcesPage() {
                 </div>
 
                 {/* Chevron - slides right on hover */}
-                <ChevronRight className="w-4 h-4 md:w-5 md:h-5 text-gray-400 group-hover:text-purple-500 group-hover:translate-x-1 transition-all flex-shrink-0 hidden sm:block" />
+                <ChevronRight className="w-4 h-4 md:w-5 md:h-5 text-gray-400 group-hover:text-teal-500 group-hover:translate-x-1 transition-all flex-shrink-0 hidden sm:block" />
               </div>
+              </MotionItem>
             );
           })}
-        </div>
+        </MotionContainer>
       )}
 
       {/* Universal Document Viewer */}

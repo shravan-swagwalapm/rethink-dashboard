@@ -19,7 +19,9 @@ import {
   Calendar,
   Eye,
 } from 'lucide-react';
+import { PageHeader } from '@/components/ui/page-header';
 import { format } from 'date-fns';
+import { MotionContainer, MotionItem, MotionFadeIn } from '@/components/ui/motion';
 import type { Invoice, Cohort } from '@/types';
 import { formatCurrency } from '@/lib/utils/currency';
 
@@ -147,61 +149,67 @@ export default function StudentInvoicesPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold">My Invoices</h1>
-        <p className="text-muted-foreground">
-          View and download your payment invoices
-        </p>
-      </div>
+      <PageHeader
+        icon={Receipt}
+        title="Invoices"
+        description="View and download your invoices"
+      />
 
       {/* Stats */}
       {stats && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-500/10 rounded-lg">
-                  <Receipt className="w-5 h-5 text-blue-600" />
+        <MotionContainer className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <MotionItem>
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-500/10 rounded-lg">
+                    <Receipt className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Total Invoices</p>
+                    <p className="text-xl font-bold">{stats.total}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Invoices</p>
-                  <p className="text-xl font-bold">{stats.total}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </MotionItem>
 
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-500/10 rounded-lg">
-                  <CheckCircle className="w-5 h-5 text-green-600" />
+          <MotionItem>
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-green-500/10 rounded-lg">
+                    <CheckCircle className="w-5 h-5 text-green-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Amount Paid</p>
+                    <p className="text-xl font-bold text-green-600">{formatCurrency(stats.paid_amount)}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Amount Paid</p>
-                  <p className="text-xl font-bold text-green-600">{formatCurrency(stats.paid_amount)}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </MotionItem>
 
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-amber-500/10 rounded-lg">
-                  <IndianRupee className="w-5 h-5 text-amber-600" />
+          <MotionItem>
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-amber-500/10 rounded-lg">
+                    <IndianRupee className="w-5 h-5 text-amber-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Pending Amount</p>
+                    <p className="text-xl font-bold text-amber-600">{formatCurrency(stats.pending_amount)}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Pending Amount</p>
-                  <p className="text-xl font-bold text-amber-600">{formatCurrency(stats.pending_amount)}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+              </CardContent>
+            </Card>
+          </MotionItem>
+        </MotionContainer>
       )}
 
       {/* Invoices List */}
+      <MotionFadeIn delay={0.1}>
       <Card>
         <CardHeader>
           <CardTitle>All Invoices</CardTitle>
@@ -272,6 +280,7 @@ export default function StudentInvoicesPage() {
           )}
         </CardContent>
       </Card>
+      </MotionFadeIn>
     </div>
   );
 }

@@ -77,6 +77,8 @@ import {
 import type { Cohort, InvoiceWithRelations, Profile } from '@/types';
 import { getClient } from '@/lib/supabase/client';
 import { formatCurrency } from '@/lib/utils/currency';
+import { MotionContainer, MotionItem, MotionFadeIn } from '@/components/ui/motion';
+import { PageHeader } from '@/components/ui/page-header';
 
 interface InvoiceStats {
   total: number;
@@ -517,98 +519,102 @@ export default function AdminInvoicesPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Invoice Management</h1>
-          <p className="text-muted-foreground">
-            Upload and manage student invoices
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="outline" size="icon" onClick={downloadTemplate}>
-                  <FileSpreadsheet className="w-4 h-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Download bulk upload template</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-
-          <Button variant="outline" onClick={() => { resetBulkForm(); setBulkDialogOpen(true); }}>
-            <Upload className="w-4 h-4 mr-2" />
-            Bulk Upload
-          </Button>
-
-          <Button className="gradient-bg" onClick={() => { resetUploadForm(); setUploadDialogOpen(true); }}>
-            <Upload className="w-4 h-4 mr-2" />
-            Upload Invoice
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        icon={Receipt}
+        title="Invoices"
+        description="Manage billing and payment records"
+        action={
+          <div className="flex items-center gap-2">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="icon" onClick={downloadTemplate}>
+                    <FileSpreadsheet className="w-4 h-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Download bulk upload template</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <Button variant="outline" onClick={() => { resetBulkForm(); setBulkDialogOpen(true); }}>
+              <Upload className="w-4 h-4 mr-2" />
+              Bulk Upload
+            </Button>
+            <Button className="gradient-bg" onClick={() => { resetUploadForm(); setUploadDialogOpen(true); }}>
+              <Upload className="w-4 h-4 mr-2" />
+              Upload Invoice
+            </Button>
+          </div>
+        }
+      />
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-500/10 rounded-lg">
-                <Receipt className="w-5 h-5 text-blue-600" />
+      <MotionContainer className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <MotionItem>
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-500/10 rounded-lg">
+                  <Receipt className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Invoices</p>
+                  <p className="text-2xl font-bold">{stats.total}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Total Invoices</p>
-                <p className="text-2xl font-bold">{stats.total}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </MotionItem>
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-500/10 rounded-lg">
-                <CheckCircle className="w-5 h-5 text-green-600" />
+        <MotionItem>
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-green-500/10 rounded-lg">
+                  <CheckCircle className="w-5 h-5 text-green-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Paid</p>
+                  <p className="text-2xl font-bold text-green-600">{stats.paid}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Paid</p>
-                <p className="text-2xl font-bold text-green-600">{stats.paid}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </MotionItem>
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-amber-500/10 rounded-lg">
-                <Clock className="w-5 h-5 text-amber-600" />
+        <MotionItem>
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-amber-500/10 rounded-lg">
+                  <Clock className="w-5 h-5 text-amber-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Pending</p>
+                  <p className="text-2xl font-bold text-amber-600">{stats.pending}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Pending</p>
-                <p className="text-2xl font-bold text-amber-600">{stats.pending}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </MotionItem>
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-500/10 rounded-lg">
-                <IndianRupee className="w-5 h-5 text-purple-600" />
+        <MotionItem>
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-purple-500/10 rounded-lg">
+                  <IndianRupee className="w-5 h-5 text-purple-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Amount</p>
+                  <p className="text-2xl font-bold">{formatCurrency(stats.total_amount)}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Total Amount</p>
-                <p className="text-2xl font-bold">{formatCurrency(stats.total_amount)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
+        </MotionItem>
+      </MotionContainer>
 
       {/* Filters */}
       <Card>
@@ -658,6 +664,7 @@ export default function AdminInvoicesPage() {
       </Card>
 
       {/* Invoices Table */}
+      <MotionFadeIn delay={0.1}>
       <Card>
         <CardHeader>
           <CardTitle>All Invoices</CardTitle>
@@ -747,6 +754,7 @@ export default function AdminInvoicesPage() {
           )}
         </CardContent>
       </Card>
+      </MotionFadeIn>
 
       {/* Single Upload Dialog */}
       <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>

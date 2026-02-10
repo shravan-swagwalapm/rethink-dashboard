@@ -8,7 +8,9 @@ import { Badge } from '@/components/ui/badge';
 import { PageLoader } from '@/components/ui/page-loader';
 import { ProfileDetailSheet } from '@/components/ui/profile-detail-sheet';
 import { toast } from 'sonner';
+import { MotionContainer, MotionItem, MotionFadeIn } from '@/components/ui/motion';
 import { Users, UserCheck } from 'lucide-react';
+import { PageHeader } from '@/components/ui/page-header';
 import type { Profile } from '@/types';
 
 interface SubgroupData {
@@ -59,10 +61,11 @@ export default function MySubgroupPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold">{data.subgroup.name}</h1>
-        <p className="text-muted-foreground">{data.subgroup.cohort_name}</p>
-      </div>
+      <PageHeader
+        icon={Users}
+        title="My Subgroup"
+        description="View your study group members"
+      />
 
       {/* Mentor Section */}
       <Card>
@@ -76,26 +79,27 @@ export default function MySubgroupPage() {
           {data.mentors.length === 0 ? (
             <p className="text-muted-foreground text-sm">A mentor will be assigned soon.</p>
           ) : (
-            <div className="grid gap-3 sm:grid-cols-2">
+            <MotionContainer className="grid gap-3 sm:grid-cols-2">
               {data.mentors.map((m) => (
-                <button
-                  key={m.user_id}
-                  onClick={() => { setSelectedProfile(m.user); setSelectedRole('Mentor'); }}
-                  className="flex items-center gap-3 p-3 rounded-xl border hover:bg-muted/50 transition-colors text-left w-full"
-                >
-                  <Avatar className="h-12 w-12">
-                    <AvatarImage src={m.user.avatar_url || ''} />
-                    <AvatarFallback className="gradient-bg text-white">
-                      {m.user.full_name?.charAt(0) || '?'}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="font-semibold">{m.user.full_name || m.user.email}</p>
-                    <Badge variant="secondary" className="text-xs mt-0.5">Mentor</Badge>
-                  </div>
-                </button>
+                <MotionItem key={m.user_id}>
+                  <button
+                    onClick={() => { setSelectedProfile(m.user); setSelectedRole('Mentor'); }}
+                    className="flex items-center gap-3 p-3 rounded-xl border hover:bg-muted/50 transition-colors text-left w-full"
+                  >
+                    <Avatar className="h-12 w-12">
+                      <AvatarImage src={m.user.avatar_url || ''} />
+                      <AvatarFallback className="gradient-bg text-white">
+                        {m.user.full_name?.charAt(0) || '?'}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-semibold">{m.user.full_name || m.user.email}</p>
+                      <Badge variant="secondary" className="text-xs mt-0.5">Mentor</Badge>
+                    </div>
+                  </button>
+                </MotionItem>
               ))}
-            </div>
+            </MotionContainer>
           )}
         </CardContent>
       </Card>
@@ -112,26 +116,27 @@ export default function MySubgroupPage() {
           {data.members.length === 0 ? (
             <p className="text-muted-foreground text-sm">No other members in your subgroup yet.</p>
           ) : (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <MotionContainer className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {data.members.map((m) => (
-                <button
-                  key={m.user_id}
-                  onClick={() => { setSelectedProfile(m.user); setSelectedRole('Student'); }}
-                  className="flex items-center gap-3 p-3 rounded-xl border hover:bg-muted/50 transition-colors text-left w-full"
-                >
-                  <Avatar className="h-10 w-10">
-                    <AvatarImage src={m.user.avatar_url || ''} />
-                    <AvatarFallback>
-                      {m.user.full_name?.charAt(0) || '?'}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="min-w-0">
-                    <p className="font-medium text-sm truncate">{m.user.full_name || m.user.email}</p>
-                    <p className="text-xs text-muted-foreground truncate">{m.user.email}</p>
-                  </div>
-                </button>
+                <MotionItem key={m.user_id}>
+                  <button
+                    onClick={() => { setSelectedProfile(m.user); setSelectedRole('Student'); }}
+                    className="flex items-center gap-3 p-3 rounded-xl border hover:bg-muted/50 transition-colors text-left w-full"
+                  >
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src={m.user.avatar_url || ''} />
+                      <AvatarFallback>
+                        {m.user.full_name?.charAt(0) || '?'}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm truncate">{m.user.full_name || m.user.email}</p>
+                      <p className="text-xs text-muted-foreground truncate">{m.user.email}</p>
+                    </div>
+                  </button>
+                </MotionItem>
               ))}
-            </div>
+            </MotionContainer>
           )}
         </CardContent>
       </Card>

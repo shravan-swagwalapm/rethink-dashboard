@@ -31,9 +31,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { BarChart3, Settings, Webhook, TestTube, LinkIcon, Mail, UserPlus, Trash2, Loader2, AlertCircle } from 'lucide-react';
+import { BarChart3, Settings, Webhook, TestTube, LinkIcon, Mail, UserPlus, Trash2, Loader2, AlertCircle, CheckSquare } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { MotionFadeIn } from '@/components/ui/motion';
+import { PageHeader } from '@/components/ui/page-header';
 import type { Profile } from '@/types';
 
 interface UnmatchedEmail {
@@ -194,13 +196,13 @@ export default function AdminAttendancePage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Attendance Configuration</h1>
-        <p className="text-muted-foreground">
-          Configure Zoom integration, email matching, and ranking weights
-        </p>
-      </div>
+      <PageHeader
+        icon={CheckSquare}
+        title="Attendance"
+        description="Track and manage session attendance"
+      />
 
+      <MotionFadeIn delay={0.1}>
       {/* Unmatched Emails Alert */}
       {unmatchedEmails.length > 0 && (
         <Card className="border-amber-500/50 bg-amber-500/5">
@@ -415,6 +417,8 @@ export default function AdminAttendancePage() {
           )}
         </CardContent>
       </Card>
+
+      </MotionFadeIn>
 
       {/* Link Email Dialog */}
       <Dialog open={showLinkDialog} onOpenChange={setShowLinkDialog}>

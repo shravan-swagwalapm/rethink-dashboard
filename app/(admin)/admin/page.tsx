@@ -16,6 +16,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { MotionContainer, MotionItem, MotionFadeIn } from '@/components/ui/motion';
 
 interface AdminStats {
   totalUsers: number;
@@ -94,91 +95,102 @@ export default function AdminPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold flex items-center gap-3">
-          <Sparkles className="w-8 h-8 text-primary" />
-          Admin Dashboard
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Welcome back, Admin. Here&apos;s what&apos;s happening.
-        </p>
-      </div>
+      <MotionFadeIn>
+        <div>
+          <h1 className="text-3xl font-bold flex items-center gap-3">
+            <Sparkles className="w-8 h-8 text-primary" />
+            Admin Dashboard
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Welcome back, Admin. Here&apos;s what&apos;s happening.
+          </p>
+        </div>
+      </MotionFadeIn>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="hover-lift">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total Users</p>
-                <p className="text-3xl font-bold">{stats?.totalUsers}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {stats?.totalStudents} students, {stats?.totalMentors} mentors
-                </p>
+      <MotionContainer className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <MotionItem>
+          <Card className="hover-lift">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Users</p>
+                  <p className="text-3xl font-bold">{stats?.totalUsers}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {stats?.totalStudents} students, {stats?.totalMentors} mentors
+                  </p>
+                </div>
+                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                  <Users className="w-6 h-6 text-primary" />
+                </div>
               </div>
-              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
-                <Users className="w-6 h-6 text-primary" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </MotionItem>
 
-        <Card className="hover-lift">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Active Cohorts</p>
-                <p className="text-3xl font-bold">{stats?.activeCohorts}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {stats?.upcomingSessions} upcoming sessions
-                </p>
+        <MotionItem>
+          <Card className="hover-lift">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Active Cohorts</p>
+                  <p className="text-3xl font-bold">{stats?.activeCohorts}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {stats?.upcomingSessions} upcoming sessions
+                  </p>
+                </div>
+                <div className="w-12 h-12 rounded-xl bg-green-500/10 flex items-center justify-center">
+                  <CalendarDays className="w-6 h-6 text-green-500" />
+                </div>
               </div>
-              <div className="w-12 h-12 rounded-xl bg-green-500/10 flex items-center justify-center">
-                <CalendarDays className="w-6 h-6 text-green-500" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </MotionItem>
 
-        <Card className="hover-lift">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Avg Attendance</p>
-                <p className="text-3xl font-bold">{stats?.avgAttendance}%</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Across all sessions
-                </p>
+        <MotionItem>
+          <Card className="hover-lift">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Avg Attendance</p>
+                  <p className="text-3xl font-bold">{stats?.avgAttendance}%</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Across all sessions
+                  </p>
+                </div>
+                <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center">
+                  <TrendingUp className="w-6 h-6 text-purple-500" />
+                </div>
               </div>
-              <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center">
-                <TrendingUp className="w-6 h-6 text-purple-500" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </MotionItem>
 
-        <Card className="hover-lift">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Open Tickets</p>
-                <p className="text-3xl font-bold">{stats?.openTickets || 0}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Support requests pending
-                </p>
+        <MotionItem>
+          <Card className="hover-lift">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Open Tickets</p>
+                  <p className="text-3xl font-bold">{stats?.openTickets || 0}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Support requests pending
+                  </p>
+                </div>
+                <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center">
+                  <HelpCircle className="w-6 h-6 text-amber-500" />
+                </div>
               </div>
-              <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center">
-                <HelpCircle className="w-6 h-6 text-amber-500" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
+        </MotionItem>
+      </MotionContainer>
 
       {/* Quick Actions & Recent Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Quick Actions */}
-        <Card>
+      <MotionFadeIn delay={0.1}>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Quick Actions */}
+          <Card>
           <CardHeader>
             <CardTitle>Quick Actions</CardTitle>
             <CardDescription>Common administrative tasks</CardDescription>
@@ -233,7 +245,8 @@ export default function AdminPage() {
             )}
           </CardContent>
         </Card>
-      </div>
+        </div>
+      </MotionFadeIn>
 
       {/* Pending Items */}
       {(stats?.openTickets || 0) > 0 && (

@@ -55,10 +55,12 @@ import {
   CalendarPlus,
   Link2,
 } from 'lucide-react';
+import { PageHeader } from '@/components/ui/page-header';
 import { useSearchParams } from 'next/navigation';
 import { format, parseISO, isPast } from 'date-fns';
 import type { Session, Cohort, SessionCohort, SessionGuest, Profile } from '@/types';
 import { Checkbox } from '@/components/ui/checkbox';
+import { MotionContainer, MotionItem, MotionFadeIn } from '@/components/ui/motion';
 
 interface SessionWithStats extends Session {
   cohort?: Cohort;
@@ -348,21 +350,20 @@ export default function SessionsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Session Management</h1>
-          <p className="text-muted-foreground">
-            Create and manage learning sessions
-          </p>
-        </div>
-        <Button onClick={() => handleOpenForm()} className="gradient-bg gap-2">
-          <Plus className="w-4 h-4" />
-          Create Session
-        </Button>
-      </div>
+      <PageHeader
+        icon={Video}
+        title="Sessions"
+        description="Schedule and manage live sessions"
+        action={
+          <Button onClick={() => handleOpenForm()} className="gradient-bg gap-2">
+            <Plus className="w-4 h-4" />
+            Create Session
+          </Button>
+        }
+      />
 
       {/* Stats */}
+      <MotionFadeIn delay={0.1}>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card>
           <CardContent className="p-4">
@@ -410,8 +411,10 @@ export default function SessionsPage() {
           </CardContent>
         </Card>
       </div>
+      </MotionFadeIn>
 
       {/* Sessions Table */}
+      <MotionFadeIn delay={0.2}>
       <Card>
         <CardHeader>
           <CardTitle>All Sessions</CardTitle>
@@ -538,6 +541,7 @@ export default function SessionsPage() {
           )}
         </CardContent>
       </Card>
+      </MotionFadeIn>
 
       {/* Create/Edit Dialog */}
       <Dialog open={showForm} onOpenChange={setShowForm}>

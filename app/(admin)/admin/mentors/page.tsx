@@ -4,7 +4,9 @@ import { useState, useCallback, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useUserContext } from '@/contexts/user-context';
-import { Loader2, Users, MessageSquare } from 'lucide-react';
+import { Loader2, Users, MessageSquare, UserCheck } from 'lucide-react';
+import { MotionFadeIn } from '@/components/ui/motion';
+import { PageHeader } from '@/components/ui/page-header';
 import type { Cohort, SubgroupWithDetails } from '@/types';
 import { SubgroupsTab } from './components/subgroups-tab';
 import { FeedbackOverviewTab } from './components/feedback-overview-tab';
@@ -70,27 +72,27 @@ export default function MentorsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold gradient-text">Mentors &amp; Subgroups</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage mentor assignments, subgroups, and feedback
-          </p>
-        </div>
-        <Select value={selectedCohort} onValueChange={setSelectedCohort}>
-          <SelectTrigger className="w-[220px]">
-            <SelectValue placeholder="Select cohort" />
-          </SelectTrigger>
-          <SelectContent>
-            {cohorts.map((cohort) => (
-              <SelectItem key={cohort.id} value={cohort.id}>
-                {cohort.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      <PageHeader
+        icon={UserCheck}
+        title="Mentors"
+        description="Manage mentor assignments and performance"
+        action={
+          <Select value={selectedCohort} onValueChange={setSelectedCohort}>
+            <SelectTrigger className="w-[220px]">
+              <SelectValue placeholder="Select cohort" />
+            </SelectTrigger>
+            <SelectContent>
+              {cohorts.map((cohort) => (
+                <SelectItem key={cohort.id} value={cohort.id}>
+                  {cohort.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        }
+      />
 
+      <MotionFadeIn delay={0.1}>
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="subgroups" className="gap-2">
@@ -116,6 +118,7 @@ export default function MentorsPage() {
           <FeedbackOverviewTab cohortId={selectedCohort} />
         </TabsContent>
       </Tabs>
+      </MotionFadeIn>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react';
 import { DashboardSidebar } from '@/components/dashboard/sidebar';
 import { DashboardHeader } from '@/components/dashboard/header';
 import { UserProvider } from '@/contexts/user-context';
+import { PageTransition } from '@/components/ui/page-transition';
 
 export default function DashboardLayout({
   children,
@@ -31,10 +32,10 @@ export default function DashboardLayout({
         />
         <div className="flex-1 flex flex-col min-w-0">
           <DashboardHeader onMenuClick={handleMobileMenuToggle} />
-          <main className="flex-1 p-4 sm:p-6 overflow-auto">
-            <div className="max-w-7xl mx-auto page-transition">
+          <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto dot-pattern">
+            <PageTransition className="max-w-7xl mx-auto">
               {children}
-            </div>
+            </PageTransition>
           </main>
         </div>
       </div>

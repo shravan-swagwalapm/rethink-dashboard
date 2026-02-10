@@ -71,7 +71,7 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
   };
 
   return (
-    <header className="h-16 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-40">
+    <header className="relative h-16 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-40">
       <div className="flex items-center justify-between h-full px-4 sm:px-6">
         {/* Left side - Mobile menu + Logo on mobile */}
         <div className="flex items-center gap-3">
@@ -96,7 +96,7 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
         </div>
 
         {/* Right side - Actions */}
-        <div className="flex items-center gap-1 sm:gap-2">
+        <div className="flex items-center gap-2 sm:gap-3">
           {/* Role Switcher */}
           <RoleSwitcher />
 
@@ -240,6 +240,7 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
           </DropdownMenu>
         </div>
       </div>
+      <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[hsl(172_66%_42%/0.3)] to-transparent" />
     </header>
   );
 }

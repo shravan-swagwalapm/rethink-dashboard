@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { PageLoader } from '@/components/ui/page-loader';
 import { toast } from 'sonner';
-import { Download } from 'lucide-react';
+import { Download, Users } from 'lucide-react';
 import { format } from 'date-fns';
 import * as XLSX from 'xlsx';
 import type { Cohort } from '@/types';
@@ -15,6 +15,8 @@ import { EditRolesDialog } from './components/edit-roles-dialog';
 import { UserFilters, ActiveFilterChips } from './components/user-filters';
 import { UserStats } from './components/user-stats';
 import { UserTable } from './components/user-table';
+import { MotionContainer, MotionItem, MotionFadeIn } from '@/components/ui/motion';
+import { PageHeader } from '@/components/ui/page-header';
 
 export default function UsersPage() {
   const [users, setUsers] = useState<UserWithCohort[]>([]);
@@ -215,27 +217,24 @@ export default function UsersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">User Management</h1>
-          <p className="text-muted-foreground">
-            Manage users, roles, and cohort assignments
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <BulkUploadDialog onCreated={() => fetchData(true)} />
-
-          <Button
-            variant="outline"
-            onClick={handleExportFiltered}
-          >
-            <Download className="w-4 h-4 mr-2" />
-            Export ({filteredUsers.length})
-          </Button>
-
-          <CreateUserDialog cohorts={cohorts} onCreated={() => fetchData(true)} />
-        </div>
-      </div>
+      <PageHeader
+        icon={Users}
+        title="User Management"
+        description="Manage students, mentors, and administrators"
+        action={
+          <div className="flex items-center gap-2">
+            <BulkUploadDialog onCreated={() => fetchData(true)} />
+            <Button
+              variant="outline"
+              onClick={handleExportFiltered}
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Export ({filteredUsers.length})
+            </Button>
+            <CreateUserDialog cohorts={cohorts} onCreated={() => fetchData(true)} />
+          </div>
+        }
+      />
 
       <EditRolesDialog
         user={editingUser}
@@ -245,19 +244,23 @@ export default function UsersPage() {
         onSaved={() => fetchData(true)}
       />
 
-      <UserFilters {...filterProps} />
+      <MotionFadeIn delay={0.1}>
+        <UserFilters {...filterProps} />
 
-      <ActiveFilterChips {...filterProps} />
+        <ActiveFilterChips {...filterProps} />
+      </MotionFadeIn>
 
-      <UserStats filteredUsers={filteredUsers} totalUsers={users} />
+      <MotionFadeIn delay={0.2}>
+        <UserStats filteredUsers={filteredUsers} totalUsers={users} />
 
-      <UserTable
-        filteredUsers={filteredUsers}
-        cohorts={cohorts}
-        activeFilterCount={activeFilterCount}
-        onEditRoles={handleEditRoles}
-        onDeleted={() => fetchData(true)}
-      />
+        <UserTable
+          filteredUsers={filteredUsers}
+          cohorts={cohorts}
+          activeFilterCount={activeFilterCount}
+          onEditRoles={handleEditRoles}
+          onDeleted={() => fetchData(true)}
+        />
+      </MotionFadeIn>
     </div>
   );
 }

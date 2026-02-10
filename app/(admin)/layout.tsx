@@ -9,6 +9,8 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { PageTransition } from '@/components/ui/page-transition';
+import { motion, useReducedMotion } from 'framer-motion';
 import {
   LayoutDashboard,
   Users,
@@ -62,6 +64,7 @@ function AdminLayoutInner({
   const { profile, isAdmin, loading, signOut, activeRole } = useUserContext();
   const router = useRouter();
   const pathname = usePathname();
+  const shouldReduceMotion = useReducedMotion();
 
   useEffect(() => {
     // Check if user has intended_role=admin cookie (just logged in as admin)
@@ -131,12 +134,27 @@ function AdminLayoutInner({
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200',
+                    'relative flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-all duration-200',
                     isActive
                       ? 'bg-sidebar-accent text-sidebar-accent-foreground shadow-sm'
-                      : 'text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50'
+                      : 'text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 hover:shadow-sm'
                   )}
                 >
+                  {/* Spring-physics active indicator */}
+                  {isActive && !shouldReduceMotion && (
+                    <motion.div
+                      layoutId="admin-sidebar-active"
+                      className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r-full bg-primary shadow-[0_0_8px_hsl(172_66%_42%/0.4)]"
+                      transition={{
+                        type: 'spring',
+                        stiffness: 300,
+                        damping: 25,
+                      }}
+                    />
+                  )}
+                  {isActive && shouldReduceMotion && (
+                    <div className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r-full bg-primary shadow-[0_0_8px_hsl(172_66%_42%/0.4)]" />
+                  )}
                   <Icon
                     className={cn(
                       'w-5 h-5 transition-colors',
@@ -178,9 +196,9 @@ function AdminLayoutInner({
 
       {/* Main Content */}
       <main className="flex-1 p-8 overflow-auto">
-        <div className="max-w-7xl mx-auto page-transition">
+        <PageTransition className="max-w-7xl mx-auto">
           {children}
-        </div>
+        </PageTransition>
       </main>
     </div>
   );

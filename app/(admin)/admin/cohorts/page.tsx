@@ -58,10 +58,13 @@ import {
   Loader2,
   RefreshCw,
   Settings,
+  GraduationCap,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import type { Cohort } from '@/types';
+import { MotionContainer, MotionItem, MotionFadeIn } from '@/components/ui/motion';
+import { PageHeader } from '@/components/ui/page-header';
 
 interface CohortWithStats extends Cohort {
   student_count?: number;
@@ -284,21 +287,20 @@ export default function CohortsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Cohort Management</h1>
-          <p className="text-muted-foreground">
-            Create and manage learning cohorts
-          </p>
-        </div>
-        <Button onClick={() => handleOpenForm()} className="gradient-bg gap-2">
-          <Plus className="w-4 h-4" />
-          Create Cohort
-        </Button>
-      </div>
+      <PageHeader
+        icon={GraduationCap}
+        title="Cohorts"
+        description="Manage learning cohorts and their configurations"
+        action={
+          <Button onClick={() => handleOpenForm()} className="gradient-bg gap-2">
+            <Plus className="w-4 h-4" />
+            Create Cohort
+          </Button>
+        }
+      />
 
       {/* Cohorts Table */}
+      <MotionFadeIn delay={0.1}>
       <Card>
         <CardHeader>
           <CardTitle>All Cohorts</CardTitle>
@@ -402,6 +404,7 @@ export default function CohortsPage() {
           )}
         </CardContent>
       </Card>
+      </MotionFadeIn>
 
       {/* Create/Edit Dialog */}
       <Dialog open={showForm} onOpenChange={setShowForm}>

@@ -26,8 +26,10 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { toast } from 'sonner';
+import { MotionContainer, MotionItem, MotionFadeIn } from '@/components/ui/motion';
 import {
   BarChart3,
+  CheckSquare,
   Download,
   Clock,
   LogIn,
@@ -36,6 +38,7 @@ import {
   TrendingUp,
   AlertTriangle,
 } from 'lucide-react';
+import { PageHeader } from '@/components/ui/page-header';
 import { format, parseISO, differenceInMinutes } from 'date-fns';
 import type { Session, Attendance, Profile } from '@/types';
 
@@ -240,111 +243,119 @@ function AttendanceContent() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Attendance Dashboard</h1>
-          <p className="text-muted-foreground">
-            Track session attendance for your team
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Select value={selectedSession} onValueChange={setSelectedSession}>
-            <SelectTrigger className="w-[250px]">
-              <SelectValue placeholder="Select session" />
-            </SelectTrigger>
-            <SelectContent>
-              {sessions.map((session) => (
-                <SelectItem key={session.id} value={session.id}>
-                  <div className="flex flex-col">
-                    <span>{session.title}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {format(parseISO(session.scheduled_at), 'MMM d, yyyy')}
-                    </span>
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button
-            variant="outline"
-            onClick={exportToCSV}
-            disabled={!selectedSessionData || exporting}
-          >
-            <Download className="w-4 h-4 mr-2" />
-            Export CSV
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        icon={CheckSquare}
+        title="Attendance"
+        description="Track session attendance"
+        action={
+          <div className="flex items-center gap-2">
+            <Select value={selectedSession} onValueChange={setSelectedSession}>
+              <SelectTrigger className="w-[250px]">
+                <SelectValue placeholder="Select session" />
+              </SelectTrigger>
+              <SelectContent>
+                {sessions.map((session) => (
+                  <SelectItem key={session.id} value={session.id}>
+                    <div className="flex flex-col">
+                      <span>{session.title}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {format(parseISO(session.scheduled_at), 'MMM d, yyyy')}
+                      </span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              variant="outline"
+              onClick={exportToCSV}
+              disabled={!selectedSessionData || exporting}
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Export CSV
+            </Button>
+          </div>
+        }
+      />
 
       {/* Stats Overview */}
       {selectedSessionData && (
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <Users className="w-5 h-5 text-primary" />
+        <MotionContainer className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+          <MotionItem>
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Users className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Total Expected</p>
+                    <p className="text-xl font-bold">{selectedSessionData.total_students}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Total Expected</p>
-                  <p className="text-xl font-bold">{selectedSessionData.total_students}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </MotionItem>
 
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center">
-                  <LogIn className="w-5 h-5 text-green-500" />
+          <MotionItem>
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center">
+                    <LogIn className="w-5 h-5 text-green-500" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Attended</p>
+                    <p className="text-xl font-bold">{selectedSessionData.attended_count}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Attended</p>
-                  <p className="text-xl font-bold">{selectedSessionData.attended_count}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </MotionItem>
 
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center">
-                  <TrendingUp className="w-5 h-5 text-amber-500" />
+          <MotionItem>
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                    <TrendingUp className="w-5 h-5 text-amber-500" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Attendance Rate</p>
+                    <p className="text-xl font-bold">
+                      {selectedSessionData.total_students > 0
+                        ? Math.round((selectedSessionData.attended_count / selectedSessionData.total_students) * 100)
+                        : 0}
+                      %
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Attendance Rate</p>
-                  <p className="text-xl font-bold">
-                    {selectedSessionData.total_students > 0
-                      ? Math.round((selectedSessionData.attended_count / selectedSessionData.total_students) * 100)
-                      : 0}
-                    %
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </MotionItem>
 
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-red-500/10 flex items-center justify-center">
-                  <AlertTriangle className="w-5 h-5 text-red-500" />
+          <MotionItem>
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-red-500/10 flex items-center justify-center">
+                    <AlertTriangle className="w-5 h-5 text-red-500" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Absent</p>
+                    <p className="text-xl font-bold">
+                      {selectedSessionData.total_students - selectedSessionData.attended_count}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Absent</p>
-                  <p className="text-xl font-bold">
-                    {selectedSessionData.total_students - selectedSessionData.attended_count}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+              </CardContent>
+            </Card>
+          </MotionItem>
+        </MotionContainer>
       )}
 
       {/* Attendance Table */}
+      <MotionFadeIn delay={0.1}>
       <Card>
         <CardHeader>
           <CardTitle>Session Attendance</CardTitle>
@@ -433,6 +444,7 @@ function AttendanceContent() {
           )}
         </CardContent>
       </Card>
+      </MotionFadeIn>
 
       {/* Cumulative Attendance */}
       {Object.keys(cumulativeStats.byUser).length > 0 && (

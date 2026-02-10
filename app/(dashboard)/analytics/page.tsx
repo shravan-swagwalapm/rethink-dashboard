@@ -40,7 +40,9 @@ import {
   BarChart3,
   Trophy,
 } from 'lucide-react';
+import { PageHeader } from '@/components/ui/page-header';
 import { motion, AnimatePresence } from 'framer-motion';
+import { MotionFadeIn } from '@/components/ui/motion';
 import {
   Select,
   SelectContent,
@@ -102,12 +104,12 @@ interface LeaderboardSession {
 
 function getAttendanceBadge(percentage: number) {
   if (percentage >= 75) {
-    return <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-200">{percentage}%</Badge>;
+    return <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-200 text-sm px-3 py-0.5">{percentage}%</Badge>;
   }
   if (percentage >= 50) {
-    return <Badge variant="outline" className="bg-yellow-500/10 text-yellow-600 border-yellow-200">{percentage}%</Badge>;
+    return <Badge variant="outline" className="bg-yellow-500/10 text-yellow-600 border-yellow-200 text-sm px-3 py-0.5">{percentage}%</Badge>;
   }
-  return <Badge variant="outline" className="bg-red-500/10 text-red-600 border-red-200">{percentage}%</Badge>;
+  return <Badge variant="outline" className="bg-red-500/10 text-red-600 border-red-200 text-sm px-3 py-0.5">{percentage}%</Badge>;
 }
 
 function getAttendanceColor(percentage: number) {
@@ -158,8 +160,8 @@ function SessionCard({ session }: { session: AttendanceSession }) {
           >
             <div className="flex items-center gap-3 text-left">
               <div>
-                <p className="font-medium text-sm">{session.title}</p>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                <p className="font-semibold text-base">{session.title}</p>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mt-0.5">
                   <Calendar className="w-3 h-3" />
                   <span>{format(new Date(session.date), 'MMM d, yyyy')}</span>
                   <span>·</span>
@@ -379,7 +381,6 @@ function StudentView() {
                   <p className="text-2xl font-bold">
                     {stats.sessionsAttended} / {stats.sessionsTotal}
                   </p>
-                  <p className="text-xs text-muted-foreground">sessions</p>
                 </div>
               </div>
             </CardContent>
@@ -390,8 +391,8 @@ function StudentView() {
           <Card aria-label={`Total hours: ${stats.totalHours}`}>
             <CardContent className="p-6">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center">
-                  <Clock className="w-6 h-6 text-purple-500" />
+                <div className="w-12 h-12 rounded-xl bg-teal-500/10 flex items-center justify-center">
+                  <Clock className="w-6 h-6 text-teal-500" />
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Total Hours</p>
@@ -567,18 +568,18 @@ function StudentView() {
                             : ''
                         }
                       >
-                        <TableCell className="font-bold text-muted-foreground">
+                        <TableCell className="font-bold text-muted-foreground text-sm">
                           {index + 1}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2.5">
-                            <Avatar className="w-7 h-7">
+                            <Avatar className="w-8 h-8">
                               <AvatarImage src={entry.avatarUrl || ''} alt={entry.name} />
                               <AvatarFallback className="text-xs">
                                 {entry.name.charAt(0).toUpperCase()}
                               </AvatarFallback>
                             </Avatar>
-                            <span className={isCurrentUser ? 'font-semibold' : ''}>
+                            <span className={`text-sm ${isCurrentUser ? 'font-semibold' : ''}`}>
                               {entry.name}
                               {isCurrentUser && (
                                 <span className="text-xs text-primary ml-1.5">(You)</span>
@@ -589,7 +590,7 @@ function StudentView() {
                         <TableCell className="text-right">
                           {wasPresent
                             ? getAttendanceBadge(displayPercentage)
-                            : <Badge variant="outline" className="bg-gray-500/10 text-gray-500 border-gray-200">Absent</Badge>
+                            : <Badge variant="outline" className="bg-gray-500/10 text-gray-500 border-gray-200 text-sm px-3 py-0.5">Absent</Badge>
                           }
                         </TableCell>
                         {selectedSession === 'overall' && (
@@ -722,8 +723,8 @@ function MentorView() {
           <Card aria-label={`Team size: ${students.length} students`}>
             <CardContent className="p-6">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center">
-                  <Users className="w-6 h-6 text-purple-500" />
+                <div className="w-12 h-12 rounded-xl bg-teal-500/10 flex items-center justify-center">
+                  <Users className="w-6 h-6 text-teal-500" />
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Team Size</p>
@@ -854,16 +855,11 @@ export default function AnalyticsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">
-          {isMentor ? 'Team Analytics' : 'Your Attendance'}
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          {isMentor
-            ? 'Monitor your team\'s attendance and engagement'
-            : 'Track your session attendance and participation'}
-        </p>
-      </div>
+      <PageHeader
+        icon={BarChart3}
+        title="Analytics"
+        description="Track your learning progress and engagement"
+      />
 
       {isMentor ? <MentorView /> : <StudentView />}
     </div>

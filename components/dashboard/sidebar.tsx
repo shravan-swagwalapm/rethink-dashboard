@@ -18,10 +18,21 @@ import {
   Sparkles,
   X,
   Receipt,
+  User,
+  Settings,
+  LogOut,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   Sheet,
   SheetContent,
@@ -29,6 +40,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { useState, useEffect } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 
 interface NavItem {
   label: string;
@@ -62,8 +74,24 @@ interface DashboardSidebarProps {
 
 export function DashboardSidebar({ mobileOpen, onMobileClose }: DashboardSidebarProps) {
   const pathname = usePathname();
-  const { profile, activeRole } = useUserContext();
+  const { profile, activeRole, signOut } = useUserContext();
   const [collapsed, setCollapsed] = useState(false);
+  const shouldReduceMotion = useReducedMotion();
+
+  const handleSignOut = () => {
+    const forceRedirectTimeout = setTimeout(() => {
+      window.location.href = '/login?signedout=1';
+    }, 2000);
+    signOut()
+      .then(() => {
+        clearTimeout(forceRedirectTimeout);
+        window.location.href = '/login?signedout=1';
+      })
+      .catch(() => {
+        clearTimeout(forceRedirectTimeout);
+        window.location.href = '/login?signedout=1';
+      });
+  };
 
   const filteredNavItems = navItems.filter(
     (item) => !item.roles || item.roles.includes(activeRole || '')
@@ -82,7 +110,7 @@ export function DashboardSidebar({ mobileOpen, onMobileClose }: DashboardSidebar
         collapsed && !isMobile ? 'justify-center' : 'justify-between'
       )}>
         <Link href="/dashboard" className="flex items-center gap-3 group" onClick={onMobileClose}>
-          <div className="w-9 h-9 rounded-xl gradient-bg flex items-center justify-center glow-sm group-hover:scale-105 transition-transform">
+          <div className="w-9 h-9 rounded-xl gradient-bg flex items-center justify-center glow-sm animate-breathe group-hover:scale-105 transition-transform">
             <Sparkles className="w-5 h-5 text-white" />
           </div>
           {(!collapsed || isMobile) && (
@@ -125,13 +153,28 @@ export function DashboardSidebar({ mobileOpen, onMobileClose }: DashboardSidebar
               href={item.href}
               onClick={isMobile ? onMobileClose : undefined}
               className={cn(
-                'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200',
+                'relative flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-all duration-200 ease-spring',
                 isActive
                   ? 'bg-sidebar-accent text-sidebar-accent-foreground shadow-sm'
-                  : 'text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50',
+                  : 'text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 hover:shadow-sm',
                 collapsed && !isMobile && 'justify-center px-0'
               )}
             >
+              {/* Spring-physics active indicator */}
+              {isActive && !shouldReduceMotion && (
+                <motion.div
+                  layoutId={isMobile ? 'sidebar-active-mobile' : 'sidebar-active'}
+                  className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r-full bg-primary shadow-[0_0_8px_hsl(172_66%_42%/0.4)]"
+                  transition={{
+                    type: 'spring',
+                    stiffness: 300,
+                    damping: 25,
+                  }}
+                />
+              )}
+              {isActive && shouldReduceMotion && (
+                <div className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r-full bg-primary shadow-[0_0_8px_hsl(172_66%_42%/0.4)]" />
+              )}
               <Icon
                 className={cn(
                   'w-5 h-5 transition-colors',
@@ -172,10 +215,10 @@ export function DashboardSidebar({ mobileOpen, onMobileClose }: DashboardSidebar
               href={item.href}
               onClick={isMobile ? onMobileClose : undefined}
               className={cn(
-                'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200',
+                'flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-all duration-200',
                 isActive
                   ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                  : 'text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50',
+                  : 'text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 hover:shadow-sm',
                 collapsed && !isMobile && 'justify-center px-0'
               )}
             >
@@ -199,30 +242,63 @@ export function DashboardSidebar({ mobileOpen, onMobileClose }: DashboardSidebar
         })}
       </div>
 
-      {/* User card when not collapsed */}
+      {/* User card with dropdown */}
       {(!collapsed || isMobile) && profile && (
         <div className="px-3 pb-4">
-          <div className="p-3 rounded-xl bg-sidebar-accent/50 border border-sidebar-border">
-            <div className="flex items-center gap-3">
-              <Avatar className="w-10 h-10 border-2 border-background">
-                <AvatarImage
-                  src={profile.avatar_url ? `${profile.avatar_url}?t=${Date.now()}` : ''}
-                  alt={profile.full_name || 'User'}
-                />
-                <AvatarFallback className="gradient-bg text-white font-medium">
-                  {profile.full_name?.charAt(0) || profile.email.charAt(0).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">
-                  {profile.full_name || 'User'}
-                </p>
-                <p className="text-xs text-muted-foreground capitalize">
-                  {activeRole || profile.role}
-                </p>
-              </div>
-            </div>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="w-full p-3 rounded-xl bg-sidebar-accent/50 border border-sidebar-border hover:bg-sidebar-accent/70 transition-colors cursor-pointer text-left">
+                <div className="flex items-center gap-3">
+                  <Avatar className="w-10 h-10 border-2 border-background">
+                    <AvatarImage
+                      src={profile.avatar_url ? `${profile.avatar_url}?t=${Date.now()}` : ''}
+                      alt={profile.full_name || 'User'}
+                    />
+                    <AvatarFallback className="gradient-bg text-white font-medium">
+                      {profile.full_name?.charAt(0) || profile.email.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">
+                      {profile.full_name || 'User'}
+                    </p>
+                    <p className="text-xs text-muted-foreground capitalize">
+                      {activeRole || profile.role}
+                    </p>
+                  </div>
+                </div>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent side="top" align="start" className="w-56 mb-1">
+              <DropdownMenuLabel>
+                <div className="flex flex-col space-y-1">
+                  <p className="text-sm font-medium">{profile.full_name || 'User'}</p>
+                  <p className="text-xs text-muted-foreground truncate">{profile.email}</p>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <Link href="/profile" onClick={isMobile ? onMobileClose : undefined}>
+                <DropdownMenuItem>
+                  <User className="w-4 h-4 mr-2" />
+                  Profile
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/profile#settings" onClick={isMobile ? onMobileClose : undefined}>
+                <DropdownMenuItem>
+                  <Settings className="w-4 h-4 mr-2" />
+                  Settings
+                </DropdownMenuItem>
+              </Link>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={handleSignOut}
+                className="text-destructive focus:text-destructive cursor-pointer"
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                Sign out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       )}
     </>
@@ -230,15 +306,18 @@ export function DashboardSidebar({ mobileOpen, onMobileClose }: DashboardSidebar
 
   return (
     <TooltipProvider delayDuration={0}>
-      {/* Desktop Sidebar */}
-      <aside
-        className={cn(
-          'h-screen sticky top-0 flex-col bg-sidebar border-r border-sidebar-border transition-all duration-300 hidden md:flex',
-          collapsed ? 'w-16' : 'w-64'
-        )}
+      {/* Desktop Sidebar — spring-animated collapse */}
+      <motion.aside
+        className="h-screen sticky top-0 flex-col bg-sidebar border-r border-sidebar-border hidden md:flex overflow-hidden"
+        animate={{ width: collapsed ? 64 : 256 }}
+        transition={
+          shouldReduceMotion
+            ? { duration: 0 }
+            : { type: 'spring', stiffness: 300, damping: 28 }
+        }
       >
         <SidebarContent isMobile={false} />
-      </aside>
+      </motion.aside>
 
       {/* Mobile Sidebar (Sheet) */}
       <Sheet open={mobileOpen} onOpenChange={onMobileClose}>

@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { TrendingUp, Video, Users } from 'lucide-react';
+import { TrendingUp, Video, Users, BarChart3 } from 'lucide-react';
 import { OverviewTab } from './components/overview-tab';
 import { MeetingsManagerTab } from './components/meetings-manager-tab';
 import { StudentAttendanceTab } from './components/student-attendance-tab';
+import { MotionContainer, MotionItem, MotionFadeIn } from '@/components/ui/motion';
+import { PageHeader } from '@/components/ui/page-header';
 
 interface Cohort {
   id: string;
@@ -39,15 +41,14 @@ export default function AdminAnalyticsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Attendance Analytics</h1>
-        <p className="text-muted-foreground mt-1">
-          Track Zoom attendance, manage meetings, and monitor student engagement
-        </p>
-      </div>
+      <PageHeader
+        icon={BarChart3}
+        title="Analytics"
+        description="System-wide performance metrics and insights"
+      />
 
       {/* Tabs */}
+      <MotionFadeIn delay={0.1}>
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-grid">
           <TabsTrigger value="overview" className="gap-2">
@@ -76,6 +77,7 @@ export default function AdminAnalyticsPage() {
           <StudentAttendanceTab cohorts={cohorts} />
         </TabsContent>
       </Tabs>
+      </MotionFadeIn>
     </div>
   );
 }

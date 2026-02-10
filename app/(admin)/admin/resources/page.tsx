@@ -5,6 +5,7 @@ import { PageLoader } from '@/components/ui/page-loader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { Video, Link as LinkIcon, Presentation, FileText } from 'lucide-react';
+import { MotionFadeIn } from '@/components/ui/motion';
 import type { Cohort, ResourceCategory } from '@/types';
 import { ResourceWithCohort } from './types';
 import { CohortSelector } from './components/cohort-selector';
@@ -15,6 +16,7 @@ import { ResourceTable } from './components/resource-table';
 import { BulkActionsBar } from './components/bulk-actions-bar';
 import { EditResourceDialog } from './components/edit-resource-dialog';
 import { DeleteResourceDialog, BulkDeleteDialog } from './components/delete-resource-dialog';
+import { PageHeader } from '@/components/ui/page-header';
 import { MoveCohortDialog } from './components/move-cohort-dialog';
 
 export default function AdminResourcesPage() {
@@ -183,15 +185,11 @@ export default function AdminResourcesPage() {
 
   return (
     <div className="space-y-8">
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-primary/10 via-primary/5 to-accent/10 p-6 border border-primary/20">
-        <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent opacity-50" />
-        <div className="relative">
-          <h1 className="text-3xl font-bold tracking-tight">Resource Management</h1>
-          <p className="text-muted-foreground mt-2">
-            Upload and manage learning resources for cohorts
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        icon={FileText}
+        title="Resources"
+        description="Manage learning materials and documents"
+      />
 
       <CohortSelector
         cohorts={cohorts}
@@ -202,6 +200,7 @@ export default function AdminResourcesPage() {
         onGlobalModeToggle={handleGlobalModeToggle}
       />
 
+      <MotionFadeIn delay={0.1}>
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as ResourceCategory)}>
         <TabsList className="w-full justify-start h-12 p-1 bg-muted/50 border">
           <TabsTrigger value="video" className="flex items-center gap-2 px-6">
@@ -256,6 +255,7 @@ export default function AdminResourcesPage() {
           />
         </TabsContent>
       </Tabs>
+      </MotionFadeIn>
 
       <BulkActionsBar
         selectedResourceIds={selectedResourceIds}

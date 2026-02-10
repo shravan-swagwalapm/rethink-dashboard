@@ -30,6 +30,7 @@ import {
   ExternalLink,
   Globe,
 } from 'lucide-react';
+import { PageHeader } from '@/components/ui/page-header';
 import {
   format,
   startOfMonth,
@@ -46,6 +47,7 @@ import {
 } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 import { cn } from '@/lib/utils';
+import { MotionContainer, MotionItem, MotionFadeIn } from '@/components/ui/motion';
 import type { Session, Rsvp } from '@/types';
 
 interface SessionWithRsvp extends Session {
@@ -321,159 +323,43 @@ export default function CalendarPage() {
 
   return (
     <div className="space-y-6">
-      {/* Futuristic Header Card */}
-      <div className="relative group">
-        {/* Animated border glow effect */}
-        <div className="absolute -inset-0.5 bg-gradient-to-r from-cyan-500 via-purple-500 to-pink-500 rounded-2xl blur-sm opacity-60 group-hover:opacity-80 transition duration-500 animate-border-glow" />
-
-        <Card className="relative overflow-hidden border-0 rounded-2xl">
-          {/* Deep space gradient background */}
-          <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-purple-900/90 to-slate-900" />
-
-          {/* Abstract wave background SVG */}
-          <div className="absolute inset-0 opacity-50">
-            <svg
-              className="absolute inset-0 w-full h-full"
-              viewBox="0 0 1200 200"
-              preserveAspectRatio="xMidYMid slice"
-              xmlns="http://www.w3.org/2000/svg"
+      {/* Header */}
+      <PageHeader
+        icon={CalendarIcon}
+        title="Calendar"
+        description="View upcoming sessions and events"
+        action={
+          <div className="flex items-center rounded-lg border p-1 gap-1">
+            <Button
+              size="sm"
+              variant={timezoneMode === 'ist' ? 'default' : 'ghost'}
+              onClick={() => setTimezoneMode('ist')}
             >
-              <defs>
-                <linearGradient id="cal-wave-1" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.6" />
-                  <stop offset="50%" stopColor="#8b5cf6" stopOpacity="0.4" />
-                  <stop offset="100%" stopColor="#ec4899" stopOpacity="0.3" />
-                </linearGradient>
-                <linearGradient id="cal-wave-2" x1="100%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.5" />
-                  <stop offset="100%" stopColor="#06b6d4" stopOpacity="0.2" />
-                </linearGradient>
-                <filter id="cal-glow">
-                  <feGaussianBlur stdDeviation="3" result="coloredBlur" />
-                  <feMerge>
-                    <feMergeNode in="coloredBlur" />
-                    <feMergeNode in="SourceGraphic" />
-                  </feMerge>
-                </filter>
-              </defs>
-              {/* Aurora wave 1 */}
-              <path
-                d="M0,100 C150,50 350,150 600,100 C850,50 1050,120 1200,80 L1200,200 L0,200 Z"
-                fill="url(#cal-wave-1)"
-                filter="url(#cal-glow)"
-                className="animate-wave-slow"
-              />
-              {/* Aurora wave 2 */}
-              <path
-                d="M0,130 C200,80 400,180 700,120 C900,80 1100,150 1200,110 L1200,200 L0,200 Z"
-                fill="url(#cal-wave-2)"
-                filter="url(#cal-glow)"
-                className="animate-wave-medium"
-              />
-              {/* Floating particles */}
-              <circle cx="150" cy="40" r="2" fill="#06b6d4" opacity="0.6" className="animate-float-particle" />
-              <circle cx="450" cy="60" r="3" fill="#8b5cf6" opacity="0.5" className="animate-float-particle-delayed" />
-              <circle cx="750" cy="35" r="2" fill="#ec4899" opacity="0.4" className="animate-float-particle" />
-              <circle cx="1050" cy="55" r="3" fill="#06b6d4" opacity="0.5" className="animate-float-particle-delayed" />
-            </svg>
+              <Globe className="w-4 h-4 mr-2" />
+              IST
+            </Button>
+            <Button
+              size="sm"
+              variant={timezoneMode === 'utc' ? 'default' : 'ghost'}
+              onClick={() => setTimezoneMode('utc')}
+            >
+              <Clock className="w-4 h-4 mr-2" />
+              UTC
+            </Button>
+            <Button
+              size="sm"
+              variant={timezoneMode === 'local' ? 'default' : 'ghost'}
+              onClick={() => setTimezoneMode('local')}
+            >
+              <CalendarIcon className="w-4 h-4 mr-2" />
+              Local
+            </Button>
           </div>
-
-          {/* Animated gradient overlay */}
-          <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/10 via-purple-500/10 to-pink-500/10 animate-gradient-x" />
-
-          {/* Cyber grid pattern */}
-          <div className="absolute inset-0 opacity-10">
-            <div className="absolute inset-0" style={{
-              backgroundImage: `
-                linear-gradient(rgba(6, 182, 212, 0.4) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(6, 182, 212, 0.4) 1px, transparent 1px)
-              `,
-              backgroundSize: '30px 30px',
-              maskImage: 'linear-gradient(to bottom, transparent, black 20%, black 80%, transparent)'
-            }} />
-          </div>
-
-          {/* Floating neon orbs */}
-          <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-            <div className="absolute -top-10 -left-10 w-40 h-40 bg-cyan-500/20 rounded-full blur-3xl animate-pulse-slow" />
-            <div className="absolute -bottom-10 -right-10 w-48 h-48 bg-purple-500/20 rounded-full blur-3xl animate-float-delayed" />
-          </div>
-
-          <CardContent className="relative p-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
-                {/* Glowing icon container */}
-                <div className="relative">
-                  <div className="absolute inset-0 bg-cyan-400 rounded-xl blur-md opacity-40 animate-pulse" />
-                  <div className="relative w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-400 to-purple-500 flex items-center justify-center shadow-lg shadow-cyan-500/30">
-                    <CalendarIcon className="w-6 h-6 text-white" />
-                  </div>
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold bg-gradient-to-r from-white via-cyan-100 to-purple-200 bg-clip-text text-transparent">
-                    Session Calendar
-                  </h1>
-                  <p className="text-cyan-200/70 text-sm mt-0.5">View and RSVP to your upcoming sessions</p>
-                </div>
-              </div>
-
-              {/* Futuristic Timezone Mode Selector */}
-              <div className="relative">
-                <div className="absolute -inset-0.5 bg-gradient-to-r from-cyan-500/50 to-purple-500/50 rounded-xl blur opacity-50" />
-                <div className="relative flex items-center rounded-xl border border-cyan-500/30 bg-slate-900/80 backdrop-blur-xl p-1 gap-1">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setTimezoneMode('ist')}
-                    className={cn(
-                      'h-9 px-4 text-sm font-semibold transition-all rounded-lg border',
-                      timezoneMode === 'ist'
-                        ? 'bg-gradient-to-r from-cyan-500 to-purple-500 text-white border-transparent shadow-lg shadow-cyan-500/30 hover:from-cyan-400 hover:to-purple-400'
-                        : 'text-cyan-300 border-cyan-500/30 hover:text-white hover:bg-cyan-500/20 hover:border-cyan-400/50'
-                    )}
-                  >
-                    <Globe className="w-4 h-4 mr-2" />
-                    IST
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setTimezoneMode('utc')}
-                    className={cn(
-                      'h-9 px-4 text-sm font-semibold transition-all rounded-lg border',
-                      timezoneMode === 'utc'
-                        ? 'bg-gradient-to-r from-cyan-500 to-purple-500 text-white border-transparent shadow-lg shadow-cyan-500/30 hover:from-cyan-400 hover:to-purple-400'
-                        : 'text-cyan-300 border-cyan-500/30 hover:text-white hover:bg-cyan-500/20 hover:border-cyan-400/50'
-                    )}
-                  >
-                    <Clock className="w-4 h-4 mr-2" />
-                    UTC
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setTimezoneMode('local')}
-                    className={cn(
-                      'h-9 px-4 text-sm font-semibold transition-all rounded-lg border',
-                      timezoneMode === 'local'
-                        ? 'bg-gradient-to-r from-cyan-500 to-purple-500 text-white border-transparent shadow-lg shadow-cyan-500/30 hover:from-cyan-400 hover:to-purple-400'
-                        : 'text-cyan-300 border-cyan-500/30 hover:text-white hover:bg-cyan-500/20 hover:border-cyan-400/50'
-                    )}
-                  >
-                    <CalendarIcon className="w-4 h-4 mr-2" />
-                    Local
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-
-          {/* Bottom neon line */}
-          <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-500 to-transparent" />
-        </Card>
-      </div>
+        }
+      />
 
       {/* Calendar */}
+      <MotionFadeIn delay={0.1}>
       <Card className="overflow-hidden shadow-lg">
         {/* Month Navigation */}
         <div className="flex items-center justify-between p-4 border-b bg-muted/30">
@@ -559,7 +445,7 @@ export default function CalendarPage() {
                         key={session.id}
                         onClick={() => setSelectedSession(session)}
                         className={cn(
-                          'w-full text-left px-2 py-1.5 rounded-md text-xs font-medium truncate transition-all hover:scale-[1.02] shadow-sm',
+                          'w-full text-left px-2.5 py-2 rounded-lg text-sm font-medium truncate transition-all hover:scale-[1.02] shadow-sm',
                           session.user_rsvp?.response === 'yes'
                             ? 'bg-green-500 text-white hover:bg-green-600'
                             : session.user_rsvp?.response === 'no'
@@ -587,6 +473,7 @@ export default function CalendarPage() {
           </div>
         </CardContent>
       </Card>
+      </MotionFadeIn>
 
       {/* Legend */}
       <div className="flex flex-wrap items-center justify-center gap-6 text-sm">

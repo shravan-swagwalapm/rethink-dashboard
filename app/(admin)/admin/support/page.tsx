@@ -41,7 +41,9 @@ import {
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { HelpCircle, Eye, Clock, CheckCircle, Send, Trash2, Loader2 } from 'lucide-react';
+import { PageHeader } from '@/components/ui/page-header';
 import { format } from 'date-fns';
+import { MotionFadeIn } from '@/components/ui/motion';
 import type { SupportTicket, Profile } from '@/types';
 
 interface TicketResponse {
@@ -222,13 +224,13 @@ export default function AdminSupportPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Support Tickets</h1>
-        <p className="text-muted-foreground">
-          View and manage student support requests
-        </p>
-      </div>
+      <PageHeader
+        icon={HelpCircle}
+        title="Support Tickets"
+        description="Review and respond to support requests"
+      />
 
+      <MotionFadeIn delay={0.1}>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card>
           <CardContent className="p-4">
@@ -278,6 +280,7 @@ export default function AdminSupportPage() {
           </CardContent>
         </Card>
       </div>
+      </MotionFadeIn>
 
       <Card>
         <CardHeader>

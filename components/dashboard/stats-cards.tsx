@@ -4,7 +4,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Users, TrendingUp, Trophy, FolderOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useEffect, useState } from 'react';
+import { SpotlightCard } from '@/components/ui/spotlight-card';
+import { MotionContainer, MotionItem } from '@/components/ui/motion';
+import { useAnimatedCounter } from '@/hooks/use-animated-counter';
 
 interface StatsCardsProps {
   stats?: {
@@ -17,35 +19,6 @@ interface StatsCardsProps {
   loading?: boolean;
 }
 
-// Animated counter hook
-function useAnimatedCounter(target: number, duration: number = 1000) {
-  const [count, setCount] = useState(0);
-
-  useEffect(() => {
-    let startTime: number;
-    let animationFrame: number;
-
-    const animate = (currentTime: number) => {
-      if (!startTime) startTime = currentTime;
-      const elapsed = currentTime - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-
-      // Ease out cubic
-      const easedProgress = 1 - Math.pow(1 - progress, 3);
-      setCount(Math.floor(easedProgress * target));
-
-      if (progress < 1) {
-        animationFrame = requestAnimationFrame(animate);
-      }
-    };
-
-    animationFrame = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(animationFrame);
-  }, [target, duration]);
-
-  return count;
-}
-
 // Stats card component with animation
 function StatCard({ card, index, stats }: any) {
   const isAttendance = card.title === 'Attendance';
@@ -55,7 +28,7 @@ function StatCard({ card, index, stats }: any) {
     ? (stats?.current_rank || 0)
     : (typeof card.value === 'number' ? card.value : parseInt(card.value) || 0);
 
-  const animatedValue = useAnimatedCounter(numericValue, 1500);
+  const animatedValue = useAnimatedCounter({ target: numericValue, duration: 1500 });
 
   const displayValue = isRank && !stats?.current_rank
     ? '—'
@@ -68,28 +41,16 @@ function StatCard({ card, index, stats }: any) {
   const strokeDashoffset = circumference - (attendancePercentage / 100) * circumference;
 
   return (
+    <SpotlightCard className="rounded-xl">
     <Card
       className={cn(
         'relative overflow-hidden group cursor-default',
-        'border-2 transition-all duration-500',
-        'hover:shadow-2xl hover:shadow-blue-500/20 hover:-translate-y-1',
-        'animate-in-up opacity-0',
-        `stagger-${index + 1}`,
-        'dark:bg-gray-900/50 dark:border-gray-700',
-        'before:absolute before:inset-0 before:rounded-lg before:p-[2px]',
-        'before:bg-gradient-to-br before:from-blue-500 before:via-purple-500 before:to-pink-500',
-        'before:opacity-0 hover:before:opacity-100 before:transition-opacity before:duration-500',
-        'before:-z-10'
+        'border border-border/50 bg-card/80 backdrop-blur-sm lit-surface card-inner-glow',
+        'hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300',
+        'active:scale-[0.98] active:transition-transform',
+        'hover:border-teal-500/40 hover:dark:border-teal-500/30'
       )}
-      style={{ animationFillMode: 'forwards' }}
     >
-      {/* Gradient glow on hover */}
-      <div className="absolute inset-0 bg-gradient-to-br from-blue-500/0 via-purple-500/0 to-pink-500/0 group-hover:from-blue-500/5 group-hover:via-purple-500/5 group-hover:to-pink-500/5 transition-all duration-500 rounded-lg" />
-
-      {/* Shimmer effect */}
-      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-        <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-      </div>
 
       <CardContent className="p-6 relative">
         <div className="flex items-center gap-4">
@@ -100,10 +61,10 @@ function StatCard({ card, index, stats }: any) {
                 'w-14 h-14 rounded-xl flex items-center justify-center',
                 'transition-all duration-500 group-hover:scale-110 group-hover:rotate-3',
                 'bg-gradient-to-br shadow-lg',
-                card.title === 'Cohort Members' && 'from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700',
-                card.title === 'Attendance' && 'from-green-500 to-emerald-600 dark:from-green-600 dark:to-emerald-700',
-                card.title === 'Current Rank' && 'from-amber-500 to-orange-600 dark:from-amber-600 dark:to-orange-700',
-                card.title === 'Total Resources' && 'from-purple-500 to-pink-600 dark:from-purple-600 dark:to-pink-700'
+                card.title === 'Cohort Members' && 'from-teal-500 to-teal-600 dark:from-teal-600 dark:to-teal-700 shadow-accent/30',
+                card.title === 'Attendance' && 'from-green-500 to-emerald-600 dark:from-green-600 dark:to-emerald-700 shadow-emerald-500/30',
+                card.title === 'Current Rank' && 'from-amber-500 to-orange-600 dark:from-amber-600 dark:to-orange-700 shadow-amber-500/30',
+                card.title === 'Total Resources' && 'from-sky-500 to-blue-600 dark:from-sky-600 dark:to-blue-700 shadow-blue-500/30'
               )}
             >
               <card.icon className="w-7 h-7 text-white drop-shadow-lg" />
@@ -147,7 +108,7 @@ function StatCard({ card, index, stats }: any) {
               {card.title}
             </p>
             <div className="flex items-baseline gap-2">
-              <p className="text-3xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 dark:from-white dark:via-gray-100 dark:to-white bg-clip-text text-transparent">
+              <p className="text-3xl font-bold tabular-nums bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 dark:from-white dark:via-gray-100 dark:to-white bg-clip-text text-transparent">
                 {displayValue}
               </p>
               {card.trend && (
@@ -170,15 +131,16 @@ function StatCard({ card, index, stats }: any) {
         </div>
 
         {/* Bottom accent bar */}
-        <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-current to-transparent opacity-0 group-hover:opacity-20 transition-opacity duration-500"
+        <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-current to-transparent opacity-0 group-hover:opacity-50 transition-opacity duration-500"
           style={{
-            color: card.title === 'Cohort Members' ? '#3b82f6' :
+            color: card.title === 'Cohort Members' ? '#14b8a6' :
                    card.title === 'Attendance' ? '#10b981' :
-                   card.title === 'Current Rank' ? '#f59e0b' : '#a855f7'
+                   card.title === 'Current Rank' ? '#f59e0b' : '#0ea5e9'
           }}
         />
       </CardContent>
     </Card>
+    </SpotlightCard>
   );
 }
 
@@ -217,7 +179,7 @@ export function StatsCards({ stats, loading }: StatsCardsProps) {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {[...Array(4)].map((_, i) => (
-          <Card key={i} className="border-2 dark:bg-gray-900/50 dark:border-gray-700">
+          <Card key={i} className="border-2 dark:bg-[hsl(228,22%,10%)] dark:border-white/10">
             <CardContent className="p-6">
               <div className="flex items-center gap-4">
                 <Skeleton className="w-14 h-14 rounded-xl" />
@@ -235,10 +197,12 @@ export function StatsCards({ stats, loading }: StatsCardsProps) {
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+    <MotionContainer className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
       {cards.map((card, index) => (
-        <StatCard key={card.title} card={card} index={index} stats={stats} />
+        <MotionItem key={card.title}>
+          <StatCard card={card} index={index} stats={stats} />
+        </MotionItem>
       ))}
-    </div>
+    </MotionContainer>
   );
 }

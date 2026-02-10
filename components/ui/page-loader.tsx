@@ -117,17 +117,17 @@ export function FullPageLoader({ message = 'Loading...' }: PageLoaderProps) {
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center overflow-hidden">
       {/* Animated gradient background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-purple-950/90 to-slate-950" />
+      <div className="absolute inset-0 bg-gradient-to-br from-[hsl(230,45%,8%)] via-[hsl(228,30%,12%)] to-[hsl(230,45%,8%)]" />
 
       {/* Animated mesh gradient overlay */}
       <div className="absolute inset-0 opacity-30">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-purple-500/20 via-transparent to-transparent animate-pulse" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-teal-500/20 via-transparent to-transparent animate-pulse" />
         <div
-          className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,_var(--tw-gradient-stops))] from-cyan-500/20 via-transparent to-transparent animate-pulse"
+          className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,_var(--tw-gradient-stops))] from-teal-400/20 via-transparent to-transparent animate-pulse"
           style={{ animationDelay: '1s' }}
         />
         <div
-          className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-pink-500/10 via-transparent to-transparent animate-pulse"
+          className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-teal-300/10 via-transparent to-transparent animate-pulse"
           style={{ animationDelay: '2s' }}
         />
       </div>
@@ -165,26 +165,26 @@ export function FullPageLoader({ message = 'Loading...' }: PageLoaderProps) {
           {/* Outer rotating ring */}
           <div className="absolute inset-[-8px] w-[calc(100%+16px)] h-[calc(100%+16px)]">
             <div
-              className="w-full h-full rounded-full border-2 border-purple-500/30 animate-spin"
+              className="w-full h-full rounded-full border-2 border-teal-500/30 animate-spin"
               style={{ animationDuration: '3s' }}
             />
           </div>
 
           {/* Second rotating ring (reverse) */}
           <div className="absolute inset-[-4px] w-[calc(100%+8px)] h-[calc(100%+8px)]">
-            <div className="w-full h-full rounded-full border border-dashed border-cyan-400/20 animate-loader-orbit-reverse" />
+            <div className="w-full h-full rounded-full border border-dashed border-teal-400/20 animate-loader-orbit-reverse" />
           </div>
 
           {/* Middle pulsing ring */}
           <div className="absolute inset-0">
             <div
-              className="w-full h-full rounded-full border border-cyan-400/40 animate-ping"
+              className="w-full h-full rounded-full border border-teal-400/40 animate-ping"
               style={{ animationDuration: '2s' }}
             />
           </div>
 
           {/* Inner glowing orb */}
-          <div className="absolute inset-2 rounded-full bg-gradient-to-br from-purple-500 via-pink-500 to-cyan-500 flex items-center justify-center shadow-2xl animate-loader-pulse-glow">
+          <div className="absolute inset-2 rounded-full bg-gradient-to-br from-teal-500 via-teal-400 to-teal-300 flex items-center justify-center shadow-2xl animate-loader-pulse-glow">
             {/* Shimmer effect overlay */}
             <div className="absolute inset-0 rounded-full overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-loader-shimmer" />
@@ -196,9 +196,9 @@ export function FullPageLoader({ message = 'Loading...' }: PageLoaderProps) {
 
           {/* Orbiting dots */}
           <div className="absolute inset-[-16px] w-[calc(100%+32px)] h-[calc(100%+32px)] animate-loader-orbit">
-            <div className="absolute top-0 left-1/2 w-2 h-2 -ml-1 bg-cyan-400 rounded-full shadow-lg shadow-cyan-400/50" />
-            <div className="absolute bottom-0 left-1/2 w-2 h-2 -ml-1 bg-pink-400 rounded-full shadow-lg shadow-pink-400/50" />
-            <div className="absolute left-0 top-1/2 w-2 h-2 -mt-1 bg-purple-400 rounded-full shadow-lg shadow-purple-400/50" />
+            <div className="absolute top-0 left-1/2 w-2 h-2 -ml-1 bg-teal-400 rounded-full shadow-lg shadow-teal-400/50" />
+            <div className="absolute bottom-0 left-1/2 w-2 h-2 -ml-1 bg-teal-300 rounded-full shadow-lg shadow-teal-300/50" />
+            <div className="absolute left-0 top-1/2 w-2 h-2 -mt-1 bg-teal-500 rounded-full shadow-lg shadow-teal-500/50" />
             <div className="absolute right-0 top-1/2 w-2 h-2 -mt-1 bg-yellow-400 rounded-full shadow-lg shadow-yellow-400/50" />
           </div>
         </div>
@@ -215,7 +215,7 @@ export function FullPageLoader({ message = 'Loading...' }: PageLoaderProps) {
           </blockquote>
 
           {/* Author */}
-          <p className="text-sm md:text-base font-medium text-purple-300/80">
+          <p className="text-sm md:text-base font-medium text-teal-300/80">
             — {quote.author}
           </p>
         </div>
@@ -224,7 +224,7 @@ export function FullPageLoader({ message = 'Loading...' }: PageLoaderProps) {
         <div className="mt-12 flex flex-col items-center gap-4">
           {/* Shimmer progress bar */}
           <div className="relative w-64 h-1.5 bg-white/10 rounded-full overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-r from-purple-500 via-pink-500 to-cyan-500 rounded-full animate-loader-shimmer-bar" />
+            <div className="absolute inset-0 bg-gradient-to-r from-teal-500 via-teal-400 to-teal-300 rounded-full animate-loader-shimmer-bar" />
             {/* Shimmer overlay */}
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent animate-loader-shimmer" />
           </div>

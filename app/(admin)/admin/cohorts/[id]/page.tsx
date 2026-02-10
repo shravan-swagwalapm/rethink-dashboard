@@ -45,8 +45,10 @@ import {
   Sparkles,
   BookOpen,
   Users,
+  GraduationCap,
 } from 'lucide-react';
 import type { Cohort, CohortResourceSharingInfo, LearningModuleWithSharing } from '@/types';
+import { PageHeader } from '@/components/ui/page-header';
 
 interface CohortStats {
   total_modules: number;
@@ -331,17 +333,16 @@ export default function CohortSettingsPage() {
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Cohorts
           </Button>
-          <div className="flex items-start justify-between">
-            <div>
-              <h1 className="text-3xl font-bold">{cohort.name}</h1>
-              <p className="text-muted-foreground mt-1">
-                Manage learning resources and content sharing for this cohort
-              </p>
-            </div>
-            <Badge variant={cohort.status === 'active' ? 'default' : 'secondary'}>
-              {cohort.status}
-            </Badge>
-          </div>
+          <PageHeader
+            icon={GraduationCap}
+            title={cohort.name}
+            description="Manage cohort details, modules, and members"
+            action={
+              <Badge variant={cohort.status === 'active' ? 'default' : 'secondary'}>
+                {cohort.status}
+              </Badge>
+            }
+          />
         </div>
 
         {/* Info Banner */}

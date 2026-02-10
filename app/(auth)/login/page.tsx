@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from 'sonner';
 import { Loader2, Phone, ArrowRight, Sparkles, AlertCircle, Shield, ArrowLeft } from 'lucide-react';
-import { Separator } from '@/components/ui/separator';
+
 import { OTPInput } from '@/components/ui/otp-input';
 import { CountryCodePicker } from '@/components/ui/country-code-picker';
 
@@ -312,13 +312,13 @@ function LoginContent() {
           </Alert>
         )}
 
-        <Card className="glass-strong animate-in-up stagger-1">
+        <Card className="glass-strong animate-in-up stagger-1 border border-[hsl(172_66%_42%/0.3)] shadow-xl">
           <CardHeader className="text-center pb-4">
             <CardTitle className="text-4xl font-bold">
               {step === 'identifier' && 'Sign In to Your Account'}
               {step === 'otp' && 'Enter Verification Code'}
             </CardTitle>
-            <CardDescription className="text-lg mt-2">
+            <CardDescription className="text-lg mt-2 text-foreground/60">
               {step === 'identifier' && 'Choose how you\'d like to sign in'}
               {step === 'otp' && `We sent a code to ${countryCode}${phone}`}
             </CardDescription>
@@ -353,7 +353,7 @@ function LoginContent() {
 
                   <Button
                     type="submit"
-                    className="w-full h-12 gradient-bg hover:opacity-90 transition-opacity text-lg font-medium"
+                    className="w-full h-12 gradient-bg hover:opacity-90 transition-opacity text-lg font-medium text-white disabled:opacity-60 !border !border-white/20"
                     disabled={loading || phone.length < 10}
                   >
                     {loading ? (
@@ -369,7 +369,7 @@ function LoginContent() {
                     )}
                   </Button>
 
-                  <p className="text-base text-muted-foreground text-center">
+                  <p className="text-base text-foreground/50 text-center">
                     We&apos;ll text you a 4-digit code
                   </p>
                 </form>
@@ -377,17 +377,17 @@ function LoginContent() {
                 {/* Google Sign In */}
                 <div className="relative py-2">
                   <div className="absolute inset-0 flex items-center">
-                    <Separator className="w-full" />
+                    <div className="divider-gradient w-full" />
                   </div>
                   <div className="relative flex justify-center text-sm">
-                    <span className="bg-card px-3 text-muted-foreground font-medium">Or</span>
+                    <span className="bg-transparent px-3 text-foreground/40 font-medium">Or</span>
                   </div>
                 </div>
 
                 <Button
                   type="button"
                   variant="outline"
-                  className="w-full h-12 border-border hover:bg-muted/50 transition-all text-lg font-medium"
+                  className="w-full h-12 !border !border-white/20 hover:!border-white/35 hover:bg-muted/50 transition-all text-lg font-medium"
                   onClick={() => handleGoogleSignIn('user')}
                   disabled={googleLoading || adminLoading}
                 >
@@ -416,24 +416,24 @@ function LoginContent() {
                   Continue with Google
                 </Button>
 
-                <p className="text-base text-muted-foreground text-center">
+                <p className="text-base text-foreground/50 text-center">
                   Sign in with your registered email
                 </p>
 
                 {/* Admin Portal - Google Only */}
                 <div className="relative pt-4">
                   <div className="absolute inset-0 flex items-center">
-                    <Separator className="w-full" />
+                    <div className="divider-gradient w-full" />
                   </div>
                   <div className="relative flex justify-center text-xs uppercase tracking-wider">
-                    <span className="bg-card px-3 text-muted-foreground font-semibold">Admin Portal</span>
+                    <span className="bg-transparent px-3 text-foreground/40 font-semibold">Admin Portal</span>
                   </div>
                 </div>
 
                 <Button
                   type="button"
                   variant="outline"
-                  className="w-full h-12 border-primary/30 hover:bg-primary/10 hover:border-primary/50 transition-all text-lg font-medium"
+                  className="w-full h-12 !border !border-white/20 hover:bg-primary/10 hover:!border-primary/50 transition-all text-lg font-medium"
                   onClick={() => handleGoogleSignIn('admin')}
                   disabled={googleLoading || adminLoading}
                 >
@@ -445,7 +445,7 @@ function LoginContent() {
                   Sign in as Administrator
                 </Button>
 
-                <p className="text-sm text-muted-foreground text-center">
+                <p className="text-sm text-foreground/40 text-center">
                   For administrators and team members only
                 </p>
               </>

@@ -30,6 +30,8 @@ import {
   XCircle,
   Loader2,
 } from 'lucide-react';
+import { PageHeader } from '@/components/ui/page-header';
+import { MotionContainer, MotionItem, MotionFadeIn } from '@/components/ui/motion';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -73,7 +75,7 @@ interface TicketWithResponses extends SupportTicket {
 const CATEGORIES = [
   { value: 'technical', label: 'Technical Issue', icon: Wrench, color: 'text-blue-500' },
   { value: 'payment', label: 'Payment', icon: CreditCard, color: 'text-green-500' },
-  { value: 'content', label: 'Content', icon: BookOpen, color: 'text-purple-500' },
+  { value: 'content', label: 'Content', icon: BookOpen, color: 'text-teal-500' },
   { value: 'schedule', label: 'Schedule', icon: Calendar, color: 'text-orange-500' },
   { value: 'other', label: 'Other', icon: HelpCircle, color: 'text-gray-500' },
 ];
@@ -275,54 +277,56 @@ export default function SupportPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center">
-          <Ticket className="w-6 h-6 text-white" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold dark:text-white">Support</h1>
-          <p className="text-muted-foreground dark:text-gray-400">
-            Create and manage your support tickets
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        icon={HelpCircle}
+        title="Support"
+        description="Get help and submit requests"
+      />
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Total Tickets</CardDescription>
-            <CardTitle className="text-3xl font-bold">{stats.total}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card className="border-red-200 dark:border-red-900/50">
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-1">
-              <AlertCircle className="w-3 h-3 text-red-500" />
-              Open
-            </CardDescription>
-            <CardTitle className="text-3xl font-bold text-red-600 dark:text-red-400">{stats.open}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card className="border-amber-200 dark:border-amber-900/50">
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-1">
-              <Clock className="w-3 h-3 text-amber-500" />
-              In Progress
-            </CardDescription>
-            <CardTitle className="text-3xl font-bold text-amber-600 dark:text-amber-400">{stats.inProgress}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card className="border-green-200 dark:border-green-900/50">
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-1">
-              <CheckCircle className="w-3 h-3 text-green-500" />
-              Resolved
-            </CardDescription>
-            <CardTitle className="text-3xl font-bold text-green-600 dark:text-green-400">{stats.resolved}</CardTitle>
-          </CardHeader>
-        </Card>
-      </div>
+      <MotionContainer className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <MotionItem>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>Total Tickets</CardDescription>
+              <CardTitle className="text-3xl font-bold">{stats.total}</CardTitle>
+            </CardHeader>
+          </Card>
+        </MotionItem>
+        <MotionItem>
+          <Card className="border-red-200 dark:border-red-900/50">
+            <CardHeader className="pb-2">
+              <CardDescription className="flex items-center gap-1">
+                <AlertCircle className="w-3 h-3 text-red-500" />
+                Open
+              </CardDescription>
+              <CardTitle className="text-3xl font-bold text-red-600 dark:text-red-400">{stats.open}</CardTitle>
+            </CardHeader>
+          </Card>
+        </MotionItem>
+        <MotionItem>
+          <Card className="border-amber-200 dark:border-amber-900/50">
+            <CardHeader className="pb-2">
+              <CardDescription className="flex items-center gap-1">
+                <Clock className="w-3 h-3 text-amber-500" />
+                In Progress
+              </CardDescription>
+              <CardTitle className="text-3xl font-bold text-amber-600 dark:text-amber-400">{stats.inProgress}</CardTitle>
+            </CardHeader>
+          </Card>
+        </MotionItem>
+        <MotionItem>
+          <Card className="border-green-200 dark:border-green-900/50">
+            <CardHeader className="pb-2">
+              <CardDescription className="flex items-center gap-1">
+                <CheckCircle className="w-3 h-3 text-green-500" />
+                Resolved
+              </CardDescription>
+              <CardTitle className="text-3xl font-bold text-green-600 dark:text-green-400">{stats.resolved}</CardTitle>
+            </CardHeader>
+          </Card>
+        </MotionItem>
+      </MotionContainer>
 
       {/* Create Ticket Form */}
       <Card className="relative overflow-hidden border-2 dark:border-gray-700">
@@ -409,11 +413,12 @@ export default function SupportPage() {
       </Card>
 
       {/* Tickets List */}
+      <MotionFadeIn delay={0.1}>
       <Card className="relative overflow-hidden border-2 dark:border-gray-700">
-        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 via-pink-500 to-purple-500" />
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-teal-500 via-teal-400 to-teal-500" />
         <CardHeader>
           <div className="flex items-center gap-2">
-            <MessageSquare className="w-5 h-5 text-purple-500" />
+            <MessageSquare className="w-5 h-5 text-teal-500" />
             <CardTitle>Your Tickets</CardTitle>
           </div>
           <CardDescription>Click on a ticket to view the conversation</CardDescription>
@@ -421,8 +426,8 @@ export default function SupportPage() {
         <CardContent>
           {tickets.length === 0 ? (
             <div className="text-center py-12">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-purple-50 dark:bg-purple-950/30 flex items-center justify-center">
-                <Ticket className="w-8 h-8 text-purple-500 dark:text-purple-400" />
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-teal-50 dark:bg-teal-950/30 flex items-center justify-center">
+                <Ticket className="w-8 h-8 text-teal-500 dark:text-teal-400" />
               </div>
               <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">No tickets yet</p>
               <p className="text-xs text-muted-foreground dark:text-gray-500">Create a ticket above to get started</p>
@@ -439,7 +444,7 @@ export default function SupportPage() {
                   <button
                     key={ticket.id}
                     onClick={() => handleOpenTicket(ticket)}
-                    className="w-full group relative flex items-center gap-4 p-4 rounded-xl border-2 border-border bg-gradient-to-br from-gray-50/50 to-white dark:from-gray-900/50 dark:to-gray-800/50 hover:from-purple-50/50 hover:to-pink-50/50 dark:hover:from-purple-950/20 dark:hover:to-pink-950/20 hover:border-primary/50 transition-all duration-300 hover:shadow-lg text-left"
+                    className="w-full group relative flex items-center gap-4 p-4 rounded-xl border-2 border-border bg-gradient-to-br from-gray-50/50 to-white dark:from-gray-900/50 dark:to-gray-800/50 hover:from-teal-50/50 hover:to-teal-50/50 dark:hover:from-teal-950/20 dark:hover:to-teal-950/20 hover:border-primary/50 transition-all duration-300 hover:shadow-lg text-left"
                   >
                     {/* Category Icon */}
                     <div className={`w-12 h-12 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center ${categoryConfig.color}`}>
@@ -448,7 +453,7 @@ export default function SupportPage() {
 
                     {/* Ticket Info */}
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold truncate text-gray-900 dark:text-white mb-1 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+                      <p className="font-semibold truncate text-gray-900 dark:text-white mb-1 group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors">
                         {ticket.summary}
                       </p>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground dark:text-gray-400">
@@ -479,6 +484,7 @@ export default function SupportPage() {
           )}
         </CardContent>
       </Card>
+      </MotionFadeIn>
 
       {/* Ticket Detail Dialog */}
       <Dialog open={ticketDetailOpen} onOpenChange={setTicketDetailOpen}>

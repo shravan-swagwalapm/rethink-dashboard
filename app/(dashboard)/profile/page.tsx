@@ -42,7 +42,9 @@ import {
   ExternalLink,
   X,
 } from 'lucide-react';
+import { PageHeader } from '@/components/ui/page-header';
 import { format } from 'date-fns';
+import { MotionContainer, MotionItem, MotionFadeIn } from '@/components/ui/motion';
 import type { Invoice } from '@/types';
 import { generateQRCode, downloadQRCode } from '@/lib/qr-code';
 import { ProfileCardPreviewModal } from '@/components/ProfileCardPreviewModal';
@@ -386,14 +388,14 @@ export default function ProfilePage() {
   return (
     <div className="space-y-6 max-w-3xl">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold">Profile</h1>
-        <p className="text-muted-foreground">
-          Manage your account settings and preferences
-        </p>
-      </div>
+      <PageHeader
+        icon={User}
+        title="Profile"
+        description="Manage your account settings"
+      />
 
       {/* Profile Card */}
+      <MotionFadeIn delay={0.1}>
       <Card>
         <CardHeader className="pb-4">
           <div className="flex items-center gap-4">
@@ -528,7 +530,7 @@ export default function ProfilePage() {
             <div className="flex items-start gap-6">
               {/* Avatar Preview */}
               <div className="relative">
-                <div className="w-32 h-32 rounded-2xl bg-gradient-to-br from-purple-100 to-purple-50 dark:from-purple-900/20 dark:to-gray-800 flex items-center justify-center overflow-hidden border-2 border-purple-200 dark:border-purple-700 shadow-lg">
+                <div className="w-32 h-32 rounded-2xl bg-gradient-to-br from-teal-100 to-teal-50 dark:from-teal-900/20 dark:to-gray-800 flex items-center justify-center overflow-hidden border-2 border-teal-200 dark:border-teal-700 shadow-lg">
                   {(avatarPreview || profile?.avatar_url) ? (
                     <img
                       src={avatarPreview || (profile?.avatar_url ? `${profile.avatar_url}?t=${avatarCacheKey}` : '')}
@@ -536,7 +538,7 @@ export default function ProfilePage() {
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <Upload className="w-12 h-12 text-purple-400" />
+                    <Upload className="w-12 h-12 text-teal-400" />
                   )}
                 </div>
 
@@ -572,7 +574,7 @@ export default function ProfilePage() {
                       type="button"
                       onClick={handleAvatarUpload}
                       disabled={uploadingAvatar}
-                      className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
+                      className="bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700"
                     >
                       {uploadingAvatar ? (
                         <>
@@ -624,12 +626,14 @@ export default function ProfilePage() {
           </Button>
         </CardContent>
       </Card>
+      </MotionFadeIn>
 
       {/* Shareable Profile Card Section */}
-      <Card className="border-2 border-purple-200 dark:border-purple-800 bg-gradient-to-br from-purple-50 to-white dark:from-purple-950/20 dark:to-gray-900 shadow-lg">
+      <MotionFadeIn delay={0.2}>
+      <Card className="border-2 border-teal-200 dark:border-teal-800 bg-gradient-to-br from-teal-50 to-white dark:from-teal-950/20 dark:to-gray-900 shadow-lg">
         <CardHeader>
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-lg">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-teal-500 to-teal-600 flex items-center justify-center shadow-lg">
               <Share2 className="w-6 h-6 text-white" />
             </div>
             <div>
@@ -645,8 +649,8 @@ export default function ProfilePage() {
           {!profileCard ? (
             // Generate Card CTA
             <div className="text-center py-8 px-4 space-y-4">
-              <div className="w-20 h-20 mx-auto rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-                <Link2 className="w-10 h-10 text-purple-500" />
+              <div className="w-20 h-20 mx-auto rounded-full bg-teal-100 dark:bg-teal-900/30 flex items-center justify-center">
+                <Link2 className="w-10 h-10 text-teal-500" />
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
@@ -659,7 +663,7 @@ export default function ProfilePage() {
               <Button
                 onClick={handleGenerateCard}
                 disabled={generatingCard}
-                className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
+                className="bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700"
               >
                 {generatingCard ? (
                   <>
@@ -680,8 +684,8 @@ export default function ProfilePage() {
               {/* Stats */}
               <div className="flex items-center justify-between p-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-                    <Eye className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                  <div className="w-10 h-10 rounded-lg bg-teal-100 dark:bg-teal-900/30 flex items-center justify-center">
+                    <Eye className="w-5 h-5 text-teal-600 dark:text-teal-400" />
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Profile Views</p>
@@ -696,7 +700,7 @@ export default function ProfilePage() {
                   size="sm"
                   onClick={handleRegenerateCard}
                   disabled={generatingCard}
-                  className="hover:bg-purple-50 dark:hover:bg-purple-900/20"
+                  className="hover:bg-teal-50 dark:hover:bg-teal-900/20"
                 >
                   <RefreshCw className={`w-4 h-4 mr-2 ${generatingCard ? 'animate-spin' : ''}`} />
                   Regenerate
@@ -707,13 +711,13 @@ export default function ProfilePage() {
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Your Shareable Link</Label>
                 <div className="flex gap-2">
-                  <div className="flex-1 px-4 py-3 rounded-lg border-2 border-purple-200 dark:border-purple-700 bg-white dark:bg-gray-800 font-mono text-sm truncate">
+                  <div className="flex-1 px-4 py-3 rounded-lg border-2 border-teal-200 dark:border-teal-700 bg-white dark:bg-gray-800 font-mono text-sm truncate">
                     {typeof window !== 'undefined' ? `${window.location.origin}/share/profile/${profileCard.slug}` : `/share/profile/${profileCard.slug}`}
                   </div>
                   <Button
                     onClick={handleCopyURL}
                     variant="outline"
-                    className="border-2 border-purple-200 dark:border-purple-700 hover:bg-purple-50 dark:hover:bg-purple-900/20"
+                    className="border-2 border-teal-200 dark:border-teal-700 hover:bg-teal-50 dark:hover:bg-teal-900/20"
                   >
                     {copied ? (
                       <>
@@ -735,7 +739,7 @@ export default function ProfilePage() {
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">QR Code</Label>
                   <div className="flex items-start gap-4">
-                    <div className="p-4 rounded-xl bg-white border-2 border-purple-200 dark:border-purple-700 shadow-sm">
+                    <div className="p-4 rounded-xl bg-white border-2 border-teal-200 dark:border-teal-700 shadow-sm">
                       <img
                         src={qrCodeDataURL}
                         alt="Profile QR Code"
@@ -750,7 +754,7 @@ export default function ProfilePage() {
                         <Button
                           onClick={handleDownloadQR}
                           variant="outline"
-                          className="border-2 border-purple-200 dark:border-purple-700 hover:bg-purple-50 dark:hover:bg-purple-900/20"
+                          className="border-2 border-teal-200 dark:border-teal-700 hover:bg-teal-50 dark:hover:bg-teal-900/20"
                         >
                           <QrCode className="w-4 h-4 mr-2" />
                           Download QR
@@ -758,7 +762,7 @@ export default function ProfilePage() {
                         <Button
                           onClick={handleOpenPreview}
                           variant="outline"
-                          className="border-2 border-purple-200 dark:border-purple-700 hover:bg-purple-50 dark:hover:bg-purple-900/20"
+                          className="border-2 border-teal-200 dark:border-teal-700 hover:bg-teal-50 dark:hover:bg-teal-900/20"
                         >
                           <Eye className="w-4 h-4 mr-2" />
                           Preview Card
@@ -766,7 +770,7 @@ export default function ProfilePage() {
                         <Button
                           onClick={() => window.open(`/share/profile/${profileCard.slug}`, '_blank')}
                           variant="outline"
-                          className="border-2 border-purple-200 dark:border-purple-700 hover:bg-purple-50 dark:hover:bg-purple-900/20"
+                          className="border-2 border-teal-200 dark:border-teal-700 hover:bg-teal-50 dark:hover:bg-teal-900/20"
                         >
                           <ExternalLink className="w-4 h-4 mr-2" />
                           Open in New Tab
@@ -780,6 +784,7 @@ export default function ProfilePage() {
           )}
         </CardContent>
       </Card>
+      </MotionFadeIn>
 
       {/* Invoices Section */}
       <Card>

@@ -24,6 +24,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
+import { MotionContainer, MotionItem, MotionFadeIn } from '@/components/ui/motion';
 import {
   Search,
   Users,
@@ -36,6 +37,7 @@ import {
   TrendingUp,
   Trophy,
 } from 'lucide-react';
+import { PageHeader } from '@/components/ui/page-header';
 import Link from 'next/link';
 import type { Profile, Ranking, Attendance } from '@/types';
 
@@ -199,80 +201,86 @@ export default function TeamPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Team Management</h1>
-          <p className="text-muted-foreground">
-            View and manage your assigned students
-          </p>
-        </div>
-        <div className="relative w-full sm:w-64">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Search students..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-      </div>
+      <PageHeader
+        icon={Users}
+        title="My Team"
+        description="View and manage your assigned students"
+        action={
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search students..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+        }
+      />
 
       {/* Stats Overview */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
-                <Users className="w-6 h-6 text-primary" />
+      <MotionContainer className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <MotionItem>
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                  <Users className="w-6 h-6 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Students</p>
+                  <p className="text-2xl font-bold">{teamMembers.length}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Total Students</p>
-                <p className="text-2xl font-bold">{teamMembers.length}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </MotionItem>
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-green-500/10 flex items-center justify-center">
-                <TrendingUp className="w-6 h-6 text-green-500" />
+        <MotionItem>
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-green-500/10 flex items-center justify-center">
+                  <TrendingUp className="w-6 h-6 text-green-500" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Avg Attendance</p>
+                  <p className="text-2xl font-bold">
+                    {teamMembers.length > 0
+                      ? Math.round(
+                          teamMembers.reduce((acc, m) => acc + (m.attendance_percentage || 0), 0) /
+                            teamMembers.length
+                        )
+                      : 0}
+                    %
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Avg Attendance</p>
-                <p className="text-2xl font-bold">
-                  {teamMembers.length > 0
-                    ? Math.round(
-                        teamMembers.reduce((acc, m) => acc + (m.attendance_percentage || 0), 0) /
-                          teamMembers.length
-                      )
-                    : 0}
-                  %
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </MotionItem>
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center">
-                <Trophy className="w-6 h-6 text-amber-500" />
+        <MotionItem>
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center">
+                  <Trophy className="w-6 h-6 text-amber-500" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Below 75% Attendance</p>
+                  <p className="text-2xl font-bold">
+                    {teamMembers.filter(m => (m.attendance_percentage || 0) < 75).length}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Below 75% Attendance</p>
-                <p className="text-2xl font-bold">
-                  {teamMembers.filter(m => (m.attendance_percentage || 0) < 75).length}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
+        </MotionItem>
+      </MotionContainer>
 
       {/* Team Table */}
+      <MotionFadeIn delay={0.1}>
       <Card>
         <CardHeader>
           <CardTitle>Team Members</CardTitle>
@@ -410,6 +418,7 @@ export default function TeamPage() {
           )}
         </CardContent>
       </Card>
+      </MotionFadeIn>
 
       {/* Low Attendance Alert */}
       {teamMembers.filter(m => (m.attendance_percentage || 0) < 75).length > 0 && (

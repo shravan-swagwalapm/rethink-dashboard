@@ -36,8 +36,10 @@ import {
   Download,
   Youtube,
 } from 'lucide-react';
+import { PageHeader } from '@/components/ui/page-header';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { MotionFadeIn } from '@/components/ui/motion';
 import { isYouTubeUrl, getYouTubeEmbedUrl, getYouTubeWatchUrl } from '@/lib/utils/youtube-url';
 import type { LearningModule, ModuleResource, ModuleResourceType, CaseStudy, CaseStudySolution, ResourceProgress, ResourceFavorite } from '@/types';
 
@@ -91,7 +93,7 @@ function getContentTypeLabel(type: ModuleResourceType): string {
 function getContentGradient(type: ModuleResourceType): { from: string; to: string; bg: string } {
   switch (type) {
     case 'video':
-      return { from: 'from-purple-500', to: 'to-purple-600', bg: 'bg-purple-500/10' };
+      return { from: 'from-teal-500', to: 'to-teal-600', bg: 'bg-teal-500/10' };
     case 'slides':
       return { from: 'from-orange-500', to: 'to-orange-600', bg: 'bg-orange-500/10' };
     case 'document':
@@ -968,14 +970,14 @@ export default function LearningsPage() {
 
     // Get border color based on section type
     const getBorderColor = () => {
-      if (iconColor === 'text-purple-500') return 'border-purple-500/20 hover:border-purple-500/40';
+      if (iconColor === 'text-teal-500') return 'border-teal-500/20 hover:border-teal-500/40';
       if (iconColor === 'text-orange-500') return 'border-orange-500/20 hover:border-orange-500/40';
       if (iconColor === 'text-blue-500') return 'border-blue-500/20 hover:border-blue-500/40';
       return 'border-gray-500/20 hover:border-gray-500/40';
     };
 
     const getGlowColor = () => {
-      if (iconColor === 'text-purple-500') return 'hover:shadow-purple-500/10';
+      if (iconColor === 'text-teal-500') return 'hover:shadow-teal-500/10';
       if (iconColor === 'text-orange-500') return 'hover:shadow-orange-500/10';
       if (iconColor === 'text-blue-500') return 'hover:shadow-blue-500/10';
       return 'hover:shadow-gray-500/10';
@@ -984,20 +986,20 @@ export default function LearningsPage() {
     return (
       <div className="space-y-4">
         {/* Section header */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4 px-4">
           <div className={cn(
-            "w-9 h-9 rounded-xl bg-gradient-to-br flex items-center justify-center shadow-md",
+            "w-11 h-11 rounded-xl bg-gradient-to-br flex items-center justify-center shadow-md",
             gradientFrom, gradientTo,
-            iconColor === 'text-purple-500' && "shadow-purple-500/20",
+            iconColor === 'text-teal-500' && "shadow-teal-500/20",
             iconColor === 'text-orange-500' && "shadow-orange-500/20",
             iconColor === 'text-blue-500' && "shadow-blue-500/20"
           )}>
-            <Icon className="w-5 h-5 text-white" />
+            <Icon className="w-6 h-6 text-white" />
           </div>
-          <h3 className="font-bold text-gray-900 dark:text-white text-lg">{title}</h3>
+          <h3 className="font-bold text-gray-900 dark:text-white text-xl">{title}</h3>
           <Badge variant="secondary" className={cn(
             "ml-auto border",
-            iconColor === 'text-purple-500' && "bg-purple-500/10 border-purple-500/20 text-purple-400",
+            iconColor === 'text-teal-500' && "bg-teal-500/10 border-teal-500/20 text-teal-400",
             iconColor === 'text-orange-500' && "bg-orange-500/10 border-orange-500/20 text-orange-400",
             iconColor === 'text-blue-500' && "bg-blue-500/10 border-blue-500/20 text-blue-400"
           )}>
@@ -1033,7 +1035,7 @@ export default function LearningsPage() {
                   <div className={cn(
                     "w-11 h-11 rounded-xl bg-gradient-to-br flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform duration-300",
                     gradientFrom, gradientTo,
-                    iconColor === 'text-purple-500' && "shadow-lg shadow-purple-500/25",
+                    iconColor === 'text-teal-500' && "shadow-lg shadow-teal-500/25",
                     iconColor === 'text-orange-500' && "shadow-lg shadow-orange-500/25",
                     iconColor === 'text-blue-500' && "shadow-lg shadow-blue-500/25"
                   )}>
@@ -1043,7 +1045,7 @@ export default function LearningsPage() {
                   {/* Content */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <p className="font-semibold text-gray-900 dark:text-white truncate group-hover:text-purple-500 dark:group-hover:text-purple-400 transition-colors">
+                      <p className="font-semibold text-gray-900 dark:text-white truncate group-hover:text-teal-500 dark:group-hover:text-teal-400 transition-colors">
                         {resource.title}
                       </p>
                       {isFavorite && (
@@ -1108,7 +1110,7 @@ export default function LearningsPage() {
                   </div>
 
                   {/* Chevron */}
-                  <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-purple-500 group-hover:translate-x-1 transition-all flex-shrink-0" />
+                  <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-teal-500 group-hover:translate-x-1 transition-all flex-shrink-0" />
                 </button>
               );
             })}
@@ -1126,11 +1128,11 @@ export default function LearningsPage() {
     return (
       <div className="space-y-4">
         {/* Section header */}
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
-            <FileQuestion className="w-5 h-5 text-white" />
+        <div className="flex items-center gap-4 px-4">
+          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+            <FileQuestion className="w-6 h-6 text-white" />
           </div>
-          <h3 className="font-bold text-gray-900 dark:text-white text-lg">Case Studies</h3>
+          <h3 className="font-bold text-gray-900 dark:text-white text-xl">Case Studies</h3>
           <Badge variant="secondary" className="ml-auto bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
             {filtered.length} {filtered.length === 1 ? 'study' : 'studies'}
           </Badge>
@@ -1240,36 +1242,35 @@ export default function LearningsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">My Learnings</h1>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Access your course materials, recordings, and presentations
-          </p>
-        </div>
-        <div className="relative w-full sm:w-80">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <Input
-            placeholder="Search all weeks..."
-            value={searchQuery}
-            onChange={handleSearchChange}
-            className="pl-11 h-11 bg-white dark:bg-gray-900/80 border-2 border-gray-200 dark:border-gray-800 rounded-xl focus:border-purple-500 dark:focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => {
-                setSearchQuery('');
-                setIsSearching(false);
-                setSearchResults([]);
-                setActiveFilter('all');
-              }}
-              className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-            >
-              <span className="text-xs text-gray-600 dark:text-gray-300">×</span>
-            </button>
-          )}
-        </div>
-      </div>
+      <PageHeader
+        icon={BookOpen}
+        title="Learnings"
+        description="Access your course modules and track progress"
+        action={
+          <div className="relative w-full sm:w-80">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Input
+              placeholder="Search all weeks..."
+              value={searchQuery}
+              onChange={handleSearchChange}
+              className="pl-11 h-11 bg-white dark:bg-gray-900/80 border-2 border-gray-200 dark:border-gray-800 rounded-xl focus:border-teal-500 dark:focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 transition-all"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => {
+                  setSearchQuery('');
+                  setIsSearching(false);
+                  setSearchResults([]);
+                  setActiveFilter('all');
+                }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+              >
+                <span className="text-xs text-gray-600 dark:text-gray-300">×</span>
+              </button>
+            )}
+          </div>
+        }
+      />
 
       {/* Filter Chips - visible when searching */}
       {isSearching && searchQuery && (
@@ -1288,8 +1289,8 @@ export default function LearningsPage() {
               className={cn(
                 "px-3 py-1.5 rounded-lg text-sm font-medium transition-all border-2",
                 activeFilter === filter.value
-                  ? "bg-purple-500 text-white border-purple-500 shadow-lg shadow-purple-500/25"
-                  : "bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-800 hover:border-purple-500/50"
+                  ? "bg-teal-500 text-white border-teal-500 shadow-lg shadow-teal-500/25"
+                  : "bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-800 hover:border-teal-500/50"
               )}
             >
               {filter.label}
@@ -1309,7 +1310,7 @@ export default function LearningsPage() {
       {weeks.length === 0 ? (
         <div className="rounded-2xl border-2 border-dashed border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50 py-20">
           <div className="flex flex-col items-center justify-center">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center mb-4 shadow-lg shadow-purple-500/25">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-teal-500 to-teal-600 flex items-center justify-center mb-4 shadow-lg shadow-teal-500/25">
               <BookOpen className="w-8 h-8 text-white" />
             </div>
             <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">No content yet</h3>
@@ -1322,12 +1323,12 @@ export default function LearningsPage() {
         <div className="space-y-6">
           {/* Continue Where You Left Off - Shows actual assets */}
           {recentActivity.length > 0 && (
-            <div className="relative rounded-2xl border border-purple-500/30 dark:border-purple-500/20 bg-gradient-to-br from-gray-900/50 to-gray-950 p-[1px] shadow-lg shadow-purple-500/5">
+            <div className="relative rounded-2xl border border-teal-500/30 dark:border-teal-500/20 bg-gradient-to-br from-gray-900/50 to-gray-950 p-[1px] shadow-lg shadow-teal-500/5">
               <div className="rounded-2xl bg-gradient-to-br from-gray-50 to-white dark:from-gray-900 dark:to-gray-950 overflow-hidden">
                 {/* Header */}
-                <div className="px-6 py-4 border-b border-gray-200/50 dark:border-gray-800/50 bg-gradient-to-r from-purple-500/5 to-transparent">
+                <div className="px-6 py-4 border-b border-gray-200/50 dark:border-gray-800/50 bg-gradient-to-r from-teal-500/5 to-transparent">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-lg shadow-purple-500/25">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-teal-600 flex items-center justify-center shadow-lg shadow-teal-500/25">
                       <Clock className="w-5 h-5 text-white" />
                     </div>
                     <div>
@@ -1355,7 +1356,7 @@ export default function LearningsPage() {
                           className={cn(
                             "relative p-4 rounded-xl text-left transition-all duration-300 group",
                             "border-2 bg-white dark:bg-gray-900/80 backdrop-blur-sm",
-                            resource.content_type === 'video' && "border-purple-500/20 hover:border-purple-500/50 hover:shadow-lg hover:shadow-purple-500/10",
+                            resource.content_type === 'video' && "border-teal-500/20 hover:border-teal-500/50 hover:shadow-lg hover:shadow-teal-500/10",
                             resource.content_type === 'slides' && "border-orange-500/20 hover:border-orange-500/50 hover:shadow-lg hover:shadow-orange-500/10",
                             resource.content_type === 'document' && "border-blue-500/20 hover:border-blue-500/50 hover:shadow-lg hover:shadow-blue-500/10",
                             !['video', 'slides', 'document'].includes(resource.content_type) && "border-gray-500/20 hover:border-gray-500/50",
@@ -1365,7 +1366,7 @@ export default function LearningsPage() {
                           {/* Content type badge - top left */}
                           <div className={cn(
                             "absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border",
-                            resource.content_type === 'video' && "bg-purple-500/10 border-purple-500/30 text-purple-400",
+                            resource.content_type === 'video' && "bg-teal-500/10 border-teal-500/30 text-teal-400",
                             resource.content_type === 'slides' && "bg-orange-500/10 border-orange-500/30 text-orange-400",
                             resource.content_type === 'document' && "bg-blue-500/10 border-blue-500/30 text-blue-400",
                             !['video', 'slides', 'document'].includes(resource.content_type) && "bg-gray-500/10 border-gray-500/30 text-gray-400"
@@ -1386,14 +1387,14 @@ export default function LearningsPage() {
                               <div className={cn(
                                 "w-12 h-12 rounded-xl bg-gradient-to-br flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform duration-300",
                                 gradient.from, gradient.to,
-                                resource.content_type === 'video' && "shadow-lg shadow-purple-500/30",
+                                resource.content_type === 'video' && "shadow-lg shadow-teal-500/30",
                                 resource.content_type === 'slides' && "shadow-lg shadow-orange-500/30",
                                 resource.content_type === 'document' && "shadow-lg shadow-blue-500/30"
                               )}>
                                 {getContentIcon(resource.content_type, 'w-6 h-6 text-white')}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className="font-semibold text-gray-900 dark:text-white text-sm line-clamp-2 leading-tight group-hover:text-purple-500 dark:group-hover:text-purple-400 transition-colors">
+                                <p className="font-semibold text-gray-900 dark:text-white text-sm line-clamp-2 leading-tight group-hover:text-teal-500 dark:group-hover:text-teal-400 transition-colors">
                                   {resource.title}
                                 </p>
                                 {/* Duration / metadata */}
@@ -1427,7 +1428,7 @@ export default function LearningsPage() {
                                   <div
                                     className={cn(
                                       "h-full rounded-full transition-all duration-500",
-                                      resource.content_type === 'video' && "bg-gradient-to-r from-purple-500 to-purple-400",
+                                      resource.content_type === 'video' && "bg-gradient-to-r from-teal-500 to-teal-400",
                                       resource.content_type === 'slides' && "bg-gradient-to-r from-orange-500 to-orange-400",
                                       resource.content_type === 'document' && "bg-gradient-to-r from-blue-500 to-blue-400",
                                       !['video', 'slides', 'document'].includes(resource.content_type) && "bg-gray-500"
@@ -1443,7 +1444,7 @@ export default function LearningsPage() {
                               <span className="text-xs text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-400 transition-colors">
                                 Click to {resource.content_type === 'video' ? 'watch' : resource.content_type === 'slides' ? 'view slides' : 'open'}
                               </span>
-                              <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-purple-500 group-hover:translate-x-1 transition-all" />
+                              <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-teal-500 group-hover:translate-x-1 transition-all" />
                             </div>
                           </div>
                         </button>
@@ -1467,7 +1468,7 @@ export default function LearningsPage() {
                     <>
                       Found <span className="font-semibold text-gray-900 dark:text-white">{filteredSearchResults.length}</span> {filteredSearchResults.length === 1 ? 'result' : 'results'}
                       {activeFilter !== 'all' && (
-                        <> in <span className="font-semibold text-purple-500">{activeFilter === 'video' ? 'Recordings' : activeFilter === 'slides' ? 'Presentations' : activeFilter === 'document' ? 'Notes' : 'Case Studies'}</span></>
+                        <> in <span className="font-semibold text-teal-500">{activeFilter === 'video' ? 'Recordings' : activeFilter === 'slides' ? 'Presentations' : activeFilter === 'document' ? 'Notes' : 'Case Studies'}</span></>
                       )}
                     </>
                   )}
@@ -1480,7 +1481,7 @@ export default function LearningsPage() {
                       setSearchResults([]);
                       setActiveFilter('all');
                     }}
-                    className="text-sm text-purple-500 hover:text-purple-600 font-medium"
+                    className="text-sm text-teal-500 hover:text-teal-600 font-medium"
                   >
                     Clear search
                   </button>
@@ -1509,7 +1510,7 @@ export default function LearningsPage() {
                       <div key={weekNum} className="space-y-3">
                         {/* Week header */}
                         <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-md shadow-purple-500/20">
+                          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-teal-500 to-teal-600 flex items-center justify-center shadow-md shadow-teal-500/20">
                             <span className="text-xs font-bold text-white">{weekNum}</span>
                           </div>
                           <h3 className="font-semibold text-gray-900 dark:text-white">Week {weekNum}</h3>
@@ -1528,9 +1529,9 @@ export default function LearningsPage() {
                                   return {
                                     label: 'Recording',
                                     icon: <Video className="w-4 h-4" />,
-                                    colors: 'bg-purple-500/10 border-purple-500/30 text-purple-500',
-                                    borderHover: 'hover:border-purple-500/50',
-                                    shadowHover: 'hover:shadow-purple-500/10',
+                                    colors: 'bg-teal-500/10 border-teal-500/30 text-teal-500',
+                                    borderHover: 'hover:border-teal-500/50',
+                                    shadowHover: 'hover:shadow-teal-500/10',
                                   };
                                 case 'slides':
                                   return {
@@ -1594,7 +1595,7 @@ export default function LearningsPage() {
 
                                 {/* Content */}
                                 <div className="flex-1 min-w-0">
-                                  <p className="font-semibold text-gray-900 dark:text-white truncate group-hover:text-purple-500 dark:group-hover:text-purple-400 transition-colors">
+                                  <p className="font-semibold text-gray-900 dark:text-white truncate group-hover:text-teal-500 dark:group-hover:text-teal-400 transition-colors">
                                     {result.title}
                                   </p>
                                   <div className="flex items-center gap-2 mt-0.5">
@@ -1612,7 +1613,7 @@ export default function LearningsPage() {
                                 </div>
 
                                 {/* Chevron */}
-                                <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-purple-500 group-hover:translate-x-1 transition-all flex-shrink-0" />
+                                <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-teal-500 group-hover:translate-x-1 transition-all flex-shrink-0" />
                               </button>
                             );
                           })}
@@ -1626,6 +1627,7 @@ export default function LearningsPage() {
 
           {/* Week Tabs with Progress - only shown when NOT searching */}
           {!isSearching && (
+          <MotionFadeIn delay={0.1}>
           <Tabs value={activeWeek} onValueChange={setActiveWeek}>
             <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50 p-1.5 overflow-hidden">
               <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700 scrollbar-track-transparent">
@@ -1640,7 +1642,7 @@ export default function LearningsPage() {
                         value={week.toString()}
                         className={cn(
                           "relative px-4 py-2.5 rounded-lg bg-transparent whitespace-nowrap",
-                          "data-[state=active]:bg-gradient-to-br data-[state=active]:from-purple-500 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-purple-500/25",
+                          "data-[state=active]:bg-gradient-to-br data-[state=active]:from-teal-500 data-[state=active]:to-teal-600 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-teal-500/25",
                           "hover:bg-gray-100 dark:hover:bg-gray-800",
                           "transition-all duration-200"
                         )}
@@ -1654,7 +1656,9 @@ export default function LearningsPage() {
                                 "text-xs px-1.5 py-0 h-5 border",
                                 isComplete
                                   ? "bg-green-500/20 border-green-500/30 text-green-400"
-                                  : "bg-gray-500/10 border-gray-500/20 text-gray-400 dark:text-gray-500"
+                                  : activeWeek === week.toString()
+                                    ? "bg-teal-900/60 border-teal-800/50 text-white"
+                                    : "bg-gray-500/10 border-gray-500/20 text-gray-400 dark:text-gray-500"
                               )}
                             >
                               {isComplete ? (
@@ -1692,15 +1696,15 @@ export default function LearningsPage() {
                       )}
                     </div>
                     {progress && progress.total > 0 && (
-                      <div className="flex items-center gap-4 px-4 py-3 rounded-xl bg-white dark:bg-gray-900/80 border-2 border-purple-500/20 shadow-sm min-w-[200px]">
+                      <div className="flex items-center gap-4 px-4 py-3 rounded-xl bg-white dark:bg-gray-900/80 border-2 border-teal-500/20 shadow-sm min-w-[200px]">
                         <div className="flex-1 space-y-2">
                           <div className="flex items-center justify-between text-xs">
                             <span className="text-gray-500 dark:text-gray-400 font-medium">Progress</span>
-                            <span className="font-bold text-purple-600 dark:text-purple-400">{progressPercent}%</span>
+                            <span className="font-bold text-teal-600 dark:text-teal-400">{progressPercent}%</span>
                           </div>
                           <div className="w-full h-2 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
                             <div
-                              className="h-full bg-gradient-to-r from-purple-500 to-purple-400 rounded-full transition-all duration-500"
+                              className="h-full bg-gradient-to-r from-teal-500 to-teal-400 rounded-full transition-all duration-500"
                               style={{ width: `${progressPercent}%` }}
                             />
                           </div>
@@ -1717,11 +1721,11 @@ export default function LearningsPage() {
                     <ContentSection
                       title="Recordings"
                       icon={Video}
-                      iconColor="text-purple-500"
+                      iconColor="text-teal-500"
                       resources={content.recordings}
                       emptyMessage="No recordings available"
-                      gradientFrom="from-purple-500"
-                      gradientTo="to-purple-600"
+                      gradientFrom="from-teal-500"
+                      gradientTo="to-teal-600"
                     />
 
                     <ContentSection
@@ -1765,6 +1769,7 @@ export default function LearningsPage() {
               );
             })}
           </Tabs>
+          </MotionFadeIn>
           )}
         </div>
       )}
@@ -1776,7 +1781,7 @@ export default function LearningsPage() {
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1 space-y-2">
                 <DialogTitle className="flex items-center gap-3 text-xl text-gray-900 dark:text-gray-100">
-                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-md">
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-teal-500 to-teal-600 flex items-center justify-center shadow-md">
                     {selectedResource && getContentIcon(selectedResource.content_type, 'w-5 h-5 text-white')}
                   </div>
                   {selectedResource?.title}
@@ -1790,7 +1795,7 @@ export default function LearningsPage() {
                     </Badge>
                   )}
                   {selectedResource?.duration_seconds && (
-                    <Badge className="bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">
+                    <Badge className="bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300">
                       <Clock className="w-3 h-3 mr-1" />
                       {formatDuration(selectedResource.duration_seconds)}
                     </Badge>
@@ -1889,7 +1894,7 @@ export default function LearningsPage() {
                 {(iframeLoading || pdfLoading) && !iframeError && (
                   <div className="absolute inset-0 flex items-center justify-center bg-gray-900 rounded-lg z-10">
                     <div className="flex flex-col items-center gap-4 p-6 text-center">
-                      <Loader2 className="w-10 h-10 animate-spin text-purple-500" />
+                      <Loader2 className="w-10 h-10 animate-spin text-teal-500" />
                       <div>
                         <p className="text-sm text-gray-300 mb-1">
                           {pdfLoading
@@ -1914,7 +1919,7 @@ export default function LearningsPage() {
                           }}
                           variant="outline"
                           size="sm"
-                          className="gap-2 border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
+                          className="gap-2 border-teal-500/30 text-teal-400 hover:bg-teal-500/10"
                         >
                           <Youtube className="w-4 h-4" />
                           {isYouTubeUrl((selectedResource as ModuleResource).external_url || '')
@@ -1926,9 +1931,9 @@ export default function LearningsPage() {
                   </div>
                 )}
                 {iframeError && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-gray-900/95 rounded-lg border-2 border-purple-500/30 z-10">
+                  <div className="absolute inset-0 flex items-center justify-center bg-gray-900/95 rounded-lg border-2 border-teal-500/30 z-10">
                     <div className="flex flex-col items-center gap-4 p-6 max-w-lg text-center">
-                      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-lg shadow-purple-500/25">
+                      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-teal-500 to-teal-600 flex items-center justify-center shadow-lg shadow-teal-500/25">
                         {selectedResource.content_type === 'video' ? (
                           <Video className="w-8 h-8 text-white" />
                         ) : (
@@ -1957,7 +1962,7 @@ export default function LearningsPage() {
                               const url = getDirectViewUrl(selectedResource as ModuleResource);
                               window.open(url, '_blank');
                             }}
-                            className="gap-2 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
+                            className="gap-2 bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700"
                           >
                             <Youtube className="w-4 h-4" />
                             {isYouTubeUrl((selectedResource as ModuleResource).external_url || '')
@@ -1967,7 +1972,7 @@ export default function LearningsPage() {
                         ) : hasUploadedFile(selectedResource as ModuleResource) && pdfSignedUrl ? (
                           <Button
                             onClick={() => window.open(pdfSignedUrl, '_blank')}
-                            className="gap-2 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
+                            className="gap-2 bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700"
                           >
                             <ExternalLink className="w-4 h-4" />
                             Open in New Tab
@@ -1978,7 +1983,7 @@ export default function LearningsPage() {
                               const url = getDirectViewUrl(selectedResource as ModuleResource);
                               window.open(url, '_blank');
                             }}
-                            className="gap-2 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
+                            className="gap-2 bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700"
                           >
                             <ExternalLink className="w-4 h-4" />
                             Open in Google Drive
@@ -2060,11 +2065,11 @@ export default function LearningsPage() {
                         }}
                         className={cn(
                           "w-full p-3 rounded-lg border text-left hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors",
-                          selectedResource?.id === resource.id && "bg-purple-50 dark:bg-purple-950/20 border-purple-500"
+                          selectedResource?.id === resource.id && "bg-teal-50 dark:bg-teal-950/20 border-teal-500"
                         )}
                       >
                         <div className="flex items-center gap-2 mb-1">
-                          {getContentIcon(resource.content_type, 'w-4 h-4 text-purple-500')}
+                          {getContentIcon(resource.content_type, 'w-4 h-4 text-teal-500')}
                           <p className="font-medium text-sm line-clamp-1 text-gray-900 dark:text-gray-100">{resource.title}</p>
                         </div>
                         {resource.duration_seconds && (

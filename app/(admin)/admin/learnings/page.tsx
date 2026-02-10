@@ -41,6 +41,8 @@ import { CaseStudyFormDialog } from './components/case-study-form-dialog';
 import type { CaseStudyFormData, PendingSolution } from './components/case-study-form-dialog';
 import { ResourceSection } from './components/resource-section';
 import { CaseStudySection } from './components/case-study-section';
+import { MotionContainer, MotionItem, MotionFadeIn } from '@/components/ui/motion';
+import { PageHeader } from '@/components/ui/page-header';
 
 export default function LearningsPage() {
   const [modules, setModules] = useState<LearningModuleWithResources[]>([]);
@@ -454,28 +456,14 @@ export default function LearningsPage() {
   return (
     <div className="space-y-8 max-w-7xl mx-auto p-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 pb-6 border-b border-border">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            {selectedCohort === GLOBAL_LIBRARY_ID ? (
-              <span className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-purple-500/10 dark:bg-purple-500/20 flex items-center justify-center">
-                  <Globe className="w-6 h-6 text-purple-600 dark:text-purple-400" />
-                </div>
-                <span className="dark:text-white">Global Library</span>
-              </span>
-            ) : (
-              <span className="dark:text-white">Learning Content</span>
-            )}
-          </h1>
-          <p className="text-base text-gray-600 dark:text-gray-300 mt-2">
-            {selectedCohort === GLOBAL_LIBRARY_ID
-              ? 'Create modules accessible to all cohorts'
-              : 'Manage recordings, presentations, notes, and case studies'
-            }
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
+      <PageHeader
+        icon={BookOpen}
+        title={selectedCohort === GLOBAL_LIBRARY_ID ? 'Global Library' : 'Learning Modules'}
+        description={selectedCohort === GLOBAL_LIBRARY_ID
+          ? 'Create modules accessible to all cohorts'
+          : 'Create and manage course content'
+        }
+        action={
           <Select value={selectedCohort} onValueChange={(value) => { setSelectedCohort(value); setSelectedWeek(''); }}>
             <SelectTrigger className="w-[220px] h-11 font-medium border-2 dark:border-gray-700 dark:bg-gray-900 dark:text-white">
               <SelectValue placeholder="Select cohort" />
@@ -497,9 +485,10 @@ export default function LearningsPage() {
               ))}
             </SelectContent>
           </Select>
-        </div>
-      </div>
+        }
+      />
 
+      <MotionFadeIn delay={0.1}>
       {/* Link Status Alert */}
       {cohortStats && cohortStats.active_source !== 'own' && (
         <Alert className="border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 animate-in fade-in slide-in-from-top-2 duration-300">
@@ -686,6 +675,7 @@ export default function LearningsPage() {
           />
         </div>
       )}
+      </MotionFadeIn>
 
       {/* Module/Week Form Dialog */}
       <ModuleFormDialog

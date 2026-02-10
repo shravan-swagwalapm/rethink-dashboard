@@ -33,9 +33,11 @@ import {
   CheckCircle,
   AlertCircle,
   RefreshCw,
+  Upload,
 } from 'lucide-react';
 import { format, subDays, parseISO } from 'date-fns';
 import type { Session, Cohort } from '@/types';
+import { PageHeader } from '@/components/ui/page-header';
 
 interface ZoomMeeting {
   id: number;
@@ -192,12 +194,11 @@ export default function ImportPage() {
   if (!zoomConfigured) {
     return (
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">Import Attendance from Zoom</h1>
-          <p className="text-muted-foreground">
-            Import historical attendance data from past Zoom meetings
-          </p>
-        </div>
+        <PageHeader
+          icon={Upload}
+          title="Import Attendance"
+          description="Bulk import attendance records"
+        />
 
         <Card>
           <CardContent className="py-12">
@@ -224,13 +225,11 @@ export default function ImportPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold">Import Attendance from Zoom</h1>
-        <p className="text-muted-foreground">
-          Import historical attendance data from past Zoom meetings
-        </p>
-      </div>
+      <PageHeader
+        icon={Upload}
+        title="Import Attendance"
+        description="Bulk import attendance records"
+      />
 
       {/* Date Range Selector */}
       <Card>
