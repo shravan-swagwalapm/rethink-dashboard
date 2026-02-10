@@ -209,7 +209,6 @@ export default function DashboardPage() {
         if (activeCohortId) {
           const [
             cohortResult,
-            studentsCountResult,
             attendanceResult,
             rankingResult,
             resourcesCountResult,
@@ -226,10 +225,6 @@ export default function DashboardPage() {
               .select('*')
               .eq('id', activeCohortId)
               .single(),
-            // Fetch cohort student count via API (bypasses RLS)
-            fetch(`/api/analytics?view=leaderboard&cohort_id=${activeCohortId}`)
-              .then(r => r.ok ? r.json() : { leaderboard: [] })
-              .catch(() => ({ leaderboard: [] })),
             // Fetch attendance
             supabase
               .from('attendance')
@@ -296,7 +291,7 @@ export default function DashboardPage() {
 
           // Set stats
           setStats({
-            total_students: studentsCountResult.leaderboard?.length || 0,
+            total_students: leaderboardResult.totalStudents ?? leaderboardResult.leaderboard?.length ?? 0,
             attendance_percentage: Math.round(avgAttendance),
             current_rank: rankingResult.data?.rank || null,
             total_resources: resourcesCountResult.count || 0,

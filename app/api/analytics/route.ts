@@ -289,6 +289,27 @@ async function getMentorTeamAttendance(supabase: any, cohortId: string | null) {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function getLeaderboard(supabase: any, _currentUserId: string, cohortId: string) {
+  // Always count students first — check both role_assignments and legacy profiles
+  const [{ data: raStudents }, { data: profileStudents }] = await Promise.all([
+    supabase
+      .from('user_role_assignments')
+      .select('user_id')
+      .eq('role', 'student')
+      .eq('cohort_id', cohortId),
+    supabase
+      .from('profiles')
+      .select('id')
+      .eq('role', 'student')
+      .eq('cohort_id', cohortId),
+  ]);
+
+  const allStudentIds = new Set([
+    ...(raStudents?.map((r: { user_id: string }) => r.user_id) ?? []),
+    ...(profileStudents?.map((r: { id: string }) => r.id) ?? []),
+  ]);
+  const totalStudents = allStudentIds.size;
+  const studentIds = Array.from(allStudentIds);
+
   // Get countable sessions for this cohort
   const { data: sessions } = await supabase
     .from('sessions')
@@ -299,22 +320,13 @@ async function getLeaderboard(supabase: any, _currentUserId: string, cohortId: s
     .order('scheduled_at', { ascending: true });
 
   if (!sessions || sessions.length === 0) {
-    return NextResponse.json({ leaderboard: [], sessions: [], cohortAvg: 0 });
+    return NextResponse.json({ leaderboard: [], sessions: [], cohortAvg: 0, totalStudents });
   }
 
   const sessionIds = sessions.map((s: { id: string }) => s.id);
 
-  // Get all students in this cohort
-  const { data: studentAssignments } = await supabase
-    .from('user_role_assignments')
-    .select('user_id')
-    .eq('role', 'student')
-    .eq('cohort_id', cohortId);
-
-  const studentIds = (studentAssignments || []).map((s: { user_id: string }) => s.user_id);
-
   if (studentIds.length === 0) {
-    return NextResponse.json({ leaderboard: [], sessions, cohortAvg: 0 });
+    return NextResponse.json({ leaderboard: [], sessions, cohortAvg: 0, totalStudents });
   }
 
   // Get profiles for names/avatars
@@ -386,5 +398,5 @@ async function getLeaderboard(supabase: any, _currentUserId: string, cohortId: s
     date: s.scheduled_at,
   }));
 
-  return NextResponse.json({ leaderboard, sessions: sessionList, cohortAvg });
+  return NextResponse.json({ leaderboard, sessions: sessionList, cohortAvg, totalStudents });
 }
