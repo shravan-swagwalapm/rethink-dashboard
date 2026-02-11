@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
 import { googleCalendar, CalendarEvent } from '@/lib/integrations/google-calendar';
 import { verifyAdmin } from '@/lib/api/verify-admin';
+import { toCalendarLocalTime } from '@/lib/utils/timezone';
 
 interface TokenResult {
   accessToken: string | null;
@@ -182,11 +183,11 @@ export async function POST(request: NextRequest) {
       summary: session.title,
       description,
       start: {
-        dateTime: startTime.toISOString(),
+        dateTime: toCalendarLocalTime(session.scheduled_at),
         timeZone: 'Asia/Kolkata',
       },
       end: {
-        dateTime: endTime.toISOString(),
+        dateTime: toCalendarLocalTime(endTime.toISOString()),
         timeZone: 'Asia/Kolkata',
       },
     };
@@ -274,11 +275,11 @@ export async function PUT(request: NextRequest) {
       summary: session.title,
       description,
       start: {
-        dateTime: startTime.toISOString(),
+        dateTime: toCalendarLocalTime(session.scheduled_at),
         timeZone: 'Asia/Kolkata',
       },
       end: {
-        dateTime: endTime.toISOString(),
+        dateTime: toCalendarLocalTime(endTime.toISOString()),
         timeZone: 'Asia/Kolkata',
       },
     });

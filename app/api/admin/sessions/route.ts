@@ -4,6 +4,7 @@ import { zoomService } from '@/lib/integrations/zoom';
 import { googleCalendar } from '@/lib/integrations/google-calendar';
 import { verifyAdmin } from '@/lib/api/verify-admin';
 import { getValidCalendarToken } from '@/lib/services/calendar-helpers';
+import { toCalendarLocalTime } from '@/lib/utils/timezone';
 
 // GET - Fetch sessions and cohorts
 export async function GET() {
@@ -259,8 +260,8 @@ export async function POST(request: NextRequest) {
               {
                 summary: title.trim(),
                 description: eventDescription,
-                start: { dateTime: startTime.toISOString(), timeZone: 'Asia/Kolkata' },
-                end: { dateTime: endTime.toISOString(), timeZone: 'Asia/Kolkata' },
+                start: { dateTime: toCalendarLocalTime(scheduled_at), timeZone: 'Asia/Kolkata' },
+                end: { dateTime: toCalendarLocalTime(endTime.toISOString()), timeZone: 'Asia/Kolkata' },
               },
               attendeeEmails
             );
@@ -382,8 +383,8 @@ export async function PUT(request: NextRequest) {
           await googleCalendar.updateEvent(accessToken, existingSession.calendar_event_id, {
             summary: title?.trim(),
             description: eventDescription,
-            start: { dateTime: startTime.toISOString(), timeZone: 'Asia/Kolkata' },
-            end: { dateTime: endTime.toISOString(), timeZone: 'Asia/Kolkata' },
+            start: { dateTime: toCalendarLocalTime(scheduled_at), timeZone: 'Asia/Kolkata' },
+            end: { dateTime: toCalendarLocalTime(endTime.toISOString()), timeZone: 'Asia/Kolkata' },
           });
         } catch (calendarError) {
           console.error('Failed to update calendar event:', calendarError);

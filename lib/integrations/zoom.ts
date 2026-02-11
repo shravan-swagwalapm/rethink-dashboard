@@ -4,6 +4,7 @@
  */
 
 import crypto from 'crypto';
+import { toZoomLocalTime } from '@/lib/utils/timezone';
 
 // Environment variables for Server-to-Server OAuth
 const ZOOM_ACCOUNT_ID = process.env.ZOOM_ACCOUNT_ID || '';
@@ -146,6 +147,7 @@ export class ZoomService {
     agenda?: string;
   }): Promise<ZoomMeeting> {
     const token = await this.getAccessToken();
+    const timezone = options.timezone || 'Asia/Kolkata';
 
     const response = await fetch('https://api.zoom.us/v2/users/me/meetings', {
       method: 'POST',
@@ -156,9 +158,9 @@ export class ZoomService {
       body: JSON.stringify({
         topic: options.topic,
         type: 2, // Scheduled meeting
-        start_time: options.startTime,
+        start_time: toZoomLocalTime(options.startTime, timezone),
         duration: options.duration,
-        timezone: options.timezone || 'Asia/Kolkata',
+        timezone,
         agenda: options.agenda || '',
         settings: {
           host_video: true,
@@ -194,7 +196,10 @@ export class ZoomService {
 
     const body: Record<string, unknown> = {};
     if (options.topic) body.topic = options.topic;
-    if (options.startTime) body.start_time = options.startTime;
+    if (options.startTime) {
+      body.start_time = toZoomLocalTime(options.startTime, 'Asia/Kolkata');
+      body.timezone = 'Asia/Kolkata';
+    }
     if (options.duration) body.duration = options.duration;
     if (options.agenda) body.agenda = options.agenda;
     // Preserve meeting settings on update (matches createMeeting settings)
