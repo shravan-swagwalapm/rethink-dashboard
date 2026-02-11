@@ -63,57 +63,15 @@ export default function TeamPage() {
       const supabase = getClient();
 
       try {
-        let members: Profile[] = [];
+        // Fetch team members via server-side API (uses adminClient, bypasses RLS)
+        const view = (isMentor && !isAdmin) ? 'mentor' : 'admin';
+        const params = new URLSearchParams({ view });
+        if (activeCohortId) params.set('cohort_id', activeCohortId);
 
-        if (isMentor && !isAdmin) {
-          // Fetch students from mentor's subgroups via API (uses admin client, bypasses RLS)
-          const subgroupRes = await fetch('/api/subgroups/mentor-subgroups');
-          const subgroupData = await subgroupRes.json();
-
-          // Extract unique student IDs from all subgroups
-          const studentIds = new Set<string>();
-          for (const sg of subgroupData.data || []) {
-            for (const m of sg.members || []) {
-              studentIds.add(m.user_id);
-            }
-          }
-
-          if (studentIds.size > 0) {
-            const { data, error } = await supabase
-              .from('profiles')
-              .select('*')
-              .in('id', Array.from(studentIds))
-              .order('full_name', { ascending: true });
-            if (error) throw error;
-            members = data || [];
-          }
-        } else {
-          // Admin: show all students in the active cohort (or all if no cohort)
-          if (activeCohortId) {
-            const res = await fetch(`/api/admin/cohorts/${activeCohortId}/students`).catch(() => null);
-            if (res?.ok) {
-              const data = await res.json();
-              members = data || [];
-            } else {
-              // Fallback: query profiles directly
-              const { data, error } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('role', 'student')
-                .order('full_name', { ascending: true });
-              if (error) throw error;
-              members = data || [];
-            }
-          } else {
-            const { data, error } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('role', 'student')
-              .order('full_name', { ascending: true });
-            if (error) throw error;
-            members = data || [];
-          }
-        }
+        const res = await fetch(`/api/team/members?${params}`);
+        if (!res.ok) throw new Error('Failed to fetch team members');
+        const { members: fetchedMembers } = await res.json();
+        const members: Profile[] = fetchedMembers || [];
 
         // Fetch rankings for all members
         const memberIds = members?.map((m: Profile) => m.id) || [];

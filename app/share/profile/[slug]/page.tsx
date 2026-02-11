@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { Mail, Phone, Globe, Linkedin, MapPin, Sparkles } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Metadata } from 'next';
@@ -27,7 +27,9 @@ export async function generateMetadata({ params }: PublicProfilePageProps): Prom
     };
   }
 
-  const { data: profile } = await supabase
+  // Use adminClient to bypass RLS — profile_cards lookup already validated the slug
+  const adminClient = await createAdminClient();
+  const { data: profile } = await adminClient
     .from('profiles')
     .select('full_name')
     .eq('id', card.user_id)
@@ -55,8 +57,9 @@ export default async function PublicProfilePage({ params }: PublicProfilePagePro
     notFound();
   }
 
-  // Fetch user profile
-  const { data: profile, error: profileError } = await supabase
+  // Fetch user profile — use adminClient to bypass RLS (user_id is trusted DB data from profile_cards)
+  const adminClient = await createAdminClient();
+  const { data: profile, error: profileError } = await adminClient
     .from('profiles')
     .select('*')
     .eq('id', card.user_id)

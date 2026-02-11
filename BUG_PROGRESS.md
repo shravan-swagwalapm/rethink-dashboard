@@ -655,3 +655,175 @@ useEffect(() => {
 
 **Deployment Status**: All changes deployed to production ✅
 **Hard Refresh Required**: Yes (Cmd+Shift+R on Mac, Ctrl+Shift+R on Windows)
+
+---
+
+## Session 5: Visual Redesign — World-Class 2026 Dark Dashboard (2026-02-11)
+
+### What Was Done
+
+Implemented a comprehensive **"Linear meets Vercel"** visual redesign across the entire dashboard and admin panel. The plan had 11 tasks across 6 layers, executed with parallel Opus subagents and build gates.
+
+### Layer 0: Design Token Overhaul (`globals.css`)
+- Added multi-layer **Josh Comeau-style shadows** (xs through xl) using navy hue `hsl(228deg)`
+- Added **teal glow shadows** (`--shadow-glow-teal`, `--shadow-glow-teal-sm`, `--shadow-glow-teal-intense`)
+- Added **border glow tokens** (`--border-glow`, `--border-glow-hover`)
+- Added **surface inset highlights** (`--shadow-card-inset`, `--shadow-button-inset`)
+- Created 15+ new utility classes: `card-inner-glow`, `btn-shine`, `table-row-accent`, `icon-container` (5 color variants), `divider-gradient`, `dot-pattern`, `section-elevated`, `section-recessed`, `glass-surface`
+
+### Layer 1: Surface Components
+- **Card**: Added `lit-surface card-inner-glow` with hover shadow elevation
+- **Dropdown**: Glass morphism (`glass-surface` → later fixed to `bg-popover`), `rounded-xl`, larger items
+- **Select**: Same glass treatment as Dropdown (→ fixed to `bg-popover`)
+- **Tooltip**: Frosted glass (`bg-foreground/95 backdrop-blur-sm`), `rounded-lg`, `shadow-xl`
+
+### Layer 2: Interactive Components
+- **Button**: `rounded-lg`, default variant gets `btn-depth btn-shine`, press scales `active:scale-[0.98]`
+- **Input**: `h-9`→`h-10`, `rounded-lg`, focus adds teal glow shadow
+- **Tabs**: Glass container (`bg-muted/60 backdrop-blur-sm`), pill triggers `rounded-lg`
+- **Progress**: Gradient fill (`from-primary to-accent`), glow shadow on indicator
+
+### Layer 3: Data Display
+- **Table**: Rounded container with overflow hidden, uppercase tracking headers, `table-row-accent` hover, generous padding (`px-4 py-3`), `tabular-nums`
+- **Badge**: Added `success`, `warning`, `info` semantic color variants
+
+### Layer 4: Navigation Chrome
+- **Sidebar**: Active indicator now **glows** (`shadow-[0_0_8px_hsl(172_66%_42%/0.4)]`), nav items `py-3`, hover adds `shadow-sm`
+- **Header**: Gradient bottom border accent line (teal glow), spacing `gap-2 sm:gap-3`
+- **Admin Sidebar**: Same glowing active indicator treatment
+
+### Layer 5: Page Patterns
+- Created **`PageHeader`** component (`components/ui/page-header.tsx`) — icon, iconColor, title, description, action props
+- Created **`EmptyState`** component (`components/ui/empty-state.tsx`) — with `dot-pattern` background
+- Applied `PageHeader` to **all 11 dashboard pages** and **all 12 admin pages**
+
+### Layer 6: Signature Moments
+- **Stats Cards**: Glass effect (`bg-card/80 backdrop-blur-sm lit-surface card-inner-glow`), colored icon shadows, accent bar `group-hover:opacity-50`
+- **Login Page**: Glow border, gradient dividers
+- **Layout**: `dot-pattern` background on main content, `lg:p-8` for desktop breathing room
+
+### QA Tweaks (Post-Deployment Visual Review)
+
+| # | Issue | Root Cause | Fix |
+|---|-------|-----------|-----|
+| 1 | Analytics leaderboard text too small | Default badge/cell sizing | Increased badge to `text-sm px-3 py-0.5`, cells to `text-sm`, avatars to `w-8 h-8` |
+| 2 | Support dropdown transparent (text bleed) | `glass-surface` used semi-transparent bg (85% opacity) | Replaced `glass-surface` with `bg-popover` in `select.tsx` and `dropdown-menu.tsx` |
+| 3 | Sidebar profile click does nothing | User card was always a static `<div>` (not a regression) | Wrapped with `DropdownMenu` (side="top") with Profile, Settings, Sign out options |
+| 4 | Admin button text invisible (30+ buttons) | `--primary-foreground: hsl(228 30% 8%)` (near-black on teal) | Changed to `hsl(0 0% 100%)` (white) in dark mode — one-line fix for all buttons |
+| 5 | Calendar session pills too small | Default `text-xs px-2 py-1.5` sizing | Changed to `text-sm px-2.5 py-2 rounded-lg` |
+| 6 | Learnings section headers misaligned | Headers had no left padding, cards had `p-4` | Added `px-4` to both `ContentSection` and `CaseStudiesSection` headers |
+| 7 | Learnings sub-module headers too small | Icon `w-9 h-9`, title `text-lg` | Upgraded to `w-11 h-11` icons, `w-6 h-6` inner icons, `text-xl` titles |
+| 8 | Analytics stat cards misaligned | Middle card had extra "sessions" `<p>` label | Removed the extra element |
+| 9 | Session history title too small | `text-sm font-medium` | Changed to `text-base font-semibold`, metadata `text-xs` → `text-sm` |
+
+### Files Changed (59 total)
+- **2,752 insertions, 1,597 deletions**
+- 51 modified files + 8 new files (PageHeader, EmptyState, and their applications)
+- All changes committed and pushed to `origin/main`
+
+### Key Learnings
+
+18. **`glass-surface` fails over text-heavy surfaces**: `backdrop-filter: blur()` does NOT obscure text beneath dropdowns. Use fully opaque `bg-popover` for dropdown/select menus.
+
+19. **One CSS variable can fix 30+ components**: `--primary-foreground` in dark mode was near-black on teal buttons. Changing one HSL value to white fixed every admin button instantly.
+
+20. **Sidebar user card was never interactive**: It was always a static `<div>` — wrapping with `DropdownMenu side="top"` added Profile/Settings/Sign out without breaking any existing functionality.
+
+21. **Use demo data injection for visual testing**: Temporarily injecting demo sessions into calendar state lets you verify styling without needing real API data. Always clean up after.
+
+22. **Parallel subagent execution with build gates**: Running 3 Opus subagents in parallel (surface + interactive + data display) with build verification between phases caught issues early and finished faster.
+
+---
+
+### 🔜 Resume Point for Next Session
+
+**Where to pick up**: Visual redesign deployed to production. A few more tweaks planned.
+
+1. **Check production deployment**:
+   - Hard refresh (Cmd+Shift+R) to clear cache
+   - Verify all visual changes render correctly on production
+   - Test on mobile device
+
+2. **Planned tweaks for tomorrow**:
+   - Any visual issues found during production review
+   - Fine-tune any remaining inconsistencies
+
+---
+
+**Deployment Status**: All changes deployed to production ✅
+**Hard Refresh Required**: Yes (Cmd+Shift+R on Mac, Ctrl+Shift+R on Windows)
+
+---
+
+## Session 6: Enable RLS on `public.profiles` — Security Fix (2026-02-11)
+
+**Status**: Code changes complete. Migration ready to apply after deploy.
+**Model**: Claude Opus 4.6
+**Trigger**: Supabase Security Advisor flagged 2 critical errors (08 Feb 2026)
+
+---
+
+### 9. Security Fix: Enable RLS on `public.profiles`
+
+**Problem**: Supabase Security Advisor flagged `public.profiles` with:
+1. **"Policy Exists RLS Disabled"** — 5 RLS policies exist but RLS is OFF
+2. **"RLS Disabled in Public"** — table exposed via PostgREST without protection
+
+The anon key (`NEXT_PUBLIC_SUPABASE_ANON_KEY`) is in client-side JS. Without RLS, anyone can `SELECT * FROM profiles` via the Supabase REST API — exposing all user emails, phones, LinkedIn URLs, and names.
+
+Migration `001_initial_schema.sql:280` has `ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;` but it was never applied to production. The 5 policies were dead code.
+
+**Root Cause**: The initial migration SQL was defined but never executed against the production database. The 5 policies (own profile read/update, admin view/manage, mentor view) existed as schema definitions but had no effect without RLS enabled.
+
+**Breaking Change Analysis**: Enabling RLS activates the 5 existing policies. Three code paths queried *other users'* profiles via `createClient()` (anon key) and would break:
+
+| Route | Problem | Fix |
+|-------|---------|-----|
+| `app/share/profile/[slug]/page.tsx` | Fetches another user's profile for public display | Switched to `createAdminClient()` |
+| `app/(dashboard)/team/page.tsx` | Client-side queries profiles of other students | Created `/api/team/members` server API route |
+| `app/api/analytics/dashboard/route.ts` | Counts students in cohort | Switched student count query to `adminClient` |
+
+**Safe routes (no changes needed):**
+- `/api/me` — queries own profile (matches "Users can view their own profile" policy)
+- All 26+ admin API routes — use `createAdminClient()` (bypasses RLS)
+- Middleware — uses service role key
+- Profile edit page — updates own profile
+
+**Files Modified**:
+
+| File | Change |
+|------|--------|
+| `app/share/profile/[slug]/page.tsx` | Switched profiles queries to `createAdminClient()` |
+| `app/api/team/members/route.ts` | **NEW** — server-side team member fetching with adminClient |
+| `app/(dashboard)/team/page.tsx` | Replaced 3 direct profiles queries with `/api/team/members` fetch |
+| `app/api/analytics/dashboard/route.ts` | Switched student count query to `adminClient` |
+| `supabase/migrations/023_enable_profiles_rls.sql` | **NEW** — `ALTER TABLE profiles ENABLE ROW LEVEL SECURITY` |
+
+**Deployment Order (Critical)**:
+1. Deploy code changes (this commit) to Vercel
+2. Verify new code is live on production
+3. Run migration SQL in Supabase Dashboard → SQL Editor
+4. Verify Security Advisor shows 0 errors
+
+**Rollback**: `ALTER TABLE profiles DISABLE ROW LEVEL SECURITY;` (instant)
+
+---
+
+### Session 6 Statistics
+
+**Total Commits**: 1
+**Files Created**: 2 (API route + migration)
+**Files Modified**: 3 existing files
+**Lines Added**: ~110
+**Lines Removed**: ~30
+**Build Verifications**: 1 (passed, 0 errors)
+
+---
+
+### Key Learnings — Session 6
+
+23. **RLS "defined but not enabled" is a silent vulnerability**: Migration SQL can define policies that have zero effect if `ENABLE ROW LEVEL SECURITY` was never applied. Always verify in Supabase Dashboard → Table Editor → RLS toggle.
+
+24. **Client-side Supabase queries are subject to RLS**: Any query using `createClient()` (anon key) or `getClient()` goes through PostgREST with RLS policies. For cross-user data, use `createAdminClient()` server-side.
+
+25. **Deploy code BEFORE enabling RLS**: If RLS is enabled before new code is live, there's a window where old code breaks. The rollback (disable RLS) is instant, but prevention is better.

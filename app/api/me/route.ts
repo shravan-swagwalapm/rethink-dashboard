@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 
 // Force dynamic rendering - no caching
@@ -15,8 +15,11 @@ export async function GET() {
       return response;
     }
 
-    // Fetch profile with role assignments
-    const { data: profile, error: profileError } = await supabase
+    // Use adminClient to bypass RLS — profiles has self-referencing policies
+    // that cause circular dependency issues (same pattern as Session 3 subgroup fix).
+    // Manual scoping via .eq('id', user.id) provides equivalent row-level isolation.
+    const adminClient = await createAdminClient();
+    const { data: profile, error: profileError } = await adminClient
       .from('profiles')
       .select(`
         *,

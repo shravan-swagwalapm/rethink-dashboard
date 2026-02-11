@@ -4,7 +4,7 @@
  */
 
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { googleCalendar } from '@/lib/integrations/google-calendar';
 
 export async function GET() {
@@ -17,8 +17,9 @@ export async function GET() {
       return NextResponse.redirect(new URL('/login', process.env.NEXT_PUBLIC_APP_URL));
     }
 
-    // Check admin role
-    const { data: profile } = await supabase
+    // Check admin role — use adminClient to bypass self-referencing RLS on profiles
+    const adminClient = await createAdminClient();
+    const { data: profile } = await adminClient
       .from('profiles')
       .select('role')
       .eq('id', user.id)

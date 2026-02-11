@@ -682,6 +682,11 @@ Changes should only touch what's necessary. Avoid introducing bugs.
 - Update 2026-02-06: 2,438-line notifications page impossible to maintain → Decompose mega-files into tab components. Orchestrator page <200 lines, each tab component self-contained
 - Update 2026-02-06: Unused dependencies (recharts, @tanstack/react-table) bloating bundle → Audit imports before removing. `dompurify` redundant with `isomorphic-dompurify`. @types/* belong in devDependencies
 
+**RLS Security Fix (2026-02-11 — Session 6)**:
+- Update 2026-02-11: `profiles` table had RLS disabled in production despite migration defining `ENABLE ROW LEVEL SECURITY` and 5 policies → ALWAYS verify RLS is actually enabled in Supabase Dashboard after running migrations. Migration SQL defined ≠ migration applied. Check Security Advisor regularly
+- Update 2026-02-11: 3 code paths queried other users' profiles via anon key (`createClient()` / `getClient()`) → When enabling RLS on a table, audit ALL queries to that table. Client-side queries using anon key are subject to RLS policies. Use `createAdminClient()` server-side for cross-user queries
+- Update 2026-02-11: `team/page.tsx` used `getClient()` (client-side) to query profiles directly → Client components cannot use `createAdminClient()`. Create a server API route that uses adminClient, then fetch from client. Pattern: auth via `createClient()`, data via `createAdminClient()` with manual scoping
+
 [Claude: Add new entries here after each mistake]
 
 ---

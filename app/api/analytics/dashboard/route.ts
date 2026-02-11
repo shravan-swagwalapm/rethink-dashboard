@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {
@@ -12,8 +12,11 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    // Use adminClient for profiles query — bypasses self-referencing RLS policies
+    const adminClient = await createAdminClient();
+
     // Get user's profile
-    const { data: profile, error: profileError } = await supabase
+    const { data: profile, error: profileError } = await adminClient
       .from('profiles')
       .select('*, cohort:cohorts(*)')
       .eq('id', user.id)
@@ -37,7 +40,7 @@ export async function GET(request: NextRequest) {
       { data: ranking },
       { count: upcomingSessions },
     ] = await Promise.all([
-      supabase
+      adminClient
         .from('profiles')
         .select('*', { count: 'exact', head: true })
         .eq('cohort_id', profile.cohort_id)

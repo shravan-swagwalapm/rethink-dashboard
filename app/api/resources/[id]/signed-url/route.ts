@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 
 export async function GET(
   request: Request,
@@ -51,7 +51,9 @@ export async function GET(
         hasAccess = true;
       } else {
         // Fallback: check legacy profiles.cohort_id for backward compatibility
-        const { data: profile } = await supabase
+        // Use adminClient to bypass self-referencing RLS on profiles
+        const adminClient = await createAdminClient();
+        const { data: profile } = await adminClient
           .from('profiles')
           .select('cohort_id')
           .eq('id', user.id)
