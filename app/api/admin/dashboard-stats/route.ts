@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/server';
 import { verifyAdmin } from '@/lib/api/verify-admin';
 
 export async function GET() {
@@ -8,7 +8,7 @@ export async function GET() {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
-  const supabase = await createClient();
+  const supabase = await createAdminClient();
 
   try {
     // Get total students (all users with student role or student role assignment)
