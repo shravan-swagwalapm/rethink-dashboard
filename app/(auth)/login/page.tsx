@@ -327,6 +327,13 @@ function LoginContent() {
           <CardContent className="space-y-4 transition-all duration-300 ease-in-out">
             {step === 'identifier' && (
               <>
+                {/* Student Login Section Header */}
+                <div className="flex items-center gap-3 mb-1">
+                  <div className="divider-gradient flex-1" />
+                  <span className="text-label text-foreground/50 tracking-widest">Student Login</span>
+                  <div className="divider-gradient flex-1" />
+                </div>
+
                 {/* Phone OTP Login */}
                 <form onSubmit={handleSendOTP} className="space-y-4">
                   <div className="space-y-3">
@@ -421,19 +428,19 @@ function LoginContent() {
                 </p>
 
                 {/* Admin Portal - Google Only */}
-                <div className="relative pt-4">
+                <div className="relative pt-5">
                   <div className="absolute inset-0 flex items-center">
-                    <div className="divider-gradient w-full" />
+                    <div className="h-px w-full bg-gradient-to-r from-transparent via-warning/40 to-transparent" />
                   </div>
                   <div className="relative flex justify-center text-xs uppercase tracking-wider">
-                    <span className="bg-transparent px-3 text-foreground/40 font-semibold">Admin Portal</span>
+                    <span className="bg-transparent px-3 text-warning/70 font-semibold">Admin Portal</span>
                   </div>
                 </div>
 
                 <Button
                   type="button"
                   variant="outline"
-                  className="w-full h-12 !border !border-white/20 hover:bg-primary/10 hover:!border-primary/50 transition-all text-lg font-medium"
+                  className="w-full h-12 !border !border-warning/30 hover:bg-warning/10 hover:!border-warning/50 transition-all text-lg font-medium text-warning/80 hover:text-warning"
                   onClick={() => handleGoogleSignIn('admin')}
                   disabled={googleLoading || adminLoading}
                 >
@@ -445,7 +452,7 @@ function LoginContent() {
                   Sign in as Administrator
                 </Button>
 
-                <p className="text-sm text-foreground/40 text-center">
+                <p className="text-sm text-warning/40 text-center">
                   For administrators and team members only
                 </p>
               </>
