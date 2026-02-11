@@ -663,7 +663,9 @@ export default function LearningsPage() {
       newCompleted.add(resourceId);
     }
 
+    // Update state and recalculate progress with the NEW set (avoids stale closure)
     setCompletedResources(newCompleted);
+    calculateWeekProgress(newCompleted);
 
     try {
       const response = await fetch('/api/learnings/progress', {
@@ -677,13 +679,12 @@ export default function LearningsPage() {
       }
 
       toast.success(isCompleted ? 'Marked as incomplete' : 'Marked as complete');
-
-      // Recalculate week progress
-      calculateWeekProgress();
     } catch (error) {
       console.error('Error marking complete:', error);
       toast.error('Failed to update completion status');
+      // Rollback both state and progress on failure
       setCompletedResources(completedResources);
+      calculateWeekProgress(completedResources);
     }
   };
 
@@ -731,8 +732,9 @@ export default function LearningsPage() {
     }
   };
 
-  // Calculate week progress
-  const calculateWeekProgress = () => {
+  // Calculate week progress — accepts an optional Set to avoid stale closure issues
+  const calculateWeekProgress = (completedSet?: Set<string>) => {
+    const completed = completedSet ?? completedResources;
     const progress: Record<number, { completed: number; total: number }> = {};
 
     modules.forEach(module => {
@@ -743,7 +745,7 @@ export default function LearningsPage() {
 
       module.resources.forEach(resource => {
         progress[week].total++;
-        if (completedResources.has(resource.id)) {
+        if (completed.has(resource.id)) {
           progress[week].completed++;
         }
       });

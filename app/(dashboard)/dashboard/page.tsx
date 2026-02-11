@@ -781,18 +781,22 @@ export default function DashboardPage() {
                     animationFillMode: 'forwards',
                   }}
                 >
-                  {/* File icon */}
+                  {/* Category-specific icon */}
                   <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-green-500 to-emerald-600 dark:from-green-600 dark:to-emerald-700 flex items-center justify-center text-white shadow-md group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
-                    <FolderOpen className="w-5 h-5" />
+                    {resource.category === 'video' ? <Video className="w-5 h-5" /> :
+                     resource.category === 'article' ? <BookOpen className="w-5 h-5" /> :
+                     resource.category === 'presentation' ? <Presentation className="w-5 h-5" /> :
+                     resource.category === 'pdf' ? <FileText className="w-5 h-5" /> :
+                     <FolderOpen className="w-5 h-5" />}
                   </div>
 
                   {/* File info */}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate text-gray-900 dark:text-white group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors mb-1">
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors mb-1">
                       {resource.name}
                     </p>
                     <p className="text-xs font-medium text-muted-foreground dark:text-gray-500 uppercase tracking-wider">
-                      {resource.file_type || 'File'}
+                      {resource.category === 'video' ? 'Video' : resource.category === 'presentation' ? 'Presentation' : resource.file_type?.toUpperCase() || resource.category?.toUpperCase() || 'File'}
                     </p>
                   </div>
                 </Link>

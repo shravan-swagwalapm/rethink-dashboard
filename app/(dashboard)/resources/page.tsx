@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { useUserContext } from '@/contexts/user-context';
 import { Card, CardContent } from '@/components/ui/card';
@@ -90,14 +90,35 @@ export default function ResourcesPage() {
   const [resources, setResources] = useState<Resource[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [viewerState, setViewerState] = useState<{
     isOpen: boolean;
     fileUrl: string;
     fileName: string;
     fileType: string;
   }>({ isOpen: false, fileUrl: '', fileName: '', fileType: '' });
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Debounce search input (300ms)
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Clear search when switching tabs
+  const handleTabChange = (tab: Tab) => {
+    setActiveTab(tab);
+    setSearchQuery('');
+    setDebouncedSearch('');
+    setResources([]);
+  };
 
   useEffect(() => {
+    // Abort any in-flight request
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     const fetchResources = async () => {
       setLoading(true);
       try {
@@ -110,27 +131,36 @@ export default function ResourcesPage() {
           params.append('cohort_id', activeCohortId);
         }
 
-        if (searchQuery) {
-          params.append('search', searchQuery);
+        if (debouncedSearch) {
+          params.append('search', debouncedSearch);
         }
 
-        const response = await fetch(`/api/resources?${params}`);
+        const response = await fetch(`/api/resources?${params}`, {
+          signal: controller.signal,
+        });
         if (!response.ok) throw new Error('Failed to fetch resources');
 
         const data = await response.json();
-        setResources(data.resources || []);
+        if (!controller.signal.aborted) {
+          setResources(data.resources || []);
+        }
       } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') return;
         console.error('Error fetching resources:', error);
         toast.error('Failed to load resources');
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
       }
     };
 
     if (!userLoading && activeCohortId) {
       fetchResources();
     }
-  }, [activeTab, searchQuery, userLoading, activeCohortId]);
+
+    return () => controller.abort();
+  }, [activeTab, debouncedSearch, userLoading, activeCohortId]);
 
   const formatFileSize = (bytes: number | null) => {
     if (!bytes) return '--';
@@ -184,7 +214,18 @@ export default function ResourcesPage() {
       if (!response.ok) throw new Error('Failed to download file');
 
       const { signedUrl } = await response.json();
-      window.open(signedUrl, '_blank');
+
+      // Fetch the file as a blob and trigger a real download
+      const fileResponse = await fetch(signedUrl);
+      const blob = await fileResponse.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = resource.name || 'download';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Error downloading:', error);
       toast.error('Failed to download file');
@@ -219,7 +260,7 @@ export default function ResourcesPage() {
           return (
             <button
               key={tab.value}
-              onClick={() => setActiveTab(tab.value)}
+              onClick={() => handleTabChange(tab.value)}
               className={cn(
                 'flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all whitespace-nowrap border',
                 isActive
