@@ -91,17 +91,42 @@ export async function GET() {
       }
     }
 
+    // Auto-save actual duration from Reports API for linked sessions missing it.
+    // The Reports API duration field is the actual runtime for past meetings.
+    // This ensures the attendance calculator has correct duration even when
+    // getPastMeetingDetails() fails (e.g., missing meeting:read:past_meeting:admin scope).
+    const sessionsToUpdateDuration: { id: string; duration: number }[] = [];
+    for (const m of meetings) {
+      const linkedSession = sessionByMeetingId.get(String(m.id));
+      if (linkedSession && !linkedSession.actual_duration_minutes && m.duration > 0) {
+        // Use getPastMeetingDetails if available, otherwise fall back to Reports API duration
+        const zoomActualDuration = pastDetailsMap.get(String(m.id));
+        const resolvedDuration = zoomActualDuration || m.duration;
+        sessionsToUpdateDuration.push({ id: linkedSession.id, duration: resolvedDuration });
+      }
+    }
+
+    if (sessionsToUpdateDuration.length > 0) {
+      for (const s of sessionsToUpdateDuration) {
+        await supabase
+          .from('sessions')
+          .update({ actual_duration_minutes: s.duration })
+          .eq('id', s.id);
+      }
+      console.log(`[Sync Zoom] Auto-saved actual_duration_minutes for ${sessionsToUpdateDuration.length} sessions`);
+    }
+
     // Build response
     const enrichedMeetings = meetings.map((m) => {
       const linkedSession = sessionByMeetingId.get(String(m.id));
       const zoomActualDuration = pastDetailsMap.get(String(m.id));
 
-      // Fallback chain: admin override > Zoom actual runtime > session scheduled > Zoom scheduled
+      // Fallback chain: admin override > Zoom actual runtime > Reports API duration > session scheduled
       const actualDurationMinutes =
         linkedSession?.actual_duration_minutes
         || zoomActualDuration
-        || linkedSession?.duration_minutes
-        || m.duration;
+        || m.duration
+        || linkedSession?.duration_minutes;
 
       return {
         zoomId: String(m.id),
@@ -109,7 +134,7 @@ export async function GET() {
         topic: m.topic,
         date: m.start_time,
         duration: m.duration,
-        scheduledDuration: m.duration,
+        scheduledDuration: linkedSession?.duration_minutes || m.duration,
         participantCount: m.participants_count || 0,
         linkedSessionId: linkedSession?.id || null,
         linkedSessionTitle: linkedSession?.title || null,
