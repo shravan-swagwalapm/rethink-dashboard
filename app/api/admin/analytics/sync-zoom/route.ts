@@ -22,11 +22,10 @@ export async function GET() {
     const today = new Date();
     const thirtyDaysAgo = subDays(today, 30);
 
-    // Fetch past meetings from Zoom
-    const { meetings } = await zoomService.listPastMeetings({
+    // Fetch ALL past meetings from Zoom (auto-paginates)
+    const meetings = await zoomService.listAllPastMeetings({
       from: format(thirtyDaysAgo, 'yyyy-MM-dd'),
       to: format(today, 'yyyy-MM-dd'),
-      pageSize: 100,
     });
 
     // Get all sessions with zoom_meeting_id to find linked ones
@@ -54,21 +53,69 @@ export async function GET() {
       attendanceCountBySession.set(a.session_id, (attendanceCountBySession.get(a.session_id) || 0) + 1);
     }
 
+    // Fetch actual durations from Zoom for meetings that don't have an admin override
+    const meetingsNeedingDuration = meetings.filter((m) => {
+      const linkedSession = sessionByMeetingId.get(String(m.id));
+      return !linkedSession?.actual_duration_minutes;
+    });
+
+    // Fetch past meeting details with rate limiting (batch of 5, 200ms delay between batches)
+    const pastDetailsMap = new Map<string, number>();
+    const BATCH_SIZE = 5;
+    const BATCH_DELAY_MS = 200;
+
+    for (let i = 0; i < meetingsNeedingDuration.length; i += BATCH_SIZE) {
+      const batch = meetingsNeedingDuration.slice(i, i + BATCH_SIZE);
+      const batchResults = await Promise.allSettled(
+        batch.map(async (m) => {
+          const details = await zoomService.getPastMeetingDetails(m.uuid);
+          if (details?.start_time && details?.end_time) {
+            const start = new Date(details.start_time).getTime();
+            const end = new Date(details.end_time).getTime();
+            const actualMinutes = Math.round((end - start) / 60000);
+            if (actualMinutes > 0) {
+              pastDetailsMap.set(String(m.id), actualMinutes);
+            }
+          }
+        })
+      );
+      // Log failures but don't block
+      batchResults.forEach((r, idx) => {
+        if (r.status === 'rejected') {
+          console.warn(`[Sync Zoom] Failed to fetch details for ${batch[idx]?.uuid}:`, r.reason);
+        }
+      });
+      // Delay between batches to respect Zoom rate limits
+      if (i + BATCH_SIZE < meetingsNeedingDuration.length) {
+        await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
+      }
+    }
+
     // Build response
     const enrichedMeetings = meetings.map((m) => {
       const linkedSession = sessionByMeetingId.get(String(m.id));
+      const zoomActualDuration = pastDetailsMap.get(String(m.id));
+
+      // Fallback chain: admin override > Zoom actual runtime > session scheduled > Zoom scheduled
+      const actualDurationMinutes =
+        linkedSession?.actual_duration_minutes
+        || zoomActualDuration
+        || linkedSession?.duration_minutes
+        || m.duration;
+
       return {
         zoomId: String(m.id),
         uuid: m.uuid,
         topic: m.topic,
         date: m.start_time,
         duration: m.duration,
+        scheduledDuration: m.duration,
         participantCount: m.participants_count || 0,
         linkedSessionId: linkedSession?.id || null,
         linkedSessionTitle: linkedSession?.title || null,
         cohortId: linkedSession?.cohort_id || null,
         countsForStudents: linkedSession?.counts_for_students || false,
-        actualDurationMinutes: linkedSession?.actual_duration_minutes || linkedSession?.duration_minutes || m.duration,
+        actualDurationMinutes,
         hasAttendance: linkedSession ? attendanceCountBySession.has(linkedSession.id) : false,
         uniqueParticipantCount: linkedSession ? (attendanceCountBySession.get(linkedSession.id) || null) : null,
         isProperSession: linkedSession ? !!linkedSession.cohort_id : false,

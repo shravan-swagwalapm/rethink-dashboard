@@ -64,13 +64,15 @@ export async function POST(request: NextRequest) {
 
       case 'participant.left':
         if (participant) {
-          await attendanceService.recordLeave(session.id, participant, session.duration_minutes);
+          const leaveDuration = session.actual_duration_minutes || session.duration_minutes;
+          await attendanceService.recordLeave(session.id, participant, leaveDuration);
           console.log(`Recorded leave for ${participant.email} in session ${session.id}`);
         }
         break;
 
       case 'meeting.ended':
-        await attendanceService.finalizeAttendance(session.id, session.duration_minutes);
+        const endDuration = session.actual_duration_minutes || session.duration_minutes;
+        await attendanceService.finalizeAttendance(session.id, endDuration);
         console.log(`Finalized attendance for session ${session.id}`);
         break;
 

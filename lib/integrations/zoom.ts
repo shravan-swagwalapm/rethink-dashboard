@@ -73,6 +73,17 @@ export interface ZoomPastParticipant {
   duration: number;
 }
 
+export interface ZoomPastMeetingDetails {
+  uuid: string;
+  id: number;
+  topic: string;
+  start_time: string;
+  end_time: string;
+  duration: number; // scheduled duration in minutes
+  total_minutes: number;
+  participants_count: number;
+}
+
 interface TokenCache {
   token: string;
   expiresAt: number;
@@ -84,6 +95,17 @@ export class ZoomService {
 
   constructor() {
     this.webhookSecret = ZOOM_WEBHOOK_SECRET;
+  }
+
+  /**
+   * Encode a Zoom meeting UUID for use in API paths.
+   * Double-encodes if the UUID contains /, +, or = (Base64 characters)
+   * that would be misinterpreted as path separators or query params.
+   */
+  private encodeUuid(uuid: string): string {
+    return /[\/+=]/.test(uuid)
+      ? encodeURIComponent(encodeURIComponent(uuid))
+      : encodeURIComponent(uuid);
   }
 
   /**
@@ -299,6 +321,39 @@ export class ZoomService {
   }
 
   /**
+   * List ALL past meetings with auto-pagination.
+   * Loops through all pages (MAX_PAGES=10 safety cap = 1000 meetings).
+   */
+  async listAllPastMeetings(options: {
+    from: string;
+    to: string;
+  }): Promise<ZoomMeetingListItem[]> {
+    const allMeetings: ZoomMeetingListItem[] = [];
+    let nextPageToken: string | undefined;
+    const MAX_PAGES = 10;
+
+    for (let page = 0; page < MAX_PAGES; page++) {
+      const result = await this.listPastMeetings({
+        from: options.from,
+        to: options.to,
+        pageSize: 100,
+        nextPageToken,
+      });
+
+      allMeetings.push(...result.meetings);
+      console.log(`[Zoom Meetings] Page ${page + 1}: ${result.meetings.length} meetings, total so far: ${allMeetings.length}`);
+
+      if (!result.nextPageToken || result.nextPageToken.trim() === '') {
+        break;
+      }
+      nextPageToken = result.nextPageToken;
+    }
+
+    console.log(`[Zoom Meetings] Final: ${allMeetings.length} total meetings from ${options.from} to ${options.to}`);
+    return allMeetings;
+  }
+
+  /**
    * Resolve "me" to an actual Zoom user ID (needed for Reports API)
    */
   private async resolveUserId(token: string): Promise<string> {
@@ -317,17 +372,84 @@ export class ZoomService {
 
   /**
    * Get past meeting participants (for attendance import)
+   * Paginates through all pages — Zoom returns max 300 per page.
+   * Safety cap: 10 pages (3000 records) to prevent infinite loops.
    */
   async getPastMeetingParticipants(meetingUuid: string): Promise<ZoomPastParticipant[]> {
     const token = await this.getAccessToken();
+    const encodedUuid = this.encodeUuid(meetingUuid);
 
-    // Double-encode UUID if it starts with / or contains //
-    const encodedUuid = meetingUuid.startsWith('/') || meetingUuid.includes('//')
-      ? encodeURIComponent(encodeURIComponent(meetingUuid))
-      : encodeURIComponent(meetingUuid);
+    const allParticipants: ZoomPastParticipant[] = [];
+    let nextPageToken: string | undefined;
+    let expectedTotal: number | null = null;
+    const MAX_PAGES = 10;
+
+    for (let page = 0; page < MAX_PAGES; page++) {
+      const params = new URLSearchParams({ page_size: '300' });
+      if (nextPageToken) {
+        params.set('next_page_token', nextPageToken);
+      }
+
+      const response = await fetch(
+        `https://api.zoom.us/v2/past_meetings/${encodedUuid}/participants?${params}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`Failed to get meeting participants: ${error}`);
+      }
+
+      const data = await response.json();
+      const participants: ZoomPastParticipant[] = data.participants || [];
+      allParticipants.push(...participants);
+
+      // Track expected total from first response
+      if (page === 0 && typeof data.total_records === 'number') {
+        expectedTotal = data.total_records;
+      }
+
+      console.log(
+        `[Zoom Participants] Page ${page + 1}: fetched ${participants.length}, ` +
+        `running total: ${allParticipants.length}` +
+        (expectedTotal !== null ? ` / ${expectedTotal} expected` : '') +
+        (data.next_page_token ? ', more pages available' : ', last page')
+      );
+
+      // Stricter token check — empty string or whitespace-only means no more pages
+      const token_value = data.next_page_token;
+      if (typeof token_value !== 'string' || token_value.trim() === '') {
+        break;
+      }
+      nextPageToken = token_value;
+    }
+
+    // Verification: warn if fetched count doesn't match expected
+    if (expectedTotal !== null && allParticipants.length !== expectedTotal) {
+      console.warn(
+        `[Zoom Participants] MISMATCH: fetched ${allParticipants.length} but Zoom reported ${expectedTotal} total_records for meeting ${meetingUuid}`
+      );
+    }
+
+    console.log(`[Zoom Participants] Final: ${allParticipants.length} participant records for meeting ${meetingUuid}`);
+
+    return allParticipants;
+  }
+
+  /**
+   * Get past meeting details (actual start/end times)
+   * Uses the same UUID double-encoding pattern as getPastMeetingParticipants.
+   */
+  async getPastMeetingDetails(meetingUuid: string): Promise<ZoomPastMeetingDetails | null> {
+    const token = await this.getAccessToken();
+    const encodedUuid = this.encodeUuid(meetingUuid);
 
     const response = await fetch(
-      `https://api.zoom.us/v2/past_meetings/${encodedUuid}/participants?page_size=300`,
+      `https://api.zoom.us/v2/past_meetings/${encodedUuid}`,
       {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -336,12 +458,12 @@ export class ZoomService {
     );
 
     if (!response.ok) {
+      if (response.status === 404) return null;
       const error = await response.text();
-      throw new Error(`Failed to get meeting participants: ${error}`);
+      throw new Error(`Failed to get past meeting details: ${error}`);
     }
 
-    const data = await response.json();
-    return data.participants || [];
+    return response.json();
   }
 
   /**

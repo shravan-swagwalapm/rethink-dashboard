@@ -5,6 +5,8 @@
 
 import { createAdminClient } from '@/lib/supabase/server';
 import { zoomService, ZoomParticipant, ZoomPastParticipant } from '@/lib/integrations/zoom';
+import { calculateSessionAttendance } from '@/lib/services/attendance-calculator';
+import { matchParticipantToUser } from '@/lib/services/user-matcher';
 
 export interface AttendanceRecord {
   sessionId: string;
@@ -26,32 +28,11 @@ export interface ImportResult {
 
 class AttendanceService {
   /**
-   * Match a Zoom participant email to a user profile
-   * First tries direct email match, then checks email aliases
+   * Match a Zoom participant email to a user profile.
+   * Delegates to shared user-matcher utility (breaks circular dependency with attendance-calculator).
    */
   async matchParticipantToUser(email: string): Promise<string | null> {
-    if (!email) return null;
-
-    const supabase = await createAdminClient();
-    const normalizedEmail = email.toLowerCase();
-
-    // First try direct match on profiles
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('email', normalizedEmail)
-      .single();
-
-    if (profile) return profile.id;
-
-    // Try matching via email aliases
-    const { data: alias } = await supabase
-      .from('user_email_aliases')
-      .select('user_id')
-      .eq('alias_email', normalizedEmail)
-      .single();
-
-    return alias?.user_id || null;
+    return matchParticipantToUser(email);
   }
 
   /**
@@ -134,12 +115,12 @@ class AttendanceService {
   /**
    * Find session by Zoom meeting ID
    */
-  async findSessionByMeetingId(meetingId: string): Promise<{ id: string; duration_minutes: number; cohort_id: string | null } | null> {
+  async findSessionByMeetingId(meetingId: string): Promise<{ id: string; duration_minutes: number; actual_duration_minutes: number | null; cohort_id: string | null } | null> {
     const supabase = await createAdminClient();
 
     const { data: session } = await supabase
       .from('sessions')
-      .select('id, duration_minutes, cohort_id')
+      .select('id, duration_minutes, actual_duration_minutes, cohort_id')
       .eq('zoom_meeting_id', meetingId)
       .single();
 
@@ -259,7 +240,9 @@ class AttendanceService {
   }
 
   /**
-   * Import attendance from a past Zoom meeting
+   * Import attendance from a past Zoom meeting.
+   * @deprecated Use calculateSessionAttendance() directly for proper segment merging,
+   * alias resolution, and auto-resolved duration. This method now delegates to the calculator.
    */
   async importFromZoom(
     zoomMeetingUuid: string,
@@ -269,80 +252,23 @@ class AttendanceService {
     const supabase = await createAdminClient();
 
     try {
-      // Get session details
-      const { data: session } = await supabase
-        .from('sessions')
-        .select('id, duration_minutes')
-        .eq('id', sessionId)
-        .single();
-
-      if (!session) {
-        return { success: false, participantsImported: 0, participantsSkipped: 0, error: 'Session not found' };
-      }
-
-      // Get participants from Zoom
-      const participants = await zoomService.getPastMeetingParticipants(zoomMeetingUuid);
-
-      let imported = 0;
-      let skipped = 0;
-
-      for (const participant of participants) {
-        if (!participant.user_email) {
-          skipped++;
-          continue;
-        }
-
-        const userId = await this.matchParticipantToUser(participant.user_email);
-        const joinTime = new Date(participant.join_time);
-        const leaveTime = new Date(participant.leave_time);
-        const durationSeconds = participant.duration;
-        const attendancePercentage = zoomService.calculateAttendancePercentage(
-          joinTime,
-          leaveTime,
-          session.duration_minutes
-        );
-
-        // Upsert attendance record
-        const { error } = await supabase
-          .from('attendance')
-          .upsert(
-            {
-              session_id: sessionId,
-              user_id: userId,
-              zoom_user_email: participant.user_email.toLowerCase(),
-              join_time: joinTime.toISOString(),
-              leave_time: leaveTime.toISOString(),
-              duration_seconds: durationSeconds,
-              attendance_percentage: attendancePercentage,
-            },
-            {
-              onConflict: 'session_id,user_id',
-              ignoreDuplicates: false,
-            }
-          );
-
-        if (error) {
-          console.error('Error importing attendance:', error);
-          skipped++;
-        } else {
-          imported++;
-        }
-      }
+      // Delegate to the calculator (handles segments, aliases, auto-duration)
+      const result = await calculateSessionAttendance(sessionId, zoomMeetingUuid);
 
       // Log the import
       await supabase.from('zoom_import_logs').insert({
-        zoom_meeting_id: zoomMeetingUuid.split('/')[0], // Get the meeting ID part
+        zoom_meeting_id: zoomMeetingUuid.split('/')[0],
         zoom_meeting_uuid: zoomMeetingUuid,
         session_id: sessionId,
         status: 'completed',
-        participants_imported: imported,
+        participants_imported: result.imported,
         imported_by: importedBy,
       });
 
       return {
         success: true,
-        participantsImported: imported,
-        participantsSkipped: skipped,
+        participantsImported: result.imported,
+        participantsSkipped: result.unmatched,
       };
     } catch (error) {
       console.error('Error importing from Zoom:', error);

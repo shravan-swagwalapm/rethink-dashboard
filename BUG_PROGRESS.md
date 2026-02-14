@@ -827,3 +827,100 @@ Migration `001_initial_schema.sql:280` has `ALTER TABLE profiles ENABLE ROW LEVE
 24. **Client-side Supabase queries are subject to RLS**: Any query using `createClient()` (anon key) or `getClient()` goes through PostgREST with RLS policies. For cross-user data, use `createAdminClient()` server-side.
 
 25. **Deploy code BEFORE enabling RLS**: If RLS is enabled before new code is live, there's a window where old code breaks. The rollback (disable RLS) is instant, but prevention is better.
+
+---
+
+## Session 7: Timezone Bug + Student UI Fixes (2026-02-11, Evening)
+
+**Status**: ✅ All Fixed — Deployed to Production
+**Model**: Claude Opus 4.6
+**Commits**: 3 pushed to `main`
+
+---
+
+### 10. ✅ Zoom/Calendar Timezone Double-Conversion Bug — `c2f65a7`
+
+**Problem**: Admin creates session at 11:00 AM IST → Zoom meeting shows 5:30 AM IST. The 5:30-hour offset = IST→UTC difference, confirming double-conversion.
+
+**Root Cause**: Frontend correctly converts local time to UTC for DB storage (`11:00 IST → 05:30Z`). But Zoom's API ignores the `Z` (UTC) suffix in `start_time` and treats the value as local time in the specified `timezone`. So `05:30Z` + `timezone: Asia/Kolkata` = 5:30 AM IST. Secondary bug: `updateMeeting()` never sent `timezone` at all.
+
+**Fix**: Created `lib/utils/timezone.ts` with two helpers:
+- `toZoomLocalTime()`: UTC → naive local string (`2026-02-14T11:00:00`) — Zoom uses separate `timezone` param
+- `toCalendarLocalTime()`: UTC → offset-aware RFC 3339 (`2026-02-14T11:00:00+05:30`) — unambiguous for Google Calendar
+
+Applied to: `zoom.ts` (createMeeting + updateMeeting), `sessions/route.ts` (POST + PUT), `calendar/route.ts` (POST + PUT).
+
+**Files**: 4 changed (+60 / -11), 1 new file
+**Verified**: Created test session at 11:00 AM IST — Zoom showed correct time.
+
+---
+
+### 11. ✅ Login Page Visual Hierarchy — `f2ca9fc`
+
+**Change**: Added "Student Login" section header with gradient dividers. Restyled admin portal divider and button with warning color accent to clearly distinguish student vs admin login flows.
+
+**Files**: 1 changed (+12 / -5)
+
+---
+
+### 12. ✅ Batch Student-Facing UI Fixes — `adf0cc6`
+
+**Files**: 3 changed (+66 / -19)
+
+#### a) Dashboard Resource Cards (`dashboard/page.tsx`)
+- **Title**: Removed `truncate` — full title wraps naturally
+- **Type label**: Uses `resource.category` (`Video`/`PDF`/`Presentation`) instead of `file_type || 'File'`
+- **Icons**: Category-specific (Video camera, BookOpen, Presentation, FileText) instead of generic FolderOpen
+
+#### b) Learnings Progress Counter (`learnings/page.tsx`)
+**Root cause**: `calculateWeekProgress()` called after `setCompletedResources()` read stale closure — the old Set (before toggle). Mark complete → showed 0/3. Mark incomplete → showed 1/3.
+
+**Fix**: `calculateWeekProgress()` now accepts optional `completedSet` parameter. `handleMarkComplete()` passes `newCompleted` directly, bypassing stale closure. Rollback on API failure also recalculates.
+
+#### c) Resources Page (`resources/page.tsx`) — 3 fixes
+1. **Stale tab count flash**: `handleTabChange()` clears `resources` immediately + resets search
+2. **Search clear breaking UI**: Added 300ms debounce + `AbortController` to prevent race conditions (older requests overwriting newer results)
+3. **Download button**: Changed from `window.open(signedUrl, '_blank')` to fetch-as-blob + `<a download>` click — triggers actual file download
+
+---
+
+### Session 7 Statistics
+
+**Total Commits**: 3
+**Files Created**: 1 (`lib/utils/timezone.ts`)
+**Files Modified**: 7
+**Bugs Fixed**: 7 (timezone, login styling, resource title, resource type label, resource icons, progress counter, search race condition + download button + stale tab count)
+**Build Verifications**: 1 (passed, 0 TypeScript errors)
+
+---
+
+### Key Learnings — Session 7
+
+26. **Zoom ignores UTC suffix**: `start_time: "2026-02-14T05:30:00.000Z"` with `timezone: "Asia/Kolkata"` → Zoom treats as 5:30 AM IST, not 11:00 AM. Must send timezone-naive local string.
+
+27. **Google Calendar prefers explicit offsets**: `2026-02-14T11:00:00+05:30` is unambiguous across all calendar clients. `2026-02-14T05:30:00.000Z` + `timeZone` parameter is inconsistent.
+
+28. **Stale closures in React event handlers**: Calling a function after `setState()` still reads the old state from the closure. Fix: pass the new value as a parameter instead of reading state.
+
+29. **AbortController prevents search race conditions**: Without it, clearing a search field fires multiple API calls that resolve in unpredictable order — an older result can overwrite the correct empty-search result.
+
+30. **`window.open` never downloads**: Even with signed URLs, browsers display files (especially PDFs) instead of downloading. Use fetch-as-blob + `<a download>` for actual downloads.
+
+---
+
+### 🔜 Resume Point for Next Session
+
+**Where to pick up**: All bugs fixed and deployed. Remaining unstaged files:
+- `docs/plans/2026-02-10-design-system-overhaul.md` — Design system plan doc
+- `supabase/audit_broken_resources.sql` — SQL audit script
+
+**Potential next steps**:
+- [ ] Test all fixes on production (hard refresh first)
+- [ ] Verify timezone fix with a real scheduled session
+- [ ] Check mobile responsiveness of resource cards
+- [ ] Consider adding timezone selector for international cohorts (currently hardcoded to Asia/Kolkata)
+
+---
+
+**Deployment Status**: All changes deployed to production ✅
+**Hard Refresh Required**: Yes (Cmd+Shift+R on Mac, Ctrl+Shift+R on Windows)

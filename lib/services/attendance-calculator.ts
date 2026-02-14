@@ -15,7 +15,7 @@
 
 import { createAdminClient } from '@/lib/supabase/server';
 import { zoomService, ZoomPastParticipant } from '@/lib/integrations/zoom';
-import { attendanceService } from '@/lib/services/attendance';
+import { matchParticipantToUser } from '@/lib/services/user-matcher';
 
 export interface TimeSegment {
   join_time: Date;
@@ -41,7 +41,7 @@ export function groupParticipantsByEmail(
   for (const p of participants) {
     const key = p.user_email
       ? p.user_email.toLowerCase().trim()
-      : `__nomail__${p.name || p.id}`;
+      : `__nomail__${p.id}`;  // Use Zoom participant ID, not name (avoids merging different guests with same name)
 
     const existing = groups.get(key) || [];
     existing.push(p);
@@ -67,7 +67,7 @@ export async function resolveUserIds(
     const email = isNoEmail ? '' : emailKey;
 
     // Resolve email to user_id
-    const userId = email ? await attendanceService.matchParticipantToUser(email) : null;
+    const userId = email ? await matchParticipantToUser(email) : null;
 
     // Build time segments from this group
     const segments: TimeSegment[] = participants.map((p) => ({
@@ -137,7 +137,7 @@ export function mergeOverlappingSegments(segments: TimeSegment[]): TimeSegment[]
  */
 function totalMinutesFromSegments(segments: TimeSegment[]): number {
   return segments.reduce((total, seg) => {
-    const ms = seg.leave_time.getTime() - seg.join_time.getTime();
+    const ms = Math.max(0, seg.leave_time.getTime() - seg.join_time.getTime());
     return total + ms / 1000 / 60;
   }, 0);
 }
@@ -156,20 +156,57 @@ function totalMinutesFromSegments(segments: TimeSegment[]): number {
 export async function calculateSessionAttendance(
   sessionId: string,
   zoomMeetingUuid: string,
-  actualDurationMinutes: number
-): Promise<{ imported: number; unmatched: number }> {
-  // Guard against division by zero
-  if (!actualDurationMinutes || actualDurationMinutes <= 0) {
-    throw new Error('actualDurationMinutes must be a positive number');
+  actualDurationMinutes?: number
+): Promise<{ imported: number; unmatched: number; actualDurationUsed: number }> {
+  const supabase = await createAdminClient();
+
+  // Auto-resolve duration: Zoom API actual > caller-provided > session.actual_duration_minutes > session.duration_minutes
+  let resolvedDuration = actualDurationMinutes || 0;
+  let durationSource = actualDurationMinutes ? 'caller' : 'none';
+
+  try {
+    const zoomDetails = await zoomService.getPastMeetingDetails(zoomMeetingUuid);
+    if (zoomDetails?.start_time && zoomDetails?.end_time) {
+      const start = new Date(zoomDetails.start_time).getTime();
+      const end = new Date(zoomDetails.end_time).getTime();
+      const zoomActual = Math.round((end - start) / 60000);
+      if (zoomActual > 0) {
+        resolvedDuration = zoomActual;
+        durationSource = 'zoom_api';
+      }
+    }
+  } catch (err) {
+    console.warn('[Attendance Calculator] Could not fetch Zoom meeting details, using fallback:', err);
   }
 
-  const supabase = await createAdminClient();
+  // If still no duration, try session record
+  if (!resolvedDuration || resolvedDuration <= 0) {
+    const { data: sessionRecord } = await supabase
+      .from('sessions')
+      .select('actual_duration_minutes, duration_minutes')
+      .eq('id', sessionId)
+      .single();
+
+    if (sessionRecord?.actual_duration_minutes && sessionRecord.actual_duration_minutes > 0) {
+      resolvedDuration = sessionRecord.actual_duration_minutes;
+      durationSource = 'session.actual_duration_minutes';
+    } else if (sessionRecord?.duration_minutes && sessionRecord.duration_minutes > 0) {
+      resolvedDuration = sessionRecord.duration_minutes;
+      durationSource = 'session.duration_minutes';
+    }
+  }
+
+  if (!resolvedDuration || resolvedDuration <= 0) {
+    throw new Error('Could not determine meeting duration from any source');
+  }
+
+  console.log(`[Attendance Calculator] Using duration: ${resolvedDuration} min (source: ${durationSource}) for session ${sessionId}`);
 
   // 1. Fetch participants from Zoom
   const participants = await zoomService.getPastMeetingParticipants(zoomMeetingUuid);
 
   if (!participants || participants.length === 0) {
-    return { imported: 0, unmatched: 0 };
+    return { imported: 0, unmatched: 0, actualDurationUsed: resolvedDuration };
   }
 
   // Compute meeting end time from the latest leave_time across all participants
@@ -187,7 +224,7 @@ export async function calculateSessionAttendance(
       const jt = new Date(p.join_time);
       return jt < earliest ? jt : earliest;
     }, new Date());
-    meetingEndTime.setTime(firstJoin.getTime() + actualDurationMinutes * 60 * 1000);
+    meetingEndTime.setTime(firstJoin.getTime() + resolvedDuration * 60 * 1000);
   }
 
   // 2. Group by email
@@ -223,7 +260,7 @@ export async function calculateSessionAttendance(
     // Merge overlapping segments
     const mergedSegments = mergeOverlappingSegments(participant.segments);
     const totalMinutes = totalMinutesFromSegments(mergedSegments);
-    const percentage = Math.min(100, Math.round((totalMinutes / actualDurationMinutes) * 100 * 100) / 100);
+    const percentage = Math.min(100, Math.round((totalMinutes / resolvedDuration) * 100 * 100) / 100);
 
     // Total duration in seconds
     const totalDurationSeconds = Math.round(totalMinutes * 60);
@@ -273,5 +310,5 @@ export async function calculateSessionAttendance(
     }
   }
 
-  return { imported, unmatched };
+  return { imported, unmatched, actualDurationUsed: resolvedDuration };
 }

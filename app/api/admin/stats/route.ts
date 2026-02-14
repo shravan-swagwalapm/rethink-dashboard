@@ -1,8 +1,8 @@
 import { createAdminClient } from '@/lib/supabase/server';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdmin } from '@/lib/api/verify-admin';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const auth = await verifyAdmin();
   if (!auth.authorized) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
@@ -10,6 +10,29 @@ export async function GET() {
 
   try {
     const adminClient = await createAdminClient();
+    const { searchParams } = new URL(request.url);
+    const cohortId = searchParams.get('cohort_id');
+
+    // Build attendance query — exclude unmatched (null user_id) from average
+    let attendanceQuery = adminClient
+      .from('attendance')
+      .select('attendance_percentage')
+      .not('user_id', 'is', null);
+
+    // If cohort_id provided, scope to sessions in that cohort
+    if (cohortId) {
+      const { data: cohortSessions } = await adminClient
+        .from('sessions')
+        .select('id')
+        .eq('cohort_id', cohortId);
+      const sessionIds = (cohortSessions || []).map(s => s.id);
+      if (sessionIds.length > 0) {
+        attendanceQuery = attendanceQuery.in('session_id', sessionIds);
+      } else {
+        // No sessions in this cohort — attendance is 0
+        attendanceQuery = attendanceQuery.eq('session_id', '__no_match__');
+      }
+    }
 
     // Fetch all stats in parallel
     const [
@@ -27,7 +50,7 @@ export async function GET() {
       adminClient.from('cohorts').select('*', { count: 'exact', head: true }).eq('status', 'active'),
       adminClient.from('sessions').select('*', { count: 'exact', head: true }).gte('scheduled_at', new Date().toISOString()),
       adminClient.from('support_tickets').select('*', { count: 'exact', head: true }).eq('status', 'open'),
-      adminClient.from('attendance').select('attendance_percentage'),
+      attendanceQuery,
     ]);
 
     const avgAttendance = attendance?.length

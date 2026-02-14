@@ -78,6 +78,7 @@ function AttendanceContent() {
           .from('sessions')
           .select('*')
           .eq('cohort_id', cohortId)
+          .eq('counts_for_students', true)
           .lte('scheduled_at', new Date().toISOString())
           .order('scheduled_at', { ascending: false });
 

@@ -15,17 +15,18 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { sessionId, zoomMeetingUuid, actualDurationMinutes } = body;
 
-    if (!sessionId || !zoomMeetingUuid || !actualDurationMinutes) {
+    if (!sessionId || !zoomMeetingUuid) {
       return NextResponse.json(
-        { error: 'sessionId, zoomMeetingUuid, and actualDurationMinutes are required' },
+        { error: 'sessionId and zoomMeetingUuid are required' },
         { status: 400 }
       );
     }
 
+    // actualDurationMinutes is now optional — calculator auto-resolves from Zoom API
     const result = await calculateSessionAttendance(
       sessionId,
       zoomMeetingUuid,
-      actualDurationMinutes
+      actualDurationMinutes || undefined
     );
 
     return NextResponse.json(result);

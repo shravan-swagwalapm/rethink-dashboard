@@ -45,10 +45,20 @@ export async function GET(request: NextRequest) {
         .select('*', { count: 'exact', head: true })
         .eq('cohort_id', profile.cohort_id)
         .eq('role', 'student'),
-      supabase
-        .from('attendance')
-        .select('attendance_percentage')
-        .eq('user_id', user.id),
+      // Scope attendance to sessions in user's cohort (avoids cross-cohort mixing)
+      (async () => {
+        const { data: cohortSessions } = await adminClient
+          .from('sessions')
+          .select('id')
+          .eq('cohort_id', profile.cohort_id);
+        const sessionIds = (cohortSessions || []).map((s: { id: string }) => s.id);
+        if (sessionIds.length === 0) return { data: [] };
+        return supabase
+          .from('attendance')
+          .select('attendance_percentage')
+          .eq('user_id', user.id)
+          .in('session_id', sessionIds);
+      })(),
       supabase
         .from('rankings')
         .select('rank')

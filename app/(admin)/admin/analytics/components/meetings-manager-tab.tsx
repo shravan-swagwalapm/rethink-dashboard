@@ -19,7 +19,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { RefreshCw, Calculator, CheckCircle2, Clock, Minus, Video, Loader2, Plus, Eye, Info } from 'lucide-react';
+import { RefreshCw, Calculator, CheckCircle2, Clock, Minus, Video, Loader2, Plus, Eye, Info, Pencil, Check, X } from 'lucide-react';
 import { AttendancePreviewDialog } from './attendance-preview-dialog';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
@@ -36,6 +36,7 @@ interface ZoomMeeting {
   topic: string;
   date: string;
   duration: number;
+  scheduledDuration?: number;
   participantCount: number;
   linkedSessionId: string | null;
   linkedSessionTitle: string | null;
@@ -97,6 +98,8 @@ export function MeetingsManagerTab({ cohorts }: MeetingsManagerTabProps) {
   const [creatingSession, setCreatingSession] = useState(false);
   const [previewSessionId, setPreviewSessionId] = useState<string | null>(null);
   const [previewTopic, setPreviewTopic] = useState('');
+  const [editingDurationId, setEditingDurationId] = useState<string | null>(null);
+  const [editDurationValue, setEditDurationValue] = useState('');
 
   const syncFromZoom = useCallback(async () => {
     setLoading(true);
@@ -279,6 +282,42 @@ export function MeetingsManagerTab({ cohorts }: MeetingsManagerTabProps) {
     }
   }, [meetings, calculateAttendance]);
 
+  const saveDuration = useCallback(async (meeting: ZoomMeeting) => {
+    const newDuration = parseInt(editDurationValue, 10);
+    if (isNaN(newDuration) || newDuration <= 0) {
+      setEditingDurationId(null);
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/admin/analytics/sync-zoom', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          zoomMeetingId: meeting.zoomId,
+          sessionId: meeting.linkedSessionId,
+          actualDurationMinutes: newDuration,
+          topic: meeting.topic,
+          countsForStudents: meeting.countsForStudents,
+          scheduledAt: meeting.date,
+        }),
+      });
+
+      if (!res.ok) throw new Error('Failed to update duration');
+
+      setMeetings((prev) =>
+        prev.map((m) =>
+          m.zoomId === meeting.zoomId ? { ...m, actualDurationMinutes: newDuration } : m
+        )
+      );
+      toast.success(`Duration updated to ${newDuration} min`);
+    } catch {
+      toast.error('Failed to update duration');
+    } finally {
+      setEditingDurationId(null);
+    }
+  }, [editDurationValue]);
+
   const openCreateSessionDialog = useCallback((meeting: ZoomMeeting) => {
     setCreateSessionMeeting(meeting);
     setCreateSessionTitle(meeting.topic);
@@ -385,7 +424,14 @@ export function MeetingsManagerTab({ cohorts }: MeetingsManagerTabProps) {
                     <TableRow>
                       <TableHead className="sticky left-0 bg-background z-10 min-w-[200px]">Title</TableHead>
                       <TableHead>Date</TableHead>
-                      <TableHead>Duration</TableHead>
+                      <TableHead>
+                        <Tooltip>
+                          <TooltipTrigger className="flex items-center gap-1">
+                            Duration <Info className="w-3 h-3 text-muted-foreground" />
+                          </TooltipTrigger>
+                          <TooltipContent>Actual meeting runtime used as the denominator for attendance %. Click to edit.</TooltipContent>
+                        </Tooltip>
+                      </TableHead>
                       <TableHead>
                         <Tooltip>
                           <TooltipTrigger className="flex items-center gap-1">
@@ -423,7 +469,53 @@ export function MeetingsManagerTab({ cohorts }: MeetingsManagerTabProps) {
                             {format(new Date(meeting.date), 'MMM d, yyyy')}
                           </TableCell>
                           <TableCell className="text-sm">
-                            {meeting.actualDurationMinutes} min
+                            {editingDurationId === meeting.zoomId ? (
+                              <div className="flex items-center gap-1">
+                                <Input
+                                  type="number"
+                                  value={editDurationValue}
+                                  onChange={(e) => setEditDurationValue(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') saveDuration(meeting);
+                                    if (e.key === 'Escape') setEditingDurationId(null);
+                                  }}
+                                  className="w-20 h-7 text-xs"
+                                  autoFocus
+                                  min={1}
+                                />
+                                <span className="text-xs text-muted-foreground">min</span>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-6 w-6"
+                                  onClick={() => saveDuration(meeting)}
+                                >
+                                  <Check className="w-3 h-3" />
+                                </Button>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-6 w-6"
+                                  onClick={() => setEditingDurationId(null)}
+                                >
+                                  <X className="w-3 h-3" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <button
+                                className="flex items-center gap-1 hover:text-foreground text-muted-foreground cursor-pointer group"
+                                onClick={() => {
+                                  setEditingDurationId(meeting.zoomId);
+                                  setEditDurationValue(String(meeting.actualDurationMinutes));
+                                }}
+                              >
+                                <span>{meeting.actualDurationMinutes} min</span>
+                                {meeting.scheduledDuration && meeting.actualDurationMinutes !== meeting.scheduledDuration && (
+                                  <span className="text-xs opacity-60">(sched: {meeting.scheduledDuration})</span>
+                                )}
+                                <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-50 transition-opacity" />
+                              </button>
+                            )}
                           </TableCell>
                           <TableCell className="text-sm">
                             {meeting.participantCount}
