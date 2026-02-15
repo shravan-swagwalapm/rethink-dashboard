@@ -687,6 +687,11 @@ Changes should only touch what's necessary. Avoid introducing bugs.
 - Update 2026-02-11: 3 code paths queried other users' profiles via anon key (`createClient()` / `getClient()`) → When enabling RLS on a table, audit ALL queries to that table. Client-side queries using anon key are subject to RLS policies. Use `createAdminClient()` server-side for cross-user queries
 - Update 2026-02-11: `team/page.tsx` used `getClient()` (client-side) to query profiles directly → Client components cannot use `createAdminClient()`. Create a server API route that uses adminClient, then fetch from client. Pattern: auth via `createClient()`, data via `createAdminClient()` with manual scoping
 
+**RSVP/Reminder & Profile Image Fixes (2026-02-15 — Session 9)**:
+- Update 2026-02-15: RSVP/reminder handlers used client-side getClient() with hardcoded id: '' in optimistic state → Always use API routes for mutations. Use the response data (with real ID) for local state updates, never hardcode placeholders
+- Update 2026-02-15: Profile image upload used createClient() for storage ops → Storage operations via createAdminClient() bypass bucket RLS policies. Always use adminClient for server-side storage operations
+- Update 2026-02-15: HEIC not in allowed image types → Always include image/heic and image/heif for iOS Safari compatibility
+
 [Claude: Add new entries here after each mistake]
 
 ---

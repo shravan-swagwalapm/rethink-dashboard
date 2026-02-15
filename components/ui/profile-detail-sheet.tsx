@@ -38,7 +38,7 @@ export function ProfileDetailSheet({ profile, role, open, onOpenChange }: Profil
           {role && <Badge className="mt-1 capitalize">{role}</Badge>}
         </div>
 
-        <div className="mt-8 space-y-4">
+        <div className="mt-8 space-y-4 flex flex-col items-center">
           {profile.email && (
             <div className="flex items-center gap-3">
               <Mail className="w-4 h-4 text-muted-foreground shrink-0" />

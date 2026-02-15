@@ -558,13 +558,13 @@ export default function ProfilePage() {
                 <div>
                   <Input
                     type="file"
-                    accept="image/jpeg,image/jpg,image/png,image/webp"
+                    accept="image/jpeg,image/jpg,image/png,image/webp,image/heic,image/heif"
                     onChange={handleAvatarChange}
                     className="cursor-pointer"
                     disabled={uploadingAvatar}
                   />
                   <p className="text-xs text-muted-foreground mt-1.5">
-                    Accepted formats: JPEG, PNG, WebP. Max size: 5MB
+                    Accepted formats: JPEG, PNG, WebP, HEIC. Max size: 5MB
                   </p>
                 </div>
 

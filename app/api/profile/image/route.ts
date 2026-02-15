@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 
 // Force dynamic rendering - no caching
 export const dynamic = 'force-dynamic';
@@ -9,10 +9,11 @@ export const dynamic = 'force-dynamic';
  * Upload a profile image for the authenticated user
  *
  * Accepts multipart form data with a 'file' field
- * - Validates file type (JPEG, JPG, PNG, WebP only)
+ * - Validates file type (JPEG, PNG, WebP, HEIC/HEIF)
  * - Validates file size (max 5MB)
- * - Uploads to Supabase Storage 'profile-images' bucket
- * - Updates user profile with new avatar_url
+ * - Uploads to Supabase Storage 'profile-images' bucket via adminClient (bypasses RLS)
+ * - Cleans up old avatar files before uploading new one
+ * - Updates user profile with new avatar_url (cache-busted)
  */
 export async function POST(request: NextRequest) {
   try {
@@ -36,17 +37,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    // Validate file type (including HEIC/HEIF for iOS Safari)
+    const allowedTypes = [
+      'image/jpeg', 'image/jpg', 'image/png', 'image/webp',
+      'image/heic', 'image/heif',
+    ];
     if (!allowedTypes.includes(file.type)) {
       return NextResponse.json(
-        { error: 'Invalid file type. Only JPEG, PNG, and WebP are allowed.' },
+        { error: 'Invalid file type. Allowed: JPEG, PNG, WebP, HEIC.' },
         { status: 400 }
       );
     }
 
     // Validate file size (5MB max)
-    const maxSizeBytes = 5 * 1024 * 1024; // 5MB
+    const maxSizeBytes = 5 * 1024 * 1024;
     if (file.size > maxSizeBytes) {
       return NextResponse.json(
         { error: 'File too large. Maximum size is 5MB.' },
@@ -54,22 +58,43 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate unique filename
+    // Use admin client for storage + profile operations (bypasses RLS and bucket policies)
+    const adminClient = await createAdminClient();
+
+    // Determine file extension and normalize content type
     const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
-    const fileName = `${user.id}-${Date.now()}.${fileExt}`;
-    const filePath = `${user.id}/${fileName}`;
+    const contentType = file.type === 'image/jpg' ? 'image/jpeg' : file.type;
+
+    // Use consistent path: {user_id}/avatar.{ext} with upsert: true
+    const filePath = `${user.id}/avatar.${fileExt}`;
+
+    // Clean up ALL existing avatar files for this user before uploading
+    try {
+      const { data: existingFiles } = await adminClient.storage
+        .from('profile-images')
+        .list(user.id);
+
+      if (existingFiles && existingFiles.length > 0) {
+        const filesToDelete = existingFiles.map(f => `${user.id}/${f.name}`);
+        await adminClient.storage
+          .from('profile-images')
+          .remove(filesToDelete);
+      }
+    } catch {
+      // Non-critical: old files may not exist, continue with upload
+    }
 
     // Convert File to ArrayBuffer for upload
     const arrayBuffer = await file.arrayBuffer();
     const fileBuffer = new Uint8Array(arrayBuffer);
 
     // Upload to Supabase Storage
-    const { data: uploadData, error: uploadError } = await supabase.storage
+    const { error: uploadError } = await adminClient.storage
       .from('profile-images')
       .upload(filePath, fileBuffer, {
-        contentType: file.type,
+        contentType,
         cacheControl: '3600',
-        upsert: false,
+        upsert: true,
       });
 
     if (uploadError) {
@@ -78,27 +103,28 @@ export async function POST(request: NextRequest) {
         {
           error: 'Failed to upload image',
           details: uploadError.message || uploadError,
-          hint: 'Check Supabase storage bucket policies'
         },
         { status: 500 }
       );
     }
 
-    // Get public URL
-    const { data: { publicUrl } } = supabase.storage
+    // Get public URL and append cache-buster for immediate display refresh
+    const { data: { publicUrl } } = adminClient.storage
       .from('profile-images')
       .getPublicUrl(filePath);
 
+    const cacheBustedUrl = `${publicUrl}?t=${Date.now()}`;
+
     // Update user profile with avatar URL
-    const { error: updateError } = await supabase
+    const { error: updateError } = await adminClient
       .from('profiles')
-      .update({ avatar_url: publicUrl })
+      .update({ avatar_url: cacheBustedUrl })
       .eq('id', user.id);
 
     if (updateError) {
       console.error('Error updating profile:', updateError);
       // Attempt to clean up the uploaded file
-      await supabase.storage
+      await adminClient.storage
         .from('profile-images')
         .remove([filePath]);
 
@@ -109,8 +135,8 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({
-      avatar_url: publicUrl,
-      message: 'Profile image uploaded successfully'
+      avatar_url: cacheBustedUrl,
+      message: 'Profile image uploaded successfully',
     });
   } catch (error) {
     console.error('Error in POST /api/profile/image:', error);
@@ -125,9 +151,7 @@ export async function POST(request: NextRequest) {
  * DELETE /api/profile/image
  * Remove the profile image for the authenticated user
  *
- * - Gets current avatar_url from profile
- * - Extracts file path from URL
- * - Deletes from Supabase Storage
+ * - Deletes ALL files in user's storage folder (robust cleanup)
  * - Updates profile to set avatar_url to null
  */
 export async function DELETE(request: NextRequest) {
@@ -142,50 +166,27 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Get current avatar URL from profile
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('avatar_url')
-      .eq('id', user.id)
-      .single();
+    const adminClient = await createAdminClient();
 
-    if (profileError) {
-      console.error('Error fetching profile:', profileError);
-      return NextResponse.json(
-        { error: 'Failed to fetch profile' },
-        { status: 500 }
-      );
-    }
+    // Delete ALL files in user's folder (robust: handles any filename pattern)
+    try {
+      const { data: existingFiles } = await adminClient.storage
+        .from('profile-images')
+        .list(user.id);
 
-    // If there's an existing avatar, try to delete it from storage
-    if (profile?.avatar_url) {
-      try {
-        // Extract file path from URL
-        // URL format: https://{project}.supabase.co/storage/v1/object/public/profile-images/{user_id}/{filename}
-        const url = new URL(profile.avatar_url);
-        const pathParts = url.pathname.split('/profile-images/');
-
-        if (pathParts.length === 2) {
-          const filePath = decodeURIComponent(pathParts[1]);
-
-          // Delete from storage
-          const { error: deleteError } = await supabase.storage
-            .from('profile-images')
-            .remove([filePath]);
-
-          if (deleteError) {
-            // Log but don't fail the request - the file might already be deleted
-            console.warn('Warning: Could not delete file from storage:', deleteError);
-          }
-        }
-      } catch (urlError) {
-        // Log but don't fail if URL parsing fails
-        console.warn('Warning: Could not parse avatar URL:', urlError);
+      if (existingFiles && existingFiles.length > 0) {
+        const filesToDelete = existingFiles.map(f => `${user.id}/${f.name}`);
+        await adminClient.storage
+          .from('profile-images')
+          .remove(filesToDelete);
       }
+    } catch (storageError) {
+      // Log but don't fail — the file might already be deleted
+      console.warn('Warning: Could not delete files from storage:', storageError);
     }
 
     // Update profile to remove avatar URL
-    const { error: updateError } = await supabase
+    const { error: updateError } = await adminClient
       .from('profiles')
       .update({ avatar_url: null })
       .eq('id', user.id);
@@ -199,7 +200,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     return NextResponse.json({
-      message: 'Profile image removed successfully'
+      message: 'Profile image removed successfully',
     });
   } catch (error) {
     console.error('Error in DELETE /api/profile/image:', error);

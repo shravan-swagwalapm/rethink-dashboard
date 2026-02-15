@@ -133,58 +133,32 @@ export default function CalendarPage() {
     if (!selectedSession || !profile) return;
 
     setRsvpLoading(true);
-    const supabase = getClient();
 
     try {
-      const { error } = await supabase
-        .from('rsvps')
-        .upsert({
-          session_id: selectedSession.id,
-          user_id: profile.id,
+      const res = await fetch(`/api/sessions/${selectedSession.id}/rsvp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           response,
           reminder_enabled: selectedSession.user_rsvp?.reminder_enabled ?? true,
-        }, {
-          onConflict: 'session_id,user_id',
-        })
-        .select()
-        .single();
+        }),
+      });
 
-      if (error) throw error;
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to update RSVP');
+
+      const rsvp = data.rsvp;
 
       setSessions(prev =>
         prev.map(s =>
           s.id === selectedSession.id
-            ? {
-                ...s,
-                user_rsvp: {
-                  ...s.user_rsvp,
-                  id: s.user_rsvp?.id || '',
-                  session_id: selectedSession.id,
-                  user_id: profile.id,
-                  response,
-                  reminder_enabled: s.user_rsvp?.reminder_enabled ?? true,
-                  created_at: s.user_rsvp?.created_at || new Date().toISOString(),
-                },
-              }
+            ? { ...s, user_rsvp: rsvp }
             : s
         )
       );
 
       setSelectedSession(prev =>
-        prev
-          ? {
-              ...prev,
-              user_rsvp: {
-                ...prev.user_rsvp,
-                id: prev.user_rsvp?.id || '',
-                session_id: selectedSession.id,
-                user_id: profile.id,
-                response,
-                reminder_enabled: prev.user_rsvp?.reminder_enabled ?? true,
-                created_at: prev.user_rsvp?.created_at || new Date().toISOString(),
-              },
-            }
-          : null
+        prev ? { ...prev, user_rsvp: rsvp } : null
       );
 
       toast.success(response === 'yes' ? "You're in! See you there." : 'RSVP updated');
@@ -199,79 +173,40 @@ export default function CalendarPage() {
   const handleToggleReminder = async () => {
     if (!selectedSession || !profile) return;
 
-    const supabase = getClient();
     const newReminderEnabled = !(selectedSession.user_rsvp?.reminder_enabled ?? false);
 
     try {
-      // If enabling reminder and no RSVP exists, create one with 'yes'
-      if (newReminderEnabled && !selectedSession.user_rsvp) {
-        const { error } = await supabase
-          .from('rsvps')
-          .upsert({
-            session_id: selectedSession.id,
-            user_id: profile.id,
-            response: 'yes',
-            reminder_enabled: true,
-          }, {
-            onConflict: 'session_id,user_id',
-          })
-          .select()
-          .single();
+      const res = await fetch(`/api/sessions/${selectedSession.id}/rsvp`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reminder_enabled: newReminderEnabled }),
+      });
 
-        if (error) throw error;
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to update reminder');
 
-        // Update local state with new RSVP
-        const newRsvp = {
-          id: '',
-          session_id: selectedSession.id,
-          user_id: profile.id,
-          response: 'yes' as const,
-          reminder_enabled: true,
-          created_at: new Date().toISOString(),
-        };
+      const rsvp = data.rsvp;
 
-        setSessions(prev =>
-          prev.map(s =>
-            s.id === selectedSession.id
-              ? { ...s, user_rsvp: newRsvp }
-              : s
-          )
-        );
+      setSessions(prev =>
+        prev.map(s =>
+          s.id === selectedSession.id
+            ? { ...s, user_rsvp: rsvp }
+            : s
+        )
+      );
 
-        setSelectedSession(prev =>
-          prev ? { ...prev, user_rsvp: newRsvp } : null
-        );
+      setSelectedSession(prev =>
+        prev ? { ...prev, user_rsvp: rsvp } : null
+      );
 
-        toast.success("Reminder enabled - You're marked as attending!");
-        return;
-      }
-
-      // Existing logic for toggling reminder when RSVP exists
-      if (selectedSession.user_rsvp) {
-        const { error } = await supabase
-          .from('rsvps')
-          .update({ reminder_enabled: newReminderEnabled })
-          .eq('id', selectedSession.user_rsvp.id);
-
-        if (error) throw error;
-
-        // Update BOTH sessions array AND selectedSession
-        setSessions(prev =>
-          prev.map(s =>
-            s.id === selectedSession.id && s.user_rsvp
-              ? { ...s, user_rsvp: { ...s.user_rsvp, reminder_enabled: newReminderEnabled } }
-              : s
-          )
-        );
-
-        setSelectedSession(prev =>
-          prev?.user_rsvp
-            ? { ...prev, user_rsvp: { ...prev.user_rsvp, reminder_enabled: newReminderEnabled } }
-            : prev
-        );
-
-        toast.success(newReminderEnabled ? 'Reminder enabled' : 'Reminder disabled');
-      }
+      const wasNewRsvp = !selectedSession.user_rsvp;
+      toast.success(
+        wasNewRsvp
+          ? "Reminder enabled - You're marked as attending!"
+          : newReminderEnabled
+            ? 'Reminder enabled'
+            : 'Reminder disabled'
+      );
     } catch (error) {
       console.error('Error toggling reminder:', error);
       toast.error('Failed to update reminder');
