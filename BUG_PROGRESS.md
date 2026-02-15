@@ -1105,3 +1105,47 @@ This auto-resolves duration for every session and recalculates with uncapped per
 **Deployment Status**: Code deployed to production ✅
 **Data Status**: Recalculate needed for exact percentages (run browser console commands above)
 **Hard Refresh Required**: Yes (Cmd+Shift+R)
+
+---
+
+## Session 9: Final Student-Reported Bug Fixes (2026-02-15)
+
+**Status**: DEPLOYED & VERIFIED ✅
+**Model**: Claude Opus 4.6
+**Commit**: `42c4a9d` pushed to `main`
+
+---
+
+### Bugs Fixed
+
+| # | Bug | Root Cause | Fix |
+|---|-----|-----------|-----|
+| 1 | Profile card contact info left-aligned | Missing centering classes on contact container | Added `flex flex-col items-center` |
+| 2 | RSVP toggle didn't persist | Client-side Supabase calls + hardcoded `id: ''` in optimistic state | Moved to API route with `createAdminClient`; use real DB record from response |
+| 3 | Reminder toggle didn't persist | Same as Bug 2 — `id: ''` meant `.eq('id', '')` matched 0 rows | New PATCH endpoint for reminder-only toggle; auto-creates RSVP if needed |
+| 4 | Profile image upload failed on iPhone/Safari | HEIC not accepted; `createClient()` for storage (RLS blocked); no cache-busting | Added HEIC/HEIF; `createAdminClient` for storage; `upsert: true`; cache-buster `?t=timestamp` |
+
+### Files Modified (7)
+
+1. `components/ui/profile-detail-sheet.tsx` — centering fix
+2. `app/api/sessions/[id]/rsvp/route.ts` — createAdminClient + PATCH method
+3. `app/(dashboard)/calendar/page.tsx` — fetch() API calls instead of direct Supabase
+4. `app/api/profile/image/route.ts` — createAdminClient + HEIC + cleanup + cache-bust
+5. `app/(dashboard)/profile/page.tsx` — HEIC in accept attribute + help text
+6. `CLAUDE.md` — 3 new Past Mistakes entries
+7. `BUG_PROGRESS.md` — this session documentation
+
+### Key Learnings — Session 9
+
+36. **Hardcoded placeholder IDs cause silent failures**: `id: ''` in optimistic state means subsequent `.eq('id', '')` matches 0 rows. Supabase returns success (0 rows updated), toast fires, but nothing persists. Always use the real ID from the API response.
+
+37. **3 of 4 bugs were the same RLS pattern**: Sessions 3, 5, 6, and 9 all hit the same issue — `createClient()` used for mutations that need `createAdminClient()`. When fixing systemic issues, audit ALL routes at once.
+
+38. **HEIC is the default iPhone camera format**: Safari inconsistently auto-converts HEIC to JPEG. Always include `image/heic` and `image/heif` in allowed types for any image upload accepting mobile users.
+
+39. **Cache-busting URLs for immediate image refresh**: Append `?t=timestamp` to stored avatar URLs so browsers don't serve stale cached versions after re-upload.
+
+---
+
+**Deployment Status**: Deployed & manually verified ✅
+**Hard Refresh Required**: Yes (Cmd+Shift+R)
