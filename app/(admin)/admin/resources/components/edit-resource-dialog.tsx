@@ -90,7 +90,7 @@ export function EditResourceDialog({ open, onOpenChange, resource, onSaved }: Ed
               onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
             />
           </div>
-          {resource?.type === 'link' && (
+          {(resource?.type === 'link' || resource?.external_url) && (
             <div className="space-y-2">
               <Label htmlFor="edit-url">URL</Label>
               <Input

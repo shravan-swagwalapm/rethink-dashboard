@@ -29,6 +29,7 @@ export function CreateUserDialog({ cohorts, onCreated }: CreateUserDialogProps) 
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
   const [roleAssignments, setRoleAssignments] = useState<RoleAssignmentInput[]>([
     { role: 'student', cohort_id: null }
   ]);
@@ -80,6 +81,7 @@ export function CreateUserDialog({ cohorts, onCreated }: CreateUserDialogProps) 
         body: JSON.stringify({
           email,
           full_name: name,
+          phone: phone || undefined,
           role_assignments: validAssignments,
         }),
       });
@@ -94,6 +96,7 @@ export function CreateUserDialog({ cohorts, onCreated }: CreateUserDialogProps) 
       setOpen(false);
       setEmail('');
       setName('');
+      setPhone('');
       setRoleAssignments([{ role: 'student', cohort_id: null }]);
       onCreated();
     } catch (error) {
@@ -137,6 +140,19 @@ export function CreateUserDialog({ cohorts, onCreated }: CreateUserDialogProps) 
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="phone">Phone Number</Label>
+            <Input
+              id="phone"
+              type="tel"
+              placeholder="+919876543210"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Include country code (e.g., +91 for India)
+            </p>
           </div>
 
           <div className="space-y-3">

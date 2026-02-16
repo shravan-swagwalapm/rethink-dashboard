@@ -61,6 +61,7 @@ import { format, parseISO, isPast } from 'date-fns';
 import type { Session, Cohort, SessionCohort, SessionGuest, Profile } from '@/types';
 import { Checkbox } from '@/components/ui/checkbox';
 import { MotionContainer, MotionItem, MotionFadeIn } from '@/components/ui/motion';
+import { RsvpListDialog } from './components/rsvp-list-dialog';
 
 interface SessionWithStats extends Session {
   cohort?: Cohort;
@@ -90,6 +91,10 @@ export default function SessionsPage() {
   const [calendarEmail, setCalendarEmail] = useState<string | null>(null);
   const [calendarHealth, setCalendarHealth] = useState<'healthy' | 'expiring_soon' | 'expired' | 'disconnected'>('disconnected');
   const [calendarNeedsReconnect, setCalendarNeedsReconnect] = useState(false);
+
+  const [rsvpDialogOpen, setRsvpDialogOpen] = useState(false);
+  const [rsvpSessionId, setRsvpSessionId] = useState<string | null>(null);
+  const [rsvpSessionTitle, setRsvpSessionTitle] = useState('');
 
   const [showForm, setShowForm] = useState(false);
   const [editingSession, setEditingSession] = useState<SessionWithStats | null>(null);
@@ -499,7 +504,15 @@ export default function SessionsPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2">
+                        <button
+                          className="flex items-center gap-2 hover:bg-muted/50 rounded-md px-2 py-1 -mx-2 -my-1 transition-colors cursor-pointer"
+                          onClick={() => {
+                            setRsvpSessionId(session.id);
+                            setRsvpSessionTitle(session.title);
+                            setRsvpDialogOpen(true);
+                          }}
+                          title="Click to view RSVP details"
+                        >
                           <span className="flex items-center gap-1 text-green-600">
                             <Check className="w-3 h-3" />
                             {session.rsvp_yes_count}
@@ -508,7 +521,7 @@ export default function SessionsPage() {
                             <X className="w-3 h-3" />
                             {session.rsvp_no_count}
                           </span>
-                        </div>
+                        </button>
                       </TableCell>
                       <TableCell>{getSessionStatus(session)}</TableCell>
                       <TableCell>
@@ -805,6 +818,13 @@ export default function SessionsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <RsvpListDialog
+        open={rsvpDialogOpen}
+        onOpenChange={setRsvpDialogOpen}
+        sessionId={rsvpSessionId}
+        sessionTitle={rsvpSessionTitle}
+      />
     </div>
   );
 }

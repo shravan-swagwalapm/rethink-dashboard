@@ -292,10 +292,6 @@ export function ResourceFormDialog({
     setUploadProgress(true);
 
     try {
-      let filePath: string | null = null;
-      let fileType: string | null = null;
-      let fileSize: number | null = null;
-
       if (selectedFile && formData.content_type !== 'video') {
         if (selectedFile.size > DIRECT_UPLOAD_THRESHOLD) {
           const result = await uploadLargeFile(
@@ -321,7 +317,9 @@ export function ResourceFormDialog({
           return;
 
         } else {
-          // Compress PDF before upload (smart size-based compression)
+          // Small file: use learnings-specific upload endpoint
+          // This uploads to storage AND creates module_resources in one step
+          // (avoids dual insert into both resources + module_resources tables)
           let fileToUpload: File = selectedFile;
           if (selectedFile.type === 'application/pdf') {
             const compressionResult = await compressPdf(selectedFile);
@@ -331,8 +329,14 @@ export function ResourceFormDialog({
           const uploadFormData = new FormData();
           uploadFormData.append('file', fileToUpload);
           uploadFormData.append('cohort_id', selectedCohort === GLOBAL_LIBRARY_ID ? 'global' : selectedCohort);
+          uploadFormData.append('module_id', targetModuleId);
+          uploadFormData.append('title', formData.title);
+          uploadFormData.append('content_type', formData.content_type);
+          if (formData.session_number) uploadFormData.append('session_number', formData.session_number);
+          if (formData.order_index !== undefined) uploadFormData.append('order_index', String(formData.order_index));
+          if (formData.duration_seconds) uploadFormData.append('duration_seconds', formData.duration_seconds);
 
-          const uploadResponse = await fetch('/api/admin/resources/upload', {
+          const uploadResponse = await fetch('/api/admin/learnings/upload', {
             method: 'POST',
             body: uploadFormData,
           });
@@ -358,13 +362,15 @@ export function ResourceFormDialog({
             throw new Error(errorMessage);
           }
 
-          const uploadData = await uploadResponse.json();
-          filePath = uploadData.file_path;
-          fileType = uploadData.file_type;
-          fileSize = uploadData.file_size;
+          // Small file upload creates module_resources in one step — return early
+          toast.success('Resource added');
+          onOpenChange(false);
+          onSaveComplete();
+          return;
         }
       }
 
+      // Only reach here for video resources (no file upload needed)
       const response = await fetch('/api/admin/learnings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -377,9 +383,9 @@ export function ResourceFormDialog({
           session_number: formData.session_number ? parseInt(formData.session_number) : null,
           order_index: formData.order_index,
           external_url: formData.content_type === 'video' ? formData.youtube_url : null,
-          file_path: filePath,
-          file_type: fileType,
-          file_size: fileSize,
+          file_path: null,
+          file_type: null,
+          file_size: null,
         }),
       });
 
@@ -409,7 +415,8 @@ export function ResourceFormDialog({
       let fileSize: number | null = null;
 
       if (selectedFile && formData.content_type !== 'video') {
-        // Compress PDF before upload (smart size-based compression)
+        // Use learnings upload in storage-only mode (no module_id)
+        // This uploads to storage WITHOUT inserting into the resources table
         let fileToUpload: File = selectedFile;
         if (selectedFile.type === 'application/pdf') {
           const compressionResult = await compressPdf(selectedFile);
@@ -419,8 +426,9 @@ export function ResourceFormDialog({
         const uploadFormData = new FormData();
         uploadFormData.append('file', fileToUpload);
         uploadFormData.append('cohort_id', selectedCohort === GLOBAL_LIBRARY_ID ? 'global' : selectedCohort);
+        // No module_id = storage-only mode
 
-        const uploadResponse = await fetch('/api/admin/resources/upload', {
+        const uploadResponse = await fetch('/api/admin/learnings/upload', {
           method: 'POST',
           body: uploadFormData,
         });

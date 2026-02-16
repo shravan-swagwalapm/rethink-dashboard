@@ -12,6 +12,7 @@ import type { UserWithCohort } from './types';
 import { CreateUserDialog } from './components/create-user-dialog';
 import { BulkUploadDialog } from './components/bulk-upload-dialog';
 import { EditRolesDialog } from './components/edit-roles-dialog';
+import { EditProfileDialog } from './components/edit-profile-dialog';
 import { UserFilters, ActiveFilterChips } from './components/user-filters';
 import { UserStats } from './components/user-stats';
 import { UserTable } from './components/user-table';
@@ -33,6 +34,8 @@ export default function UsersPage() {
 
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserWithCohort | null>(null);
+  const [editProfileDialogOpen, setEditProfileDialogOpen] = useState(false);
+  const [editProfileUser, setEditProfileUser] = useState<UserWithCohort | null>(null);
 
   const hasFetchedRef = useRef(false);
 
@@ -189,6 +192,11 @@ export default function UsersPage() {
     setEditDialogOpen(true);
   };
 
+  const handleEditProfile = (user: UserWithCohort) => {
+    setEditProfileUser(user);
+    setEditProfileDialogOpen(true);
+  };
+
   const activeFilterCount = getActiveFilterCount();
 
   const filterProps = {
@@ -244,6 +252,13 @@ export default function UsersPage() {
         onSaved={() => fetchData(true)}
       />
 
+      <EditProfileDialog
+        user={editProfileUser}
+        open={editProfileDialogOpen}
+        onOpenChange={setEditProfileDialogOpen}
+        onSaved={() => fetchData(true)}
+      />
+
       <MotionFadeIn delay={0.1}>
         <UserFilters {...filterProps} />
 
@@ -258,6 +273,7 @@ export default function UsersPage() {
           cohorts={cohorts}
           activeFilterCount={activeFilterCount}
           onEditRoles={handleEditRoles}
+          onEditProfile={handleEditProfile}
           onDeleted={() => fetchData(true)}
         />
       </MotionFadeIn>

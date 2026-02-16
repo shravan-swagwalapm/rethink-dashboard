@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { email, full_name, cohort_id, role_assignments } = body;
+    const { email, full_name, phone, cohort_id, role_assignments } = body;
 
     if (!email) {
       return NextResponse.json({ error: 'Email is required' }, { status: 400 });
@@ -77,6 +77,7 @@ export async function POST(request: NextRequest) {
       .from('profiles')
       .update({
         full_name: full_name || null,
+        phone: phone || null,
         cohort_id: primaryCohortId,
         role: primaryRole,
       })

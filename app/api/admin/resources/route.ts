@@ -120,7 +120,7 @@ export async function POST(request: Request) {
         file_path: filePath,
         file_size: fileSize,
         file_type: fileType,
-        type: 'file',
+        type: externalUrl ? 'link' : 'file',
         uploaded_by: auth.userId,
       })
       .select()

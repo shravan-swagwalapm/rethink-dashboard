@@ -30,7 +30,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { MoreVertical, Mail, Pencil, Phone, Trash2, Loader2 } from 'lucide-react';
+import { MoreVertical, Mail, Pencil, Phone, Trash2, Loader2, UserPen } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import type { Cohort } from '@/types';
@@ -42,10 +42,11 @@ interface UserTableProps {
   cohorts: Cohort[];
   activeFilterCount: number;
   onEditRoles: (user: UserWithCohort) => void;
+  onEditProfile: (user: UserWithCohort) => void;
   onDeleted: () => void;
 }
 
-export function UserTable({ filteredUsers, cohorts, activeFilterCount, onEditRoles, onDeleted }: UserTableProps) {
+export function UserTable({ filteredUsers, cohorts, activeFilterCount, onEditRoles, onEditProfile, onDeleted }: UserTableProps) {
   const [deleteUser, setDeleteUser] = useState<UserWithCohort | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -166,6 +167,10 @@ export function UserTable({ filteredUsers, cohorts, activeFilterCount, onEditRol
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => onEditProfile(user)}>
+                              <UserPen className="w-4 h-4 mr-2" />
+                              Edit Profile
+                            </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => onEditRoles(user)}>
                               <Pencil className="w-4 h-4 mr-2" />
                               Edit Roles

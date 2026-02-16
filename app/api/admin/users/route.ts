@@ -94,13 +94,78 @@ export async function PUT(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { id, role, cohort_id, role_assignments } = body;
+    const { id, role, cohort_id, role_assignments, email, phone, full_name } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
     }
 
     const adminClient = await createAdminClient();
+
+    // Handle profile field updates (email, phone, full_name)
+    if (email !== undefined || phone !== undefined || full_name !== undefined) {
+      const profileUpdate: Record<string, unknown> = {};
+      if (phone !== undefined) profileUpdate.phone = phone;
+      if (full_name !== undefined) profileUpdate.full_name = full_name;
+
+      // Update email in Supabase Auth first (if changed)
+      if (email !== undefined) {
+        const { data: currentProfile } = await adminClient
+          .from('profiles')
+          .select('email')
+          .eq('id', id)
+          .single();
+
+        if (currentProfile && email !== currentProfile.email) {
+          const { error: authError } = await adminClient.auth.admin.updateUserById(id, {
+            email: email,
+          });
+
+          if (authError) {
+            return NextResponse.json(
+              { error: `Failed to update email: ${authError.message}` },
+              { status: 400 }
+            );
+          }
+
+          profileUpdate.email = email;
+        }
+      }
+
+      if (Object.keys(profileUpdate).length > 0) {
+        const { error: profileError } = await adminClient
+          .from('profiles')
+          .update(profileUpdate)
+          .eq('id', id);
+
+        if (profileError) {
+          console.error('Error updating profile:', profileError);
+          return NextResponse.json(
+            { error: 'Failed to update profile' },
+            { status: 500 }
+          );
+        }
+      }
+
+      // If only profile fields were updated (no role changes), return early
+      if (role === undefined && cohort_id === undefined && role_assignments === undefined) {
+        const { data: updatedUser } = await adminClient
+          .from('profiles')
+          .select('*, cohort:cohorts!fk_profile_cohort(*)')
+          .eq('id', id)
+          .single();
+
+        const { data: updatedAssignments } = await adminClient
+          .from('user_role_assignments')
+          .select('*, cohort:cohorts(*)')
+          .eq('user_id', id);
+
+        return NextResponse.json({
+          ...updatedUser,
+          role_assignments: updatedAssignments || [],
+        });
+      }
+    }
 
     // Get current user data and role assignments BEFORE update
     const { data: currentUser } = await adminClient
