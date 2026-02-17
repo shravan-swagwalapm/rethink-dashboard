@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
-import { Loader2, Users, LogIn, AlertTriangle, BookOpen } from 'lucide-react';
+import { Loader2, Users, LogIn, AlertTriangle, BookOpen, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { HealthBadge, HealthDot } from './health-badge';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
@@ -23,9 +23,14 @@ interface CohortTabProps {
   onCohortChange: (cohortId: string) => void;
 }
 
+type SortKey = 'name' | 'login_count' | 'last_login' | 'content_completion_percent' | 'health_status';
+type SortDir = 'asc' | 'desc';
+
 export function CohortTab({ period, selectedCohort }: CohortTabProps) {
   const [stats, setStats] = useState<CohortUsageStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sortKey, setSortKey] = useState<SortKey | null>(null);
+  const [sortDir, setSortDir] = useState<SortDir | null>(null);
 
   const fetchStats = useCallback(async () => {
     if (!selectedCohort) return;
@@ -62,6 +67,46 @@ export function CohortTab({ period, selectedCohort }: CohortTabProps) {
       </div>
     );
   }
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey !== key) {
+      setSortKey(key);
+      setSortDir('asc');
+    } else if (sortDir === 'asc') {
+      setSortDir('desc');
+    } else {
+      setSortKey(null);
+      setSortDir(null);
+    }
+  };
+
+  const sortedStudents = useMemo(() => {
+    const students = stats?.students || [];
+    if (!sortKey || !sortDir) return students;
+
+    return [...students].sort((a, b) => {
+      const dir = sortDir === 'asc' ? 1 : -1;
+      switch (sortKey) {
+        case 'name':
+          return dir * a.name.localeCompare(b.name);
+        case 'login_count':
+          return dir * (a.login_count - b.login_count);
+        case 'last_login': {
+          const aTime = a.last_login ? new Date(a.last_login).getTime() : 0;
+          const bTime = b.last_login ? new Date(b.last_login).getTime() : 0;
+          return dir * (aTime - bTime);
+        }
+        case 'content_completion_percent':
+          return dir * (a.content_completion_percent - b.content_completion_percent);
+        case 'health_status': {
+          const order: Record<string, number> = { active: 0, at_risk: 1, inactive: 2 };
+          return dir * ((order[a.health_status] ?? 2) - (order[b.health_status] ?? 2));
+        }
+        default:
+          return 0;
+      }
+    });
+  }, [stats?.students, sortKey, sortDir]);
 
   return (
     <div className="space-y-6">
@@ -112,22 +157,62 @@ export function CohortTab({ period, selectedCohort }: CohortTabProps) {
       {/* Student Table */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Students ({stats.students.length})</CardTitle>
+          <CardTitle className="text-base">Students ({sortedStudents.length})</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead className="w-8"></TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead className="text-center">Logins</TableHead>
-                <TableHead>Last Login</TableHead>
-                <TableHead className="text-center">Content</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead
+                  className="cursor-pointer select-none hover:text-foreground transition-colors"
+                  onClick={() => handleSort('name')}
+                >
+                  <span className="inline-flex items-center gap-1.5">
+                    Name
+                    {sortKey === 'name' ? (sortDir === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />) : <ArrowUpDown className="w-4 h-4 opacity-50" />}
+                  </span>
+                </TableHead>
+                <TableHead
+                  className="text-center cursor-pointer select-none hover:text-foreground transition-colors"
+                  onClick={() => handleSort('login_count')}
+                >
+                  <span className="inline-flex items-center gap-1.5 justify-center">
+                    Logins
+                    {sortKey === 'login_count' ? (sortDir === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />) : <ArrowUpDown className="w-4 h-4 opacity-50" />}
+                  </span>
+                </TableHead>
+                <TableHead
+                  className="cursor-pointer select-none hover:text-foreground transition-colors"
+                  onClick={() => handleSort('last_login')}
+                >
+                  <span className="inline-flex items-center gap-1.5">
+                    Last Login
+                    {sortKey === 'last_login' ? (sortDir === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />) : <ArrowUpDown className="w-4 h-4 opacity-50" />}
+                  </span>
+                </TableHead>
+                <TableHead
+                  className="text-center cursor-pointer select-none hover:text-foreground transition-colors"
+                  onClick={() => handleSort('content_completion_percent')}
+                >
+                  <span className="inline-flex items-center gap-1.5 justify-center">
+                    Content
+                    {sortKey === 'content_completion_percent' ? (sortDir === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />) : <ArrowUpDown className="w-4 h-4 opacity-50" />}
+                  </span>
+                </TableHead>
+                <TableHead
+                  className="cursor-pointer select-none hover:text-foreground transition-colors"
+                  onClick={() => handleSort('health_status')}
+                >
+                  <span className="inline-flex items-center gap-1.5">
+                    Status
+                    {sortKey === 'health_status' ? (sortDir === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />) : <ArrowUpDown className="w-4 h-4 opacity-50" />}
+                  </span>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {stats.students.map((student) => (
+              {sortedStudents.map((student) => (
                 <TableRow key={student.user_id}>
                   <TableCell>
                     <HealthDot status={student.health_status} />
@@ -164,7 +249,7 @@ export function CohortTab({ period, selectedCohort }: CohortTabProps) {
                   </TableCell>
                 </TableRow>
               ))}
-              {stats.students.length === 0 && (
+              {sortedStudents.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                     No students in this cohort
