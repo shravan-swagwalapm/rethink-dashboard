@@ -605,3 +605,105 @@ export interface FeedbackAggregate {
   total_count: number;
   by_week?: { week_number: number; average_rating: number; count: number }[];
 }
+
+// ============================================
+// LMS Usage Analytics Types
+// ============================================
+
+export interface LoginEvent {
+  id: string;
+  user_id: string;
+  login_method: 'phone_otp' | 'google_oauth' | 'magic_link';
+  ip_address: string | null;
+  user_agent: string | null;
+  created_at: string;
+}
+
+export type UsagePeriod = 'today' | 'week' | 'month' | 'custom';
+
+export type StudentHealthStatus = 'active' | 'at_risk' | 'inactive';
+
+export interface UsageOverviewStats {
+  total_logins: number;
+  previous_period_logins: number;
+  active_students: number;
+  total_students: number;
+  avg_logins_per_student: number;
+  content_completion_percent: number;
+  cohort_rankings: {
+    cohort_id: string;
+    cohort_name: string;
+    engagement_percent: number;
+    active_count: number;
+    total_count: number;
+  }[];
+  daily_login_trend: {
+    date: string;
+    count: number;
+  }[];
+  asset_summary: {
+    videos: { completed: number; total: number };
+    case_studies: { completed: number; total: number };
+    presentations: { completed: number; total: number };
+    pdfs: { completed: number; total: number };
+  };
+}
+
+export interface CohortUsageStudent {
+  user_id: string;
+  name: string;
+  email: string;
+  avatar_url: string | null;
+  login_count: number;
+  last_login: string | null;
+  content_completion_percent: number;
+  health_status: StudentHealthStatus;
+}
+
+export interface CohortUsageStats {
+  logins_this_period: number;
+  active_students: number;
+  total_students: number;
+  at_risk_count: number;
+  content_completion_percent: number;
+  students: CohortUsageStudent[];
+  module_assets: {
+    module_id: string;
+    module_name: string;
+    week_number: number | null;
+    videos: { completed: number; total: number };
+    case_studies: { completed: number; total: number };
+    presentations: { completed: number; total: number };
+    pdfs: { completed: number; total: number };
+  }[];
+}
+
+export interface StudentUsageDetail {
+  user_id: string;
+  name: string;
+  email: string;
+  avatar_url: string | null;
+  cohort_name: string;
+  last_login: string | null;
+  total_logins: number;
+  content_completion_percent: number;
+  health_status: StudentHealthStatus;
+  login_history: {
+    created_at: string;
+    login_method: string;
+  }[];
+  module_engagement: {
+    module_id: string;
+    module_name: string;
+    week_number: number | null;
+    completed: number;
+    total: number;
+    percent: number;
+  }[];
+  recent_activity: {
+    type: 'video_watched' | 'case_study_opened' | 'presentation_viewed' | 'pdf_opened' | 'resource_completed';
+    title: string;
+    timestamp: string;
+    detail?: string;
+  }[];
+}
