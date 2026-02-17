@@ -18,7 +18,7 @@ interface StudentDetailTabProps {
   onStudentChange: (userId: string) => void;
 }
 
-export function StudentDetailTab({ period, students, selectedStudentId, onStudentChange }: StudentDetailTabProps) {
+export function StudentDetailTab({ students, selectedStudentId, onStudentChange }: StudentDetailTabProps) {
   const [detail, setDetail] = useState<StudentUsageDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');

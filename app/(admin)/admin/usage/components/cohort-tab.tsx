@@ -22,7 +22,7 @@ interface CohortTabProps {
   onCohortChange: (cohortId: string) => void;
 }
 
-export function CohortTab({ period, cohorts, selectedCohort, onCohortChange }: CohortTabProps) {
+export function CohortTab({ period, selectedCohort }: CohortTabProps) {
   const [stats, setStats] = useState<CohortUsageStats | null>(null);
   const [loading, setLoading] = useState(true);
 

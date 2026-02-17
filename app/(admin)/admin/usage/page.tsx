@@ -25,7 +25,7 @@ export default function UsagePage() {
   const [selectedCohort, setSelectedCohort] = useState('');
   const [loadingCohorts, setLoadingCohorts] = useState(true);
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
-  const [cohortStudents, setCohortStudents] = useState<CohortUsageStudent[]>([]);
+  const [cohortStudents] = useState<CohortUsageStudent[]>([]);
 
   // Fetch cohorts
   const fetchCohorts = useCallback(async () => {

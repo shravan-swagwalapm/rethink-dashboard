@@ -187,7 +187,6 @@ export async function GET(request: NextRequest) {
     : 0;
 
   // Module asset breakdown
-  const resourceTypeMap = new Map((moduleResources || []).map(r => [r.id, r]));
   const typeKeyMap: Record<string, string> = {
     video: 'videos', case_study: 'case_studies', presentation: 'presentations', pdf: 'pdfs',
   };
