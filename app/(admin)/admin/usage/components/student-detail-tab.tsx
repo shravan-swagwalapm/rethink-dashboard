@@ -358,45 +358,45 @@ export function StudentDetailTab({ period, cohorts }: StudentDetailTabProps) {
                     className="cursor-pointer select-none hover:text-foreground transition-colors"
                     onClick={() => handleSort('name')}
                   >
-                    <span className="inline-flex items-center gap-1">
+                    <span className="inline-flex items-center gap-1.5">
                       Name
-                      {sortKey === 'name' ? (sortDir === 'asc' ? <ArrowUp className="w-3.5 h-3.5" /> : <ArrowDown className="w-3.5 h-3.5" />) : <ArrowUpDown className="w-3.5 h-3.5 opacity-40" />}
+                      {sortKey === 'name' ? (sortDir === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />) : <ArrowUpDown className="w-4 h-4 opacity-50" />}
                     </span>
                   </TableHead>
                   <TableHead
                     className="text-center cursor-pointer select-none hover:text-foreground transition-colors"
                     onClick={() => handleSort('login_count')}
                   >
-                    <span className="inline-flex items-center gap-1 justify-center">
+                    <span className="inline-flex items-center gap-1.5 justify-center">
                       Logins
-                      {sortKey === 'login_count' ? (sortDir === 'asc' ? <ArrowUp className="w-3.5 h-3.5" /> : <ArrowDown className="w-3.5 h-3.5" />) : <ArrowUpDown className="w-3.5 h-3.5 opacity-40" />}
+                      {sortKey === 'login_count' ? (sortDir === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />) : <ArrowUpDown className="w-4 h-4 opacity-50" />}
                     </span>
                   </TableHead>
                   <TableHead
                     className="cursor-pointer select-none hover:text-foreground transition-colors"
                     onClick={() => handleSort('last_login')}
                   >
-                    <span className="inline-flex items-center gap-1">
+                    <span className="inline-flex items-center gap-1.5">
                       Last Login
-                      {sortKey === 'last_login' ? (sortDir === 'asc' ? <ArrowUp className="w-3.5 h-3.5" /> : <ArrowDown className="w-3.5 h-3.5" />) : <ArrowUpDown className="w-3.5 h-3.5 opacity-40" />}
+                      {sortKey === 'last_login' ? (sortDir === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />) : <ArrowUpDown className="w-4 h-4 opacity-50" />}
                     </span>
                   </TableHead>
                   <TableHead
                     className="text-center cursor-pointer select-none hover:text-foreground transition-colors"
                     onClick={() => handleSort('content_completion_percent')}
                   >
-                    <span className="inline-flex items-center gap-1 justify-center">
+                    <span className="inline-flex items-center gap-1.5 justify-center">
                       Content
-                      {sortKey === 'content_completion_percent' ? (sortDir === 'asc' ? <ArrowUp className="w-3.5 h-3.5" /> : <ArrowDown className="w-3.5 h-3.5" />) : <ArrowUpDown className="w-3.5 h-3.5 opacity-40" />}
+                      {sortKey === 'content_completion_percent' ? (sortDir === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />) : <ArrowUpDown className="w-4 h-4 opacity-50" />}
                     </span>
                   </TableHead>
                   <TableHead
                     className="cursor-pointer select-none hover:text-foreground transition-colors"
                     onClick={() => handleSort('health_status')}
                   >
-                    <span className="inline-flex items-center gap-1">
+                    <span className="inline-flex items-center gap-1.5">
                       Status
-                      {sortKey === 'health_status' ? (sortDir === 'asc' ? <ArrowUp className="w-3.5 h-3.5" /> : <ArrowDown className="w-3.5 h-3.5" />) : <ArrowUpDown className="w-3.5 h-3.5 opacity-40" />}
+                      {sortKey === 'health_status' ? (sortDir === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />) : <ArrowUpDown className="w-4 h-4 opacity-50" />}
                     </span>
                   </TableHead>
                 </TableRow>
