@@ -100,8 +100,15 @@ export async function GET(request: NextRequest) {
   }
 
   // Total logins
-  const totalLogins = (loginHistory || []).length;
-  const lastLogin = loginHistory?.[0]?.created_at || null;
+  let totalLogins = (loginHistory || []).length;
+  let lastLogin = loginHistory?.[0]?.created_at || null;
+
+  // Fallback: if no login_events, use Supabase auth's last_sign_in_at
+  if (!lastLogin) {
+    const { data: { user: authUser } } = await adminClient.auth.admin.getUserById(userId);
+    lastLogin = authUser?.last_sign_in_at || null;
+    if (lastLogin) totalLogins = 1; // They logged in at least once
+  }
 
   // Filter module resources to only those belonging to the effective cohort
   let filteredResources = moduleResources || [];

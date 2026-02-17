@@ -136,13 +136,28 @@ export async function GET(request: NextRequest) {
     loginCountMap.set(l.user_id, (loginCountMap.get(l.user_id) || 0) + 1);
   });
 
-  // Last login per user
+  // Last login per user (from login_events)
   const lastLoginMap = new Map<string, string>();
   (lastLogins || []).forEach(l => {
     if (!lastLoginMap.has(l.user_id)) {
       lastLoginMap.set(l.user_id, l.created_at);
     }
   });
+
+  // Fallback: for students with no login_events, check auth.users.last_sign_in_at
+  const missingLoginUsers = studentUserIds.filter(uid => !lastLoginMap.has(uid));
+  if (missingLoginUsers.length > 0) {
+    const { data: { users: authUsers } } = await adminClient.auth.admin.listUsers({
+      perPage: 1000,
+    });
+    const authUserMap = new Map(authUsers.map(u => [u.id, u.last_sign_in_at]));
+    missingLoginUsers.forEach(uid => {
+      const authLastLogin = authUserMap.get(uid);
+      if (authLastLogin) {
+        lastLoginMap.set(uid, authLastLogin);
+      }
+    });
+  }
 
   // Resource completion per user
   const completionMap = new Map<string, { completed: number; total: number }>();
@@ -158,8 +173,12 @@ export async function GET(request: NextRequest) {
   // Build student rows
   const students = studentUserIds.map(uid => {
     const profile = profileMap.get(uid);
-    const loginCount = loginCountMap.get(uid) || 0;
+    let loginCount = loginCountMap.get(uid) || 0;
     const lastLogin = lastLoginMap.get(uid) || null;
+    // If login count is 0 but we have a fallback lastLogin within the period, count as 1
+    if (loginCount === 0 && lastLogin && lastLogin >= start && lastLogin <= end) {
+      loginCount = 1;
+    }
     const completion = completionMap.get(uid) || { completed: 0, total: 0 };
     const completionPercent = completion.total > 0
       ? Math.round((completion.completed / completion.total) * 100)
