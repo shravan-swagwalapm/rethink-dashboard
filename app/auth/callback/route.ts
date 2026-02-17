@@ -36,12 +36,12 @@ export async function GET(request: Request) {
       return NextResponse.redirect(`${origin}/login?error=no_email`);
     }
 
-    if (data.session?.user?.id) {
-      await trackLogin(data.session.user.id, 'magic_link');
-    }
+    // Login already tracked as 'phone_otp' in /api/auth/otp/verify before redirect here.
+    // Supabase uses magiclink type internally to create sessions from OTP verification —
+    // this is NOT a separate login method, so we skip tracking to avoid double-counting.
 
     // User mode always redirects to dashboard
-    console.log('Auth callback (USER path): Magic link verified, redirecting to /dashboard');
+    console.log('Auth callback (USER path): OTP session verified, redirecting to /dashboard');
     return NextResponse.redirect(`${origin}/dashboard`);
   }
 
