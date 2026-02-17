@@ -2,6 +2,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { isEmailDomainAllowed, bypassesWhitelist } from '@/lib/auth/allowed-domains';
 import { isEmailWhitelisted } from '@/lib/auth/whitelist';
+import { trackLogin } from '@/lib/services/login-tracker';
 
 // This route handles USER login mode (default)
 // Path: /auth/callback
@@ -33,6 +34,10 @@ export async function GET(request: Request) {
     if (!userEmail) {
       await supabase.auth.signOut();
       return NextResponse.redirect(`${origin}/login?error=no_email`);
+    }
+
+    if (data.session?.user?.id) {
+      await trackLogin(data.session.user.id, 'magic_link');
     }
 
     // User mode always redirects to dashboard
@@ -131,6 +136,8 @@ export async function GET(request: Request) {
           .eq('id', data.session.user.id);
       }
     }
+
+    await trackLogin(data.session.user.id, 'google_oauth');
 
     // User mode always redirects to dashboard
     console.log('Auth callback (USER path): Redirecting to /dashboard');

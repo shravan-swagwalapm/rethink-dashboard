@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyOTP } from '@/lib/integrations/msg91-otp';
 import { validateVerifyOTPRequest } from '@/lib/services/otp-validator';
+import { trackLogin } from '@/lib/services/login-tracker';
 import {
   logOTPVerification,
   logSessionCreation,
@@ -295,6 +296,8 @@ export async function POST(request: NextRequest) {
       .from('otp_codes')
       .update({ verified: true })
       .eq('id', otpRecord.id);
+
+    await trackLogin(userProfile.id, 'phone_otp');
 
     // =====================================================
     // Step 8: Log success and return response
