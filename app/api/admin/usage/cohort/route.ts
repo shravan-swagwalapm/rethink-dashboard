@@ -19,10 +19,13 @@ function getDateRange(period: string, startDate?: string, endDate?: string) {
       start = new Date(now);
       start.setMonth(now.getMonth() - 1);
       break;
-    case 'custom':
-      start = startDate ? new Date(startDate) : new Date(now.setMonth(now.getMonth() - 1));
+    case 'custom': {
+      const fallbackStart = new Date();
+      fallbackStart.setMonth(fallbackStart.getMonth() - 1);
+      start = startDate ? new Date(startDate) : fallbackStart;
       end = endDate ? new Date(endDate) : new Date();
       break;
+    }
     default:
       start = new Date(now);
       start.setDate(now.getDate() - 7);

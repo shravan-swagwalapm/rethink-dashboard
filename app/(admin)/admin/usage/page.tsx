@@ -11,6 +11,7 @@ import { OverviewTab } from './components/overview-tab';
 import { CohortTab } from './components/cohort-tab';
 import { StudentDetailTab } from './components/student-detail-tab';
 import type { UsagePeriod, CohortUsageStudent } from '@/types';
+import type { CohortUsageStats } from '@/types';
 
 interface Cohort {
   id: string;
@@ -25,7 +26,24 @@ export default function UsagePage() {
   const [selectedCohort, setSelectedCohort] = useState('');
   const [loadingCohorts, setLoadingCohorts] = useState(true);
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
-  const [cohortStudents] = useState<CohortUsageStudent[]>([]);
+  const [cohortStudents, setCohortStudents] = useState<CohortUsageStudent[]>([]);
+
+  // Fetch students for the selected cohort (used by Student Detail tab)
+  const fetchCohortStudents = useCallback(async () => {
+    if (!selectedCohort) return;
+    try {
+      const res = await fetch(`/api/admin/usage/cohort?cohort_id=${selectedCohort}&period=${period}`);
+      if (!res.ok) return;
+      const data: CohortUsageStats = await res.json();
+      setCohortStudents(data.students || []);
+    } catch {
+      // Student list fetch is best-effort
+    }
+  }, [selectedCohort, period]);
+
+  useEffect(() => {
+    fetchCohortStudents();
+  }, [fetchCohortStudents]);
 
   // Fetch cohorts
   const fetchCohorts = useCallback(async () => {
