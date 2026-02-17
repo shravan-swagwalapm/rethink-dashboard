@@ -2,6 +2,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { isEmailDomainAllowed, bypassesWhitelist } from '@/lib/auth/allowed-domains';
 import { isEmailWhitelisted } from '@/lib/auth/whitelist';
+import { trackLogin } from '@/lib/services/login-tracker';
 
 // This route handles ADMIN login mode
 // Path: /auth/callback/admin
@@ -119,6 +120,7 @@ export async function GET(request: Request) {
 
     if (shouldGoToAdmin) {
       console.log('Auth callback: Redirecting to /admin');
+      await trackLogin(data.session.user.id, 'google_oauth');
       const response = NextResponse.redirect(`${origin}/admin`);
 
       // Set intended role cookie for multi-role users

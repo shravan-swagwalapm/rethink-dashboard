@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Loader2, LogIn, BookOpen, Clock, Video, FileText, Presentation, Search } from 'lucide-react';
 import { HealthBadge } from './health-badge';
 import { formatDistanceToNow, format } from 'date-fns';
+import { toast } from 'sonner';
 import type { UsagePeriod, StudentUsageDetail, CohortUsageStudent } from '@/types';
 
 interface StudentDetailTabProps {
@@ -33,6 +34,7 @@ export function StudentDetailTab({ students, selectedStudentId, onStudentChange 
       setDetail(data);
     } catch (error) {
       console.error('Failed to fetch student detail:', error);
+      toast.error('Failed to load student details');
     } finally {
       setLoading(false);
     }

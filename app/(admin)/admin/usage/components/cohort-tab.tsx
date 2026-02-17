@@ -8,6 +8,7 @@ import { Progress } from '@/components/ui/progress';
 import { Loader2, Users, LogIn, AlertTriangle, BookOpen } from 'lucide-react';
 import { HealthBadge, HealthDot } from './health-badge';
 import { formatDistanceToNow } from 'date-fns';
+import { toast } from 'sonner';
 import type { UsagePeriod, CohortUsageStats } from '@/types';
 
 interface Cohort {
@@ -36,6 +37,7 @@ export function CohortTab({ period, selectedCohort }: CohortTabProps) {
       setStats(data);
     } catch (error) {
       console.error('Failed to fetch cohort stats:', error);
+      toast.error('Failed to load cohort stats');
     } finally {
       setLoading(false);
     }

@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, TrendingUp, TrendingDown, Users, LogIn, BarChart3, BookOpen } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
+import { toast } from 'sonner';
 import type { UsagePeriod, UsageOverviewStats } from '@/types';
 
 interface OverviewTabProps {
@@ -23,6 +24,7 @@ export function OverviewTab({ period }: OverviewTabProps) {
       setStats(data);
     } catch (error) {
       console.error('Failed to fetch overview stats:', error);
+      toast.error('Failed to load overview stats');
     } finally {
       setLoading(false);
     }
