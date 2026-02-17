@@ -39,8 +39,11 @@ function computeHealthStatus(lastLogin: string | null, completionPercent: number
     ? Math.floor((now.getTime() - new Date(lastLogin).getTime()) / (1000 * 60 * 60 * 24))
     : Infinity;
 
-  if (daysSinceLogin <= 3 && completionPercent > 50) return 'active';
-  if (daysSinceLogin <= 7 || (completionPercent >= 30 && completionPercent <= 50)) return 'at_risk';
+  // Active: logged in within 7 days
+  if (daysSinceLogin <= 7) return 'active';
+  // At-risk: logged in within 14 days, or has meaningful content progress
+  if (daysSinceLogin <= 14 || completionPercent >= 30) return 'at_risk';
+  // Inactive: no login for 14+ days and low/no content progress
   return 'inactive';
 }
 
