@@ -52,22 +52,6 @@ export function CohortTab({ period, selectedCohort }: CohortTabProps) {
     fetchStats();
   }, [fetchStats]);
 
-  if (!selectedCohort) {
-    return (
-      <div className="text-center py-12 text-muted-foreground">
-        Select a cohort to view usage data
-      </div>
-    );
-  }
-
-  if (loading || !stats) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
   const handleSort = (key: SortKey) => {
     if (sortKey !== key) {
       setSortKey(key);
@@ -107,6 +91,22 @@ export function CohortTab({ period, selectedCohort }: CohortTabProps) {
       }
     });
   }, [stats?.students, sortKey, sortDir]);
+
+  if (!selectedCohort) {
+    return (
+      <div className="text-center py-12 text-muted-foreground">
+        Select a cohort to view usage data
+      </div>
+    );
+  }
+
+  if (loading || !stats) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
