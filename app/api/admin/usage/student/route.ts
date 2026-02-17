@@ -21,6 +21,7 @@ export async function GET(request: NextRequest) {
 
   const searchParams = request.nextUrl.searchParams;
   const userId = searchParams.get('user_id');
+  const cohortId = searchParams.get('cohort_id');
 
   if (!userId) {
     return NextResponse.json({ error: 'user_id is required' }, { status: 400 });
@@ -81,19 +82,58 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'User not found' }, { status: 404 });
   }
 
-  const cohortRaw = roleAssignment?.cohorts as { name: string } | { name: string }[] | null | undefined;
-  const cohortName = Array.isArray(cohortRaw) ? cohortRaw[0]?.name : cohortRaw?.name;
+  // Determine effective cohort: prefer explicit param, fall back to role assignment
+  const effectiveCohortId = cohortId || roleAssignment?.cohort_id;
+
+  // Get cohort name — use role assignment data, or query if cohort_id param was provided
+  let cohortName: string | undefined;
+  if (cohortId) {
+    const { data: cohortData } = await adminClient
+      .from('cohorts')
+      .select('name')
+      .eq('id', cohortId)
+      .single();
+    cohortName = cohortData?.name;
+  } else {
+    const cohortRaw = roleAssignment?.cohorts as { name: string } | { name: string }[] | null | undefined;
+    cohortName = Array.isArray(cohortRaw) ? cohortRaw[0]?.name : cohortRaw?.name;
+  }
 
   // Total logins
   const totalLogins = (loginHistory || []).length;
   const lastLogin = loginHistory?.[0]?.created_at || null;
 
+  // Filter module resources to only those belonging to the effective cohort
+  let filteredResources = moduleResources || [];
+  if (effectiveCohortId) {
+    const [{ data: cohortModules }, { data: linkedModules }] = await Promise.all([
+      adminClient
+        .from('learning_modules')
+        .select('id')
+        .or(`cohort_id.eq.${effectiveCohortId},is_global.eq.true`),
+      adminClient
+        .from('cohort_module_links')
+        .select('module_id')
+        .eq('cohort_id', effectiveCohortId),
+    ]);
+
+    const validModuleIds = new Set([
+      ...(cohortModules || []).map(m => m.id),
+      ...(linkedModules || []).map(m => m.module_id),
+    ]);
+
+    filteredResources = filteredResources.filter(r => {
+      const mod = Array.isArray(r.learning_modules) ? r.learning_modules[0] : r.learning_modules;
+      return mod && validModuleIds.has(mod.id);
+    });
+  }
+
   // Module engagement
-  const resourceMap = new Map((moduleResources || []).map(r => [r.id, r]));
+  const resourceMap = new Map((filteredResources).map(r => [r.id, r]));
   const progressMap = new Map((resourceProgress || []).map(rp => [rp.resource_id, rp]));
 
   const moduleMap = new Map<string, { id: string; title: string; week_number: number | null; completed: number; total: number }>();
-  (moduleResources || []).forEach(r => {
+  (filteredResources).forEach(r => {
     const mod = Array.isArray(r.learning_modules) ? r.learning_modules[0] : r.learning_modules;
     if (!mod) return;
 

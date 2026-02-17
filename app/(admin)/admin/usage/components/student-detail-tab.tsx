@@ -62,7 +62,7 @@ export function StudentDetailTab({ period, cohorts }: StudentDetailTabProps) {
     if (!selectedStudentId) return;
     setLoadingDetail(true);
     try {
-      const res = await fetch(`/api/admin/usage/student?user_id=${selectedStudentId}`);
+      const res = await fetch(`/api/admin/usage/student?user_id=${selectedStudentId}&cohort_id=${selectedCohort}`);
       if (!res.ok) throw new Error('Failed to fetch');
       const data = await res.json();
       setDetail(data);
@@ -72,7 +72,7 @@ export function StudentDetailTab({ period, cohorts }: StudentDetailTabProps) {
     } finally {
       setLoadingDetail(false);
     }
-  }, [selectedStudentId]);
+  }, [selectedStudentId, selectedCohort]);
 
   useEffect(() => {
     fetchDetail();
@@ -212,7 +212,10 @@ export function StudentDetailTab({ period, cohorts }: StudentDetailTabProps) {
                     <div key={mod.module_id} className="space-y-1">
                       <div className="flex justify-between text-sm">
                         <span className="font-medium">
-                          {mod.week_number ? `Week ${mod.week_number}: ` : ''}{mod.module_name}
+                          {mod.week_number && !mod.module_name.toLowerCase().startsWith('week')
+                            ? `Week ${mod.week_number}: `
+                            : ''
+                          }{mod.module_name}
                         </span>
                         <span className="text-muted-foreground tabular-nums">{mod.completed}/{mod.total}</span>
                       </div>
