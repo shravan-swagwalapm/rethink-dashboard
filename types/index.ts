@@ -643,9 +643,9 @@ export interface UsageOverviewStats {
   }[];
   asset_summary: {
     videos: { completed: number; total: number };
-    case_studies: { completed: number; total: number };
-    presentations: { completed: number; total: number };
-    pdfs: { completed: number; total: number };
+    slides: { completed: number; total: number };
+    documents: { completed: number; total: number };
+    links: { completed: number; total: number };
   };
 }
 
@@ -672,9 +672,9 @@ export interface CohortUsageStats {
     module_name: string;
     week_number: number | null;
     videos: { completed: number; total: number };
-    case_studies: { completed: number; total: number };
-    presentations: { completed: number; total: number };
-    pdfs: { completed: number; total: number };
+    slides: { completed: number; total: number };
+    documents: { completed: number; total: number };
+    links: { completed: number; total: number };
   }[];
 }
 
@@ -701,7 +701,7 @@ export interface StudentUsageDetail {
     percent: number;
   }[];
   recent_activity: {
-    type: 'video_watched' | 'case_study_opened' | 'presentation_viewed' | 'pdf_opened' | 'resource_completed';
+    type: 'video_watched' | 'slides_viewed' | 'document_opened' | 'link_opened' | 'resource_completed';
     title: string;
     timestamp: string;
     detail?: string;

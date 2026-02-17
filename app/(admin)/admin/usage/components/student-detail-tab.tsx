@@ -51,9 +51,9 @@ export function StudentDetailTab({ students, selectedStudentId, onStudentChange 
 
   const activityIcon: Record<string, typeof Video> = {
     video_watched: Video,
-    case_study_opened: FileText,
-    presentation_viewed: Presentation,
-    pdf_opened: FileText,
+    slides_viewed: Presentation,
+    document_opened: FileText,
+    link_opened: FileText,
     resource_completed: BookOpen,
   };
 

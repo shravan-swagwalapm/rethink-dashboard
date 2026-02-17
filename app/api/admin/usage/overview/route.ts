@@ -106,7 +106,7 @@ export async function GET(request: NextRequest) {
     // All module resources with type info
     adminClient
       .from('module_resources')
-      .select('id, resource_type'),
+      .select('id, content_type'),
   ]);
 
   const studentIds = new Set((allStudents || []).map(s => s.user_id));
@@ -136,19 +136,19 @@ export async function GET(request: NextRequest) {
   // Content completion
   const resourceTypeMap = new Map<string, string>();
   (moduleResources || []).forEach(r => {
-    resourceTypeMap.set(r.id, r.resource_type || 'other');
+    resourceTypeMap.set(r.id, r.content_type || 'other');
   });
 
-  const assetCounts = { videos: { completed: 0, total: 0 }, case_studies: { completed: 0, total: 0 }, presentations: { completed: 0, total: 0 }, pdfs: { completed: 0, total: 0 } };
+  const assetCounts = { videos: { completed: 0, total: 0 }, slides: { completed: 0, total: 0 }, documents: { completed: 0, total: 0 }, links: { completed: 0, total: 0 } };
   const typeKeyMap: Record<string, keyof typeof assetCounts> = {
-    video: 'videos', case_study: 'case_studies', presentation: 'presentations', pdf: 'pdfs',
+    video: 'videos', slides: 'slides', document: 'documents', link: 'links',
   };
 
   // Count per student per resource (only students)
   const studentProgress = (resourceProgress || []).filter(rp => studentIds.has(rp.user_id));
   const seenResources = new Set<string>();
   (moduleResources || []).forEach(r => {
-    const type = r.resource_type || 'other';
+    const type = r.content_type || 'other';
     const key = typeKeyMap[type];
     if (key && !seenResources.has(r.id)) {
       seenResources.add(r.id);

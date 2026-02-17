@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
     // All module resources with module info
     adminClient
       .from('module_resources')
-      .select('id, title, module_id, resource_type, learning_modules(id, title, week_number)')
+      .select('id, title, module_id, content_type, learning_modules(id, title, week_number)')
       .order('created_at', { ascending: false }),
     // Recent activity (last 20 viewed resources)
     adminClient
@@ -131,14 +131,14 @@ export async function GET(request: NextRequest) {
   // Recent activity
   const typeDisplayMap: Record<string, string> = {
     video: 'video_watched',
-    case_study: 'case_study_opened',
-    presentation: 'presentation_viewed',
-    pdf: 'pdf_opened',
+    slides: 'slides_viewed',
+    document: 'document_opened',
+    link: 'link_opened',
   };
 
   const recentActivity = (recentViewed || []).map(rv => {
     const resource = resourceMap.get(rv.resource_id);
-    const resourceType = resource?.resource_type || 'other';
+    const resourceType = resource?.content_type || 'other';
     return {
       type: rv.is_completed ? 'resource_completed' : (typeDisplayMap[resourceType] || 'pdf_opened'),
       title: resource?.title || 'Unknown Resource',

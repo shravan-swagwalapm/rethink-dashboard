@@ -124,7 +124,7 @@ export async function GET(request: NextRequest) {
     // All module resources
     adminClient
       .from('module_resources')
-      .select('id, module_id, resource_type'),
+      .select('id, module_id, content_type'),
   ]);
 
   // Build profile map
@@ -191,7 +191,7 @@ export async function GET(request: NextRequest) {
 
   // Module asset breakdown
   const typeKeyMap: Record<string, string> = {
-    video: 'videos', case_study: 'case_studies', presentation: 'presentations', pdf: 'pdfs',
+    video: 'videos', slides: 'slides', document: 'documents', link: 'links',
   };
 
   const moduleAssets = (modules || []).map(m => {
@@ -201,13 +201,13 @@ export async function GET(request: NextRequest) {
     const modResources = (moduleResources || []).filter(r => r.module_id === mod.id);
     const assets: Record<string, { completed: number; total: number }> = {
       videos: { completed: 0, total: 0 },
-      case_studies: { completed: 0, total: 0 },
-      presentations: { completed: 0, total: 0 },
-      pdfs: { completed: 0, total: 0 },
+      slides: { completed: 0, total: 0 },
+      documents: { completed: 0, total: 0 },
+      links: { completed: 0, total: 0 },
     };
 
     modResources.forEach(r => {
-      const key = typeKeyMap[r.resource_type || 'other'];
+      const key = typeKeyMap[r.content_type || 'other'];
       if (key && assets[key]) {
         assets[key].total++;
         // Count unique students who completed this resource

@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
 
   // Get modules (cohort-scoped or all) and normalize inline to avoid union type issues
   const [{ data: moduleResources }, { data: resourceProgress }] = await Promise.all([
-    adminClient.from('module_resources').select('id, module_id, resource_type'),
+    adminClient.from('module_resources').select('id, module_id, content_type'),
     adminClient.from('resource_progress').select('user_id, resource_id, is_completed').in('user_id', studentUserIds),
   ]);
 
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
   }
 
   const typeKeyMap: Record<string, string> = {
-    video: 'videos', case_study: 'case_studies', presentation: 'presentations', pdf: 'pdfs',
+    video: 'videos', slides: 'slides', document: 'documents', link: 'links',
   };
 
   // Build completion count per resource
@@ -75,13 +75,13 @@ export async function GET(request: NextRequest) {
     const modResources = (moduleResources || []).filter(r => r.module_id === mod.id);
     const assets: Record<string, { completed: number; total: number }> = {
       videos: { completed: 0, total: 0 },
-      case_studies: { completed: 0, total: 0 },
-      presentations: { completed: 0, total: 0 },
-      pdfs: { completed: 0, total: 0 },
+      slides: { completed: 0, total: 0 },
+      documents: { completed: 0, total: 0 },
+      links: { completed: 0, total: 0 },
     };
 
     modResources.forEach(r => {
-      const key = typeKeyMap[r.resource_type || 'other'];
+      const key = typeKeyMap[r.content_type || 'other'];
       if (key && assets[key]) {
         assets[key].total++;
         assets[key].completed += completionCountMap.get(r.id) || 0;

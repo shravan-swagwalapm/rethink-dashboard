@@ -192,9 +192,9 @@ export function CohortTab({ period, selectedCohort }: CohortTabProps) {
                 </div>
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs text-muted-foreground">
                   <span>Videos {mod.videos.completed}/{mod.videos.total}</span>
-                  <span>Cases {mod.case_studies.completed}/{mod.case_studies.total}</span>
-                  <span>Slides {mod.presentations.completed}/{mod.presentations.total}</span>
-                  <span>PDFs {mod.pdfs.completed}/{mod.pdfs.total}</span>
+                  <span>Slides {mod.slides.completed}/{mod.slides.total}</span>
+                  <span>Documents {mod.documents.completed}/{mod.documents.total}</span>
+                  <span>Links {mod.links.completed}/{mod.links.total}</span>
                 </div>
               </div>
             ))}

@@ -51,10 +51,10 @@ export default function UsagePage() {
       const res = await fetch('/api/admin/cohorts');
       if (!res.ok) throw new Error('Failed to fetch cohorts');
       const data = await res.json();
-      const activeCohorts = (data || []).filter((c: Cohort) => c.status === 'active' || !c.status);
-      setCohorts(activeCohorts);
-      if (activeCohorts.length > 0 && !selectedCohort) {
-        setSelectedCohort(activeCohorts[0].id);
+      const allCohorts = (data || []).filter((c: Cohort) => c.status !== 'archived');
+      setCohorts(allCohorts);
+      if (allCohorts.length > 0 && !selectedCohort) {
+        setSelectedCohort(allCohorts[0].id);
       }
     } catch (error) {
       console.error('Failed to fetch cohorts:', error);
