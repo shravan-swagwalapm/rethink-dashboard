@@ -26,6 +26,7 @@ import {
   LogOut,
   Sparkles,
   BookOpen,
+  Activity,
 } from 'lucide-react';
 import { FullPageLoader } from '@/components/ui/page-loader';
 
@@ -40,6 +41,7 @@ const adminNavItems = [
   { label: 'Attendance', href: '/admin/attendance', icon: BarChart3 },
   { label: 'Notifications', href: '/admin/notifications', icon: Bell },
   { label: 'Analytics', href: '/admin/analytics', icon: LineChart },
+  { label: 'Usage', href: '/admin/usage', icon: Activity },
   { label: 'Invoices', href: '/admin/invoices', icon: FileText },
   { label: 'Support', href: '/admin/support', icon: HelpCircle },
 ];

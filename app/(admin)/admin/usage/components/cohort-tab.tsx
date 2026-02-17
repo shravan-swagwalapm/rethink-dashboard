@@ -1,0 +1,204 @@
+'use client';
+
+import { useState, useCallback, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Progress } from '@/components/ui/progress';
+import { Loader2, Users, LogIn, AlertTriangle, BookOpen } from 'lucide-react';
+import { HealthBadge, HealthDot } from './health-badge';
+import { formatDistanceToNow } from 'date-fns';
+import type { UsagePeriod, CohortUsageStats } from '@/types';
+
+interface Cohort {
+  id: string;
+  name: string;
+}
+
+interface CohortTabProps {
+  period: UsagePeriod;
+  cohorts: Cohort[];
+  selectedCohort: string;
+  onCohortChange: (cohortId: string) => void;
+}
+
+export function CohortTab({ period, cohorts, selectedCohort, onCohortChange }: CohortTabProps) {
+  const [stats, setStats] = useState<CohortUsageStats | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchStats = useCallback(async () => {
+    if (!selectedCohort) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/admin/usage/cohort?cohort_id=${selectedCohort}&period=${period}`);
+      if (!res.ok) throw new Error('Failed to fetch');
+      const data = await res.json();
+      setStats(data);
+    } catch (error) {
+      console.error('Failed to fetch cohort stats:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedCohort, period]);
+
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
+
+  if (!selectedCohort) {
+    return (
+      <div className="text-center py-12 text-muted-foreground">
+        Select a cohort to view usage data
+      </div>
+    );
+  }
+
+  if (loading || !stats) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Stat Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Logins This Period</CardTitle>
+            <LogIn className="w-4 h-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.logins_this_period}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Active Students</CardTitle>
+            <Users className="w-4 h-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.active_students}/{stats.total_students}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">At-Risk Students</CardTitle>
+            <AlertTriangle className="w-4 h-4 text-red-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-500">{stats.at_risk_count}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Content Completion</CardTitle>
+            <BookOpen className="w-4 h-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.content_completion_percent}%</div>
+            <Progress value={stats.content_completion_percent} className="mt-2 h-1.5" />
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Student Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Students ({stats.students.length})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-8"></TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead className="text-center">Logins</TableHead>
+                <TableHead>Last Login</TableHead>
+                <TableHead className="text-center">Content</TableHead>
+                <TableHead>Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {stats.students.map((student) => (
+                <TableRow key={student.user_id}>
+                  <TableCell>
+                    <HealthDot status={student.health_status} />
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <Avatar className="w-8 h-8">
+                        <AvatarImage src={student.avatar_url || undefined} />
+                        <AvatarFallback className="text-xs">
+                          {student.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <div className="font-medium text-sm">{student.name}</div>
+                        <div className="text-xs text-muted-foreground">{student.email}</div>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-center tabular-nums">{student.login_count}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {student.last_login
+                      ? formatDistanceToNow(new Date(student.last_login), { addSuffix: true })
+                      : 'Never'
+                    }
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <div className="flex items-center gap-2 justify-center">
+                      <Progress value={student.content_completion_percent} className="w-16 h-1.5" />
+                      <span className="text-xs tabular-nums">{student.content_completion_percent}%</span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <HealthBadge status={student.health_status} />
+                  </TableCell>
+                </TableRow>
+              ))}
+              {stats.students.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    No students in this cohort
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* Module Asset Breakdown */}
+      {stats.module_assets && stats.module_assets.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Content by Module</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {stats.module_assets.map((mod) => (
+              <div key={mod.module_id} className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">
+                    {mod.week_number ? `Week ${mod.week_number}: ` : ''}{mod.module_name}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs text-muted-foreground">
+                  <span>Videos {mod.videos.completed}/{mod.videos.total}</span>
+                  <span>Cases {mod.case_studies.completed}/{mod.case_studies.total}</span>
+                  <span>Slides {mod.presentations.completed}/{mod.presentations.total}</span>
+                  <span>PDFs {mod.pdfs.completed}/{mod.pdfs.total}</span>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
