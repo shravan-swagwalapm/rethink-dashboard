@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, LogIn, BookOpen, Clock, Video, FileText, Presentation, Search, ArrowLeft } from 'lucide-react';
+import { Loader2, LogIn, BookOpen, Clock, Video, FileText, Presentation, Search, ArrowLeft, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { HealthBadge, HealthDot } from './health-badge';
 import { formatDistanceToNow, format } from 'date-fns';
 import { toast } from 'sonner';
@@ -26,6 +26,10 @@ export function StudentDetailTab({ period, cohorts }: StudentDetailTabProps) {
   const [loadingStudents, setLoadingStudents] = useState(false);
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  type SortKey = 'name' | 'login_count' | 'last_login' | 'content_completion_percent' | 'health_status';
+  type SortDir = 'asc' | 'desc';
+  const [sortKey, setSortKey] = useState<SortKey | null>(null);
+  const [sortDir, setSortDir] = useState<SortDir | null>(null);
   const [detail, setDetail] = useState<StudentUsageDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
@@ -78,11 +82,51 @@ export function StudentDetailTab({ period, cohorts }: StudentDetailTabProps) {
     fetchDetail();
   }, [fetchDetail]);
 
-  // Filter students by search term
-  const filteredStudents = students.filter(s =>
-    s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Sort toggle: asc → desc → reset
+  const handleSort = (key: SortKey) => {
+    if (sortKey !== key) {
+      setSortKey(key);
+      setSortDir('asc');
+    } else if (sortDir === 'asc') {
+      setSortDir('desc');
+    } else {
+      setSortKey(null);
+      setSortDir(null);
+    }
+  };
+
+  // Filter + sort students
+  const sortedStudents = useMemo(() => {
+    const filtered = students.filter(s =>
+      s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      s.email.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    if (!sortKey || !sortDir) return filtered;
+
+    return [...filtered].sort((a, b) => {
+      const dir = sortDir === 'asc' ? 1 : -1;
+      switch (sortKey) {
+        case 'name':
+          return dir * a.name.localeCompare(b.name);
+        case 'login_count':
+          return dir * (a.login_count - b.login_count);
+        case 'last_login': {
+          const aTime = a.last_login ? new Date(a.last_login).getTime() : 0;
+          const bTime = b.last_login ? new Date(b.last_login).getTime() : 0;
+          return dir * (aTime - bTime);
+        }
+        case 'content_completion_percent':
+          return dir * (a.content_completion_percent - b.content_completion_percent);
+        case 'health_status': {
+          const order: Record<string, number> = { active: 0, at_risk: 1, inactive: 2 };
+          return dir * ((order[a.health_status] ?? 2) - (order[b.health_status] ?? 2));
+        }
+        default:
+          return 0;
+      }
+    });
+  }, [students, searchTerm, sortKey, sortDir]);
 
   const activityIcon: Record<string, typeof Video> = {
     video_watched: Video,
@@ -303,22 +347,62 @@ export function StudentDetailTab({ period, cohorts }: StudentDetailTabProps) {
       ) : (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Students ({filteredStudents.length})</CardTitle>
+            <CardTitle className="text-base">Students ({sortedStudents.length})</CardTitle>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-8"></TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead className="text-center">Logins</TableHead>
-                  <TableHead>Last Login</TableHead>
-                  <TableHead className="text-center">Content</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead
+                    className="cursor-pointer select-none hover:text-foreground transition-colors"
+                    onClick={() => handleSort('name')}
+                  >
+                    <span className="inline-flex items-center gap-1">
+                      Name
+                      {sortKey === 'name' ? (sortDir === 'asc' ? <ArrowUp className="w-3.5 h-3.5" /> : <ArrowDown className="w-3.5 h-3.5" />) : <ArrowUpDown className="w-3.5 h-3.5 opacity-40" />}
+                    </span>
+                  </TableHead>
+                  <TableHead
+                    className="text-center cursor-pointer select-none hover:text-foreground transition-colors"
+                    onClick={() => handleSort('login_count')}
+                  >
+                    <span className="inline-flex items-center gap-1 justify-center">
+                      Logins
+                      {sortKey === 'login_count' ? (sortDir === 'asc' ? <ArrowUp className="w-3.5 h-3.5" /> : <ArrowDown className="w-3.5 h-3.5" />) : <ArrowUpDown className="w-3.5 h-3.5 opacity-40" />}
+                    </span>
+                  </TableHead>
+                  <TableHead
+                    className="cursor-pointer select-none hover:text-foreground transition-colors"
+                    onClick={() => handleSort('last_login')}
+                  >
+                    <span className="inline-flex items-center gap-1">
+                      Last Login
+                      {sortKey === 'last_login' ? (sortDir === 'asc' ? <ArrowUp className="w-3.5 h-3.5" /> : <ArrowDown className="w-3.5 h-3.5" />) : <ArrowUpDown className="w-3.5 h-3.5 opacity-40" />}
+                    </span>
+                  </TableHead>
+                  <TableHead
+                    className="text-center cursor-pointer select-none hover:text-foreground transition-colors"
+                    onClick={() => handleSort('content_completion_percent')}
+                  >
+                    <span className="inline-flex items-center gap-1 justify-center">
+                      Content
+                      {sortKey === 'content_completion_percent' ? (sortDir === 'asc' ? <ArrowUp className="w-3.5 h-3.5" /> : <ArrowDown className="w-3.5 h-3.5" />) : <ArrowUpDown className="w-3.5 h-3.5 opacity-40" />}
+                    </span>
+                  </TableHead>
+                  <TableHead
+                    className="cursor-pointer select-none hover:text-foreground transition-colors"
+                    onClick={() => handleSort('health_status')}
+                  >
+                    <span className="inline-flex items-center gap-1">
+                      Status
+                      {sortKey === 'health_status' ? (sortDir === 'asc' ? <ArrowUp className="w-3.5 h-3.5" /> : <ArrowDown className="w-3.5 h-3.5" />) : <ArrowUpDown className="w-3.5 h-3.5 opacity-40" />}
+                    </span>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredStudents.map((student) => (
+                {sortedStudents.map((student) => (
                   <TableRow
                     key={student.user_id}
                     className="cursor-pointer hover:bg-muted/50"
@@ -359,7 +443,7 @@ export function StudentDetailTab({ period, cohorts }: StudentDetailTabProps) {
                     </TableCell>
                   </TableRow>
                 ))}
-                {filteredStudents.length === 0 && (
+                {sortedStudents.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                       {searchTerm ? 'No students match your search' : 'No students in this cohort'}

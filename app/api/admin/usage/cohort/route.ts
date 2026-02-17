@@ -175,8 +175,8 @@ export async function GET(request: NextRequest) {
     const profile = profileMap.get(uid);
     let loginCount = loginCountMap.get(uid) || 0;
     const lastLogin = lastLoginMap.get(uid) || null;
-    // If login count is 0 but we have a fallback lastLogin within the period, count as 1
-    if (loginCount === 0 && lastLogin && lastLogin >= start && lastLogin <= end) {
+    // If login count is 0 but we have a lastLogin, always count as at least 1
+    if (loginCount === 0 && lastLogin) {
       loginCount = 1;
     }
     const completion = completionMap.get(uid) || { completed: 0, total: 0 };
