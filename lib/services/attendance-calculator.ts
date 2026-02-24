@@ -160,33 +160,54 @@ export async function calculateSessionAttendance(
 ): Promise<{ imported: number; unmatched: number; actualDurationUsed: number }> {
   const supabase = await createAdminClient();
 
-  // Auto-resolve duration: Zoom API actual > caller-provided > session.actual_duration_minutes > session.duration_minutes
-  let resolvedDuration = actualDurationMinutes || 0;
-  let durationSource = actualDurationMinutes ? 'caller' : 'none';
+  // Fetch session record FIRST (needed for formal_end_minutes priority check)
+  const { data: sessionRecord } = await supabase
+    .from('sessions')
+    .select('actual_duration_minutes, duration_minutes, formal_end_minutes')
+    .eq('id', sessionId)
+    .single();
 
-  try {
-    const zoomDetails = await zoomService.getPastMeetingDetails(zoomMeetingUuid);
-    if (zoomDetails?.start_time && zoomDetails?.end_time) {
-      const start = new Date(zoomDetails.start_time).getTime();
-      const end = new Date(zoomDetails.end_time).getTime();
-      const zoomActual = Math.round((end - start) / 60000);
-      if (zoomActual > 0) {
-        resolvedDuration = zoomActual;
-        durationSource = 'zoom_api';
-      }
-    }
-  } catch (err) {
-    console.warn('[Attendance Calculator] Could not fetch Zoom meeting details, using fallback:', err);
+  // Duration priority chain:
+  // 1. formal_end_minutes (cliff-adjusted, from session record)
+  // 2. Caller-provided actualDurationMinutes
+  // 3. Zoom API actual duration
+  // 4. session.actual_duration_minutes
+  // 5. session.duration_minutes (scheduled)
+  let resolvedDuration = 0;
+  let durationSource = 'none';
+
+  // Priority 1: formal_end_minutes (cliff-adjusted)
+  if (sessionRecord?.formal_end_minutes && sessionRecord.formal_end_minutes > 0) {
+    resolvedDuration = sessionRecord.formal_end_minutes;
+    durationSource = 'formal_end_minutes';
   }
 
-  // If still no duration, try session record
-  if (!resolvedDuration || resolvedDuration <= 0) {
-    const { data: sessionRecord } = await supabase
-      .from('sessions')
-      .select('actual_duration_minutes, duration_minutes')
-      .eq('id', sessionId)
-      .single();
+  // Priority 2: Caller-provided override
+  if (!resolvedDuration && actualDurationMinutes && actualDurationMinutes > 0) {
+    resolvedDuration = actualDurationMinutes;
+    durationSource = 'caller';
+  }
 
+  // Priority 3: Zoom API actual duration
+  if (!resolvedDuration) {
+    try {
+      const zoomDetails = await zoomService.getPastMeetingDetails(zoomMeetingUuid);
+      if (zoomDetails?.start_time && zoomDetails?.end_time) {
+        const start = new Date(zoomDetails.start_time).getTime();
+        const end = new Date(zoomDetails.end_time).getTime();
+        const zoomActual = Math.round((end - start) / 60000);
+        if (zoomActual > 0) {
+          resolvedDuration = zoomActual;
+          durationSource = 'zoom_api';
+        }
+      }
+    } catch (err) {
+      console.warn('[Attendance Calculator] Could not fetch Zoom meeting details, using fallback:', err);
+    }
+  }
+
+  // Priority 4-5: session record fields
+  if (!resolvedDuration || resolvedDuration <= 0) {
     if (sessionRecord?.actual_duration_minutes && sessionRecord.actual_duration_minutes > 0) {
       resolvedDuration = sessionRecord.actual_duration_minutes;
       durationSource = 'session.actual_duration_minutes';
