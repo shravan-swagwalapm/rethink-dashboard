@@ -190,9 +190,20 @@
 | Week 3 S1 Design Thinking | 303m | 288m | 15m | 21/80 (26%) | 80 | Medium |
 | Week 3 S2 Live Build | 357m | 344m | 13m | 30/82 (37%) | 82 | High |
 
-### Pending:
-- [ ] User testing timeline visualization on localhost
-- [ ] Apply high-confidence cliffs (3 sessions)
-- [ ] Review medium-confidence cliffs (2 sessions) manually
-- [ ] Commit all changes
-- [ ] Push to prod after dev verification
+### Completed:
+- [x] User testing timeline visualization on localhost
+- [x] Apply all 5 cliffs (3 high + 2 medium confidence)
+- [x] Fix >100% attendance bug (120 records capped)
+- [x] Fix formal_end_minutes in student-facing APIs
+- [x] Commit all changes (032ebd9)
+- [x] Push to prod (2026-02-24)
+
+---
+
+## Session 2 Summary (2026-02-24)
+
+**Commit**: `032ebd9` — fix: post-review cliff detection fixes + cap attendance at 100%
+
+All 5 code review issues fixed + 7 additional fixes (>100% bug, timeline rewrite, plain English stats, bulk apply all, padding, error tracking, formal_end_minutes in APIs).
+
+**Data applied to prod**: 5 formal ends, 120 attendance records capped. Zero >100% records remaining.

@@ -1351,3 +1351,131 @@ Verified that sortable headers (NAME, LOGINS, LAST LOGIN, CONTENT, STATUS) were 
 **Student Impact**: Retroactive — past sessions can be re-analyzed and attendance percentages corrected
 **Hard Refresh Required**: Yes (Cmd+Shift+R)
 **Post-Deploy**: Run migration `026_cliff_detection.sql` in Supabase Dashboard SQL Editor
+
+---
+
+## Session 13: Post-Review Fixes + Attendance >100% Bug (2026-02-24, Session 2)
+
+**Context**: Opus 4.6 code review of cliff detection found 5 important issues. Fixed all 5, then discovered and fixed the >100% attendance bug caused by cliff detection.
+
+### Fixes Applied
+
+#### 1. ✅ Student Self-View Attendance Average
+**Problem**: `getStudentOwnAttendance()` divided by `attendedSessions.length` instead of `totalSessions`, inflating student's own average.
+**Fix**: Changed divisor to `totalSessions` in `app/api/analytics/route.ts:143`.
+
+#### 2. ✅ Input Validation for formalEndMinutes
+**Problem**: `apply-cliff` route accepted negative numbers and strings via the `!formalEndMinutes` check.
+**Fix**: Added `typeof === 'number' && > 0` with `Math.round()` in `apply-cliff/route.ts:19-21`.
+
+#### 3. ✅ Dark Mode Badge Contrast
+**Problem**: Hardcoded `text-gray-500`, `border-gray-200` etc. lacked dark mode variants.
+**Fix**: Added `dark:text-*-400` and `dark:border-*-800/700` to all 8 badge locations in `meetings-manager-tab.tsx` and `student-attendance-tab.tsx`.
+
+#### 4. ✅ N+1 Query in Bulk Detection
+**Problem**: Each session queried `zoom_import_logs` separately.
+**Fix**: Batch-fetch with `.in('session_id', ids)` + Map lookup in `detect-cliffs-bulk/route.ts:30-46`.
+
+#### 5. ✅ Bulk Re-Detection Overwrites Applied State
+**Problem**: Running bulk detect again overwrote `cliff_detection` JSON on already-applied sessions.
+**Fix**: Added `cliffData?.appliedAt` skip check in `detect-cliffs-bulk/route.ts:64-67`.
+
+#### 6. ✅ Attendance >100% Bug (CRITICAL)
+**Problem**: After applying cliff detection, students who stayed for QnA past the formal end showed >100% attendance (e.g., 357m / 344m = 103.7%).
+**Fix**:
+- **Code**: Added `Math.min(100, ...)` to `attendance-calculator.ts:284`
+- **Data**: Script capped 120 existing records across 5 sessions to 100%
+- **Display**: Added `formal_end_minutes` to all 3 student-facing analytics queries so `totalDuration` shows cliff-adjusted value
+
+#### 7. ✅ formal_end_minutes Missing from Student APIs
+**Problem**: Student/mentor/leaderboard views queried sessions without `formal_end_minutes`, showing full Zoom duration in "attended X of Y min".
+**Fix**: Added `formal_end_minutes` to select + used as first priority in `totalDuration` computation in all 3 functions in `app/api/analytics/route.ts`.
+
+#### 8. ✅ Timeline Visualization Rewrite
+**Problem**: Original bar chart was invisible (70+ thin bars in 400px panel).
+**Fix**: Rewrote as horizontal departure bar chart showing last ~50 minutes with running "remaining" count.
+
+#### 9. ✅ Confidence Card UX
+**Problem**: Technical jargon ("Cliff ratio", "Spike ratio", "Meeting-end stayers") meaningless to non-technical users.
+**Fix**: Replaced with plain English: "83 students were on the call. At minute 277, 14 left together within 10 minutes — 16.7x the normal rate."
+
+#### 10. ✅ Bulk Apply All (Including Medium Confidence)
+**Problem**: Dialog only had "Apply All High-Confidence" — medium confidence results had no clear action path.
+**Fix**: Added "Apply All (N)" button + hint text about individual review via cliff badges.
+
+#### 11. ✅ Cliff Detail Panel Padding
+**Problem**: "Effective Duration" label flush against left edge of modal.
+**Fix**: Added `px-4` to content wrapper in `cliff-detail-panel.tsx`.
+
+#### 12. ✅ Silent Error Swallowing in Bulk Apply
+**Problem**: `handleApplyAllHighConfidence` and `handleApplyAllDetected` silently caught errors.
+**Fix**: Track failed count, show `toast.error` when failures occur.
+
+### Commits
+- `032ebd9` — fix: post-review cliff detection fixes + cap attendance at 100%
+
+### Files Modified
+- `lib/services/attendance-calculator.ts` — Math.min(100, ...) cap
+- `lib/services/cliff-detector.ts` — Rounded cliffWindowStartMin/EndMin
+- `app/api/analytics/route.ts` — formal_end_minutes in all 3 queries + student avg divisor fix
+- `app/api/admin/analytics/apply-cliff/route.ts` — Input validation
+- `app/api/admin/analytics/detect-cliffs-bulk/route.ts` — N+1 fix, skip applied, actualDurationMinutes
+- `app/(admin)/admin/analytics/components/meetings-manager-tab.tsx` — Dark mode, bulk apply handlers with error tracking
+- `app/(admin)/admin/analytics/components/student-attendance-tab.tsx` — Dark mode badges
+- `app/(admin)/admin/analytics/components/cliff-detail-panel.tsx` — Plain English stats, padding fix
+- `app/(admin)/admin/analytics/components/cliff-timeline.tsx` — Complete rewrite to horizontal departure bars
+- `app/(admin)/admin/analytics/components/bulk-cliff-dialog.tsx` — Apply All button, actualDurationMinutes display
+
+### Database Changes (Already Applied to Prod)
+- 5 sessions have `formal_end_minutes` set (219, 277, 313, 288, 344)
+- 5 sessions have `cliff_detection` JSONB stored
+- 120 attendance records capped from >100% to 100%
+
+### Prod Verification
+- `npm run build` ✅
+- `npm run lint` ✅ (0 errors in changed files)
+- Database: 0 records with attendance_percentage > 100 ✅
+- Both attendance code paths (calculator + webhook) have Math.min(100, ...) ✅
+
+---
+
+## Lessons Learned (Continued)
+
+49. **Always cap computed percentages at boundaries.** When a denominator can change (e.g., formal_end_minutes < actual_duration), the numerator (student's actual time) can exceed it. `Math.min(100, ...)` is a one-line guard that prevents an entire class of display bugs.
+
+50. **Fix data AND code simultaneously.** Fixing the code prevents future >100% records, but existing records in the DB still show wrong values. A database script to retroactively cap existing records is required alongside the code fix.
+
+51. **Student-facing APIs must stay in sync with calculation logic.** The attendance calculator used `formal_end_minutes` as P1 priority, but the analytics API that serves students didn't query that column — causing a mismatch between the stored percentage and the displayed "X of Y min".
+
+52. **Silent error swallowing in bulk operations hides failures.** Always track and surface error counts. An admin clicking "Apply All" needs to know if 2 of 5 failed, not just see "Applied 3 sessions" and wonder what happened to the rest.
+
+53. **Review what the user actually sees, not just what the code computes.** The attendance percentage was correct in the DB, but the UI showed "attended 357 of 344 min" because the display layer used a different duration field than the calculator.
+
+---
+
+## Pending Enhancements (from Opus 4.6 Code Review)
+
+### From Review — Not Yet Addressed
+1. **Dashboard stats scope**: `app/api/analytics/dashboard/route.ts` doesn't filter for `counts_for_students = true` — dashboard card may include non-countable sessions in average
+2. **UUID format validation**: `apply-cliff` DELETE handler doesn't validate sessionId format (Supabase rejects invalid UUIDs, but defense-in-depth)
+3. **Race condition in apply-cliff POST**: Two separate UPDATE calls to same row — could combine into single update
+4. **Zoom API rate limiting**: Bulk detection makes 2 Zoom API calls per session with only 200ms delay — could hit rate limits with 50+ sessions
+5. **Vercel timeout on bulk**: Large cohorts could exceed 60s function timeout — consider batching or progress mechanism
+6. **`bulkResults` typed as `any`**: Should use proper `{ summary: BulkSummary; results: BulkResult[] }` type
+7. **Use `Math.floor` for effectiveEndMinutes**: Conservative rounding (currently uses `Math.round`)
+8. **Comment the 0.85/0.95 impact thresholds**: Add rationale for magic numbers in cliff detector
+9. **Generic error messages**: Some routes return `error.message` — should use generic messages in production
+10. **ARIA labels**: Add to chart bars and cliff badge buttons for accessibility
+11. **Progress indicator for bulk detection**: Show real-time progress as sessions are scanned
+
+### Feature Ideas
+- **Auto-recalculate on apply**: One-click "Apply & Recalculate" that triggers attendance recalc immediately after setting formal_end_minutes
+- **Cliff detection on new sync**: Auto-detect cliffs when syncing attendance from Zoom for new sessions
+- **Email/notification on cliff detected**: Alert admin when a high-confidence cliff is found
+- **Student-visible formal end note**: Show students "Session ended at 219m — QnA continued until 246m" on their attendance view
+
+---
+
+**Deployment Status**: Pushed to prod via `git push origin main` (commit `032ebd9`) ✅
+**Vercel**: Auto-deploying from main branch
+**Hard Refresh Required**: Yes (Cmd+Shift+R) after Vercel deploy completes
