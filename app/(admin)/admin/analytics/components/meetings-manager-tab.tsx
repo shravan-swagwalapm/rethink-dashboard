@@ -650,7 +650,7 @@ export function MeetingsManagerTab({ cohorts }: MeetingsManagerTabProps) {
                           <TooltipTrigger className="flex items-center gap-1">
                             Formal End <Info className="w-3 h-3 text-muted-foreground" />
                           </TooltipTrigger>
-                          <TooltipContent>Auto-detected session end (excludes QnA). Click to review.</TooltipContent>
+                          <TooltipContent>Detected formal end is auto-used for attendance %. Override to set a custom value, or dismiss to use full meeting duration. Click a badge to review.</TooltipContent>
                         </Tooltip>
                       </TableHead>
                       <TableHead>Cohort</TableHead>
