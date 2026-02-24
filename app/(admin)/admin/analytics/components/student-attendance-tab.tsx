@@ -38,6 +38,7 @@ interface SessionDetail {
   totalDuration: number;
   attended: boolean;
   segments: { join: string; leave: string; duration: number }[];
+  formalEndMinutes?: number | null;
 }
 
 interface StudentData {
@@ -94,6 +95,14 @@ function SessionCard({ session }: { session: SessionDetail }) {
                     <>
                       <span>·</span>
                       <span>{session.segments.length} joins</span>
+                    </>
+                  )}
+                  {session.formalEndMinutes && session.formalEndMinutes < session.totalDuration && (
+                    <>
+                      <span>·</span>
+                      <span className="text-emerald-500 font-medium">
+                        ⚡ Formal: {session.formalEndMinutes}m (of {session.totalDuration}m)
+                      </span>
                     </>
                   )}
                 </div>

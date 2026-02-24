@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     // Get countable sessions for this cohort
     const { data: sessions } = await supabase
       .from('sessions')
-      .select('id, title, scheduled_at, duration_minutes, actual_duration_minutes')
+      .select('id, title, scheduled_at, duration_minutes, actual_duration_minutes, formal_end_minutes')
       .eq('counts_for_students', true)
       .eq('cohort_id', cohortId)
       .lt('scheduled_at', new Date().toISOString())
@@ -133,6 +133,7 @@ export async function GET(request: NextRequest) {
             : 0,
           totalDuration: session.actual_duration_minutes || session.duration_minutes,
           attended: !!attendance,
+          formalEndMinutes: session.formal_end_minutes || null,
           segments: attendanceSegments.map((seg) => ({
             join: seg.join_time,
             leave: seg.leave_time,
