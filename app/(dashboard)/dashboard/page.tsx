@@ -16,7 +16,7 @@ import { format, isToday, isTomorrow, parseISO } from 'date-fns';
 import { InvoiceCard } from '@/components/dashboard/invoice-card';
 import { toast } from 'sonner';
 import { MotionContainer, MotionItem, MotionFadeIn } from '@/components/ui/motion';
-import type { Session, DashboardStats, LearningModule, Resource, Invoice, Cohort, ModuleResource, ModuleResourceType } from '@/types';
+import type { Session, DashboardStats, LearningModule, Resource, Invoice, Cohort, ModuleResource, ModuleResourceType, AdminDashboardStats, AdminDashboardSession, AdminDashboardLearning } from '@/types';
 
 interface InvoiceWithCohort extends Invoice {
   cohort?: Cohort;
@@ -124,9 +124,9 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
 
   // Admin-specific state
-  const [adminStats, setAdminStats] = useState<any>(null);
-  const [adminSessions, setAdminSessions] = useState<any[]>([]);
-  const [adminLearnings, setAdminLearnings] = useState<any[]>([]);
+  const [adminStats, setAdminStats] = useState<AdminDashboardStats | null>(null);
+  const [adminSessions, setAdminSessions] = useState<AdminDashboardSession[]>([]);
+  const [adminLearnings, setAdminLearnings] = useState<AdminDashboardLearning[]>([]);
 
   /**
    * Fetch recent learning modules with override logic
@@ -219,6 +219,7 @@ export default function DashboardPage() {
             invoicesResult,
             learningAssetsResult,
             leaderboardResult,
+            progressResult,
           ] = await Promise.all([
             // Fetch cohort info
             supabase
@@ -273,7 +274,13 @@ export default function DashboardPage() {
             fetch(`/api/analytics?view=leaderboard&cohort_id=${activeCohortId}`)
               .then(r => r.ok ? r.json() : { cohortAvg: null })
               .catch(() => ({ cohortAvg: null })),
+            // Fetch completion progress
+            fetch('/api/learnings/progress')
+              .then(r => r.ok ? r.json() : { progress: [] })
+              .catch(() => ({ progress: [] })),
           ]);
+
+          const completedCount = progressResult.progress?.filter((p: { is_completed: boolean }) => p.is_completed).length || 0;
 
           // Process cohort data
           const cohort = cohortResult.data;
@@ -297,6 +304,7 @@ export default function DashboardPage() {
             current_rank: rankingResult.data?.rank || null,
             total_resources: resourcesCountResult.count || 0,
             cohort_avg: leaderboardResult.cohortAvg ?? null,
+            completed_resources: completedCount,
           });
 
           // Set sessions, modules, and resources

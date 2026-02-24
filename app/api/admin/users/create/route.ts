@@ -136,9 +136,7 @@ export async function POST(request: NextRequest) {
       for (const cid of cohortIds) {
         try {
           const result = await sendCalendarInvitesToNewMember(profile.email, cid, auth.userId!);
-          if (result.sent > 0) {
-            console.log(`Sent ${result.sent} calendar invites to new user ${profile.email} for cohort ${cid}`);
-          }
+          // Calendar invites sent successfully
         } catch (calendarError) {
           console.error('Failed to send calendar invites:', calendarError);
         }

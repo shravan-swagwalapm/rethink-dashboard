@@ -41,6 +41,7 @@ import { CaseStudyFormDialog } from './components/case-study-form-dialog';
 import type { CaseStudyFormData, PendingSolution } from './components/case-study-form-dialog';
 import { ResourceSection } from './components/resource-section';
 import { CaseStudySection } from './components/case-study-section';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { MotionContainer, MotionItem, MotionFadeIn } from '@/components/ui/motion';
 import { PageHeader } from '@/components/ui/page-header';
 
@@ -73,6 +74,9 @@ export default function LearningsPage() {
 
   const [showCaseStudyForm, setShowCaseStudyForm] = useState(false);
   const [editingCaseStudy, setEditingCaseStudy] = useState<CaseStudy | null>(null);
+
+  // Shared delete confirmation dialog
+  const [deleteTarget, setDeleteTarget] = useState<{ type: string; id: string; title: string } | null>(null);
 
   // Preview modal
   const [previewResource, setPreviewResource] = useState<ModuleResource | null>(null);
@@ -239,8 +243,6 @@ export default function LearningsPage() {
   };
 
   const handleDeleteModule = async (moduleId: string) => {
-    if (!confirm('Delete this week? All resources in it will also be deleted.')) return;
-
     try {
       const response = await fetch(`/api/admin/learnings?id=${moduleId}&type=module`, { method: 'DELETE' });
       if (!response.ok) throw new Error('Failed to delete module');
@@ -253,8 +255,6 @@ export default function LearningsPage() {
   };
 
   const handleDeleteResource = async (resourceId: string) => {
-    if (!confirm('Delete this resource?')) return;
-
     try {
       const response = await fetch(`/api/admin/learnings?id=${resourceId}&type=resource`, { method: 'DELETE' });
       if (!response.ok) throw new Error('Failed to delete resource');
@@ -355,8 +355,6 @@ export default function LearningsPage() {
   };
 
   const handleDeleteCaseStudy = async (caseStudyId: string) => {
-    if (!confirm('Delete this case study?')) return;
-
     try {
       const response = await fetch(`/api/admin/case-studies?id=${caseStudyId}`, { method: 'DELETE' });
       if (!response.ok) throw new Error('Failed to delete case study');
@@ -595,7 +593,7 @@ export default function LearningsPage() {
                 size="sm"
                 variant="ghost"
                 className="text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 transition-all"
-                onClick={() => handleDeleteModule(currentWeekModule.id)}
+                onClick={() => setDeleteTarget({ type: 'week', id: currentWeekModule.id, title: currentWeekModule.title })}
               >
                 <Trash2 className="w-4 h-4" />
               </Button>
@@ -610,7 +608,10 @@ export default function LearningsPage() {
             onAdd={() => openAddResource('video')}
             onPreview={(resource) => setPreviewResource(resource)}
             onEdit={(resource) => openEditResource(resource)}
-            onDelete={(resourceId) => handleDeleteResource(resourceId)}
+            onDelete={(resourceId) => {
+              const resource = recordings.find(r => r.id === resourceId);
+              setDeleteTarget({ type: 'resource', id: resourceId, title: resource?.title || 'this resource' });
+            }}
           />
 
           <ResourceSection
@@ -621,7 +622,10 @@ export default function LearningsPage() {
             onAdd={() => openAddResource('slides')}
             onPreview={(resource) => setPreviewResource(resource)}
             onEdit={(resource) => openEditResource(resource)}
-            onDelete={(resourceId) => handleDeleteResource(resourceId)}
+            onDelete={(resourceId) => {
+              const resource = slides.find(r => r.id === resourceId);
+              setDeleteTarget({ type: 'resource', id: resourceId, title: resource?.title || 'this resource' });
+            }}
           />
 
           <ResourceSection
@@ -632,7 +636,10 @@ export default function LearningsPage() {
             onAdd={() => openAddResource('document')}
             onPreview={(resource) => setPreviewResource(resource)}
             onEdit={(resource) => openEditResource(resource)}
-            onDelete={(resourceId) => handleDeleteResource(resourceId)}
+            onDelete={(resourceId) => {
+              const resource = documents.find(r => r.id === resourceId);
+              setDeleteTarget({ type: 'resource', id: resourceId, title: resource?.title || 'this resource' });
+            }}
           />
 
           <CaseStudySection
@@ -641,7 +648,10 @@ export default function LearningsPage() {
             caseStudies={weekCaseStudies}
             onAdd={openAddCaseStudy}
             onEdit={openEditCaseStudy}
-            onDelete={handleDeleteCaseStudy}
+            onDelete={(caseStudyId) => {
+              const cs = weekCaseStudies.find(c => c.id === caseStudyId);
+              setDeleteTarget({ type: 'case study', id: caseStudyId, title: cs?.title || 'this case study' });
+            }}
             onToggleVisibility={toggleSolutionVisibility}
             onPreviewProblem={async (cs) => {
               if (!cs.problem_file_path) return;
@@ -729,8 +739,9 @@ export default function LearningsPage() {
           openEditResource(resource);
         }}
         onDelete={(resourceId) => {
+          const resource = weekResources.find(r => r.id === resourceId);
           setPreviewResource(null);
-          handleDeleteResource(resourceId);
+          setDeleteTarget({ type: 'resource', id: resourceId, title: resource?.title || 'this resource' });
         }}
       />
 
@@ -751,6 +762,44 @@ export default function LearningsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Shared Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete {deleteTarget?.type === 'week' ? 'Week' : deleteTarget?.type === 'resource' ? 'Resource' : 'Case Study'}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget?.type === 'week'
+                ? `Delete "${deleteTarget.title}"? All resources in it will also be deleted. This action cannot be undone.`
+                : deleteTarget?.type === 'resource'
+                  ? `Delete "${deleteTarget.title}"? This action cannot be undone.`
+                  : `Delete "${deleteTarget?.title}"? This action cannot be undone.`
+              }
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={async () => {
+                if (!deleteTarget) return;
+                if (deleteTarget.type === 'week') {
+                  await handleDeleteModule(deleteTarget.id);
+                } else if (deleteTarget.type === 'resource') {
+                  await handleDeleteResource(deleteTarget.id);
+                } else {
+                  await handleDeleteCaseStudy(deleteTarget.id);
+                }
+                setDeleteTarget(null);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

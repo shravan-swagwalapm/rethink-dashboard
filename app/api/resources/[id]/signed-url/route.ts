@@ -79,14 +79,6 @@ export async function GET(
     // Office docs: 1 hour (Office Online needs to fetch), PDFs: 15 min, Others: 10 min
     const expirySeconds = isOfficeDoc ? 3600 : (isPDF ? 900 : 600);
 
-    console.log('[SignedURL] Generating URL:', {
-      resourceId,
-      fileType,
-      isOfficeDoc,
-      expirySeconds,
-      filePath: resource.file_path,
-    });
-
     const { data: signedUrl, error: signedError } = await supabase.storage
       .from('resources')
       .createSignedUrl(resource.file_path, expirySeconds);
@@ -95,11 +87,6 @@ export async function GET(
       console.error('[SignedURL] Failed to generate:', signedError);
       return NextResponse.json({ error: 'Failed to generate URL' }, { status: 500 });
     }
-
-    console.log('[SignedURL] Generated successfully:', {
-      resourceId,
-      urlPrefix: signedUrl.signedUrl.substring(0, 80) + '...',
-    });
 
     return NextResponse.json({ signedUrl: signedUrl.signedUrl });
 

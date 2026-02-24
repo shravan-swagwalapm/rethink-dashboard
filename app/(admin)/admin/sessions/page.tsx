@@ -60,6 +60,7 @@ import { useSearchParams } from 'next/navigation';
 import { format, parseISO, isPast } from 'date-fns';
 import type { Session, Cohort, SessionCohort, SessionGuest, Profile } from '@/types';
 import { Checkbox } from '@/components/ui/checkbox';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { MotionContainer, MotionItem, MotionFadeIn } from '@/components/ui/motion';
 import { RsvpListDialog } from './components/rsvp-list-dialog';
 
@@ -96,6 +97,7 @@ export default function SessionsPage() {
   const [rsvpSessionId, setRsvpSessionId] = useState<string | null>(null);
   const [rsvpSessionTitle, setRsvpSessionTitle] = useState('');
 
+  const [deleteSessionId, setDeleteSessionId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingSession, setEditingSession] = useState<SessionWithStats | null>(null);
   const [formData, setFormData] = useState({
@@ -314,10 +316,6 @@ export default function SessionsPage() {
   };
 
   const handleDelete = async (sessionId: string) => {
-    if (!confirm('Are you sure you want to delete this session? This will also delete all RSVPs.')) {
-      return;
-    }
-
     try {
       const response = await fetch(`/api/admin/sessions?id=${sessionId}`, {
         method: 'DELETE',
@@ -537,7 +535,7 @@ export default function SessionsPage() {
                               Edit
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              onClick={() => handleDelete(session.id)}
+                              onClick={() => setDeleteSessionId(session.id)}
                               className="text-destructive focus:text-destructive"
                             >
                               <Trash2 className="w-4 h-4 mr-2" />
@@ -818,6 +816,32 @@ export default function SessionsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Session Confirmation Dialog */}
+      <AlertDialog open={!!deleteSessionId} onOpenChange={(open) => { if (!open) setDeleteSessionId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Session?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this session? This will also delete all RSVPs. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={async () => {
+                if (deleteSessionId) {
+                  await handleDelete(deleteSessionId);
+                  setDeleteSessionId(null);
+                }
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <RsvpListDialog
         open={rsvpDialogOpen}

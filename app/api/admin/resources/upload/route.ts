@@ -91,15 +91,6 @@ export async function POST(request: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Log upload attempt details for debugging
-    console.log('[Upload] Attempting to upload:', {
-      bucket: 'resources',
-      filePath,
-      fileSize: file.size,
-      fileType: file.type,
-      cohortId: storageFolder,
-    });
-
     // Upload to Supabase Storage
     const { data: uploadData, error: uploadError } = await adminClient.storage
       .from('resources')
@@ -152,7 +143,6 @@ export async function POST(request: NextRequest) {
       throw dbError;
     }
 
-    console.log('[Upload] Storage upload succeeded:', uploadData);
     return NextResponse.json(resource);
   } catch (error) {
     console.error('[Upload] Error uploading file:', error);

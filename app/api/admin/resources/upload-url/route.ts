@@ -77,14 +77,6 @@ export async function POST(request: NextRequest) {
     const sanitizedName = filename.replace(/[^a-zA-Z0-9.-]/g, '_');
     const filePath = `${storageFolder}/${timestamp}_${sanitizedName}`;
 
-    console.log('[Upload URL] Generating signed upload URL:', {
-      filename,
-      fileSize: `${(fileSize / 1024 / 1024).toFixed(2)} MB`,
-      contentType,
-      cohortId: storageFolder,
-      filePath,
-    });
-
     // Pre-flight check: verify bucket file_size_limit allows this upload
     const adminClient = await createAdminClient();
 
@@ -126,12 +118,6 @@ export async function POST(request: NextRequest) {
     }
 
     const expiresAt = new Date(Date.now() + SIGNED_URL_EXPIRY * 1000).toISOString();
-
-    console.log('[Upload URL] Signed URL generated successfully:', {
-      filePath: data.path,
-      expiresAt,
-      urlPrefix: data.signedUrl.substring(0, 80) + '...',
-    });
 
     return NextResponse.json({
       uploadUrl: data.signedUrl,

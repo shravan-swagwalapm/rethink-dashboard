@@ -47,6 +47,7 @@ import {
   Settings,
   Zap,
 } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { VariableConfigModal } from '@/components/admin/notifications/variable-config-modal';
 import { NotificationTemplate, getChannelIcon, getChannelColor } from '../types';
@@ -70,6 +71,7 @@ export function TemplatesTab() {
   const [htmlPreviewMode, setHtmlPreviewMode] = useState<'desktop' | 'mobile'>('desktop');
   const [previewTemplate, setPreviewTemplate] = useState<NotificationTemplate | null>(null);
   const [showVariableConfig, setShowVariableConfig] = useState(false);
+  const [deleteTemplateId, setDeleteTemplateId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchTemplates();
@@ -178,8 +180,6 @@ export function TemplatesTab() {
   };
 
   const handleDeleteTemplate = async (id: string) => {
-    if (!confirm('Delete this template? This action cannot be undone.')) return;
-
     try {
       const response = await fetch(`/api/admin/notifications/templates?id=${id}`, {
         method: 'DELETE',
@@ -281,7 +281,7 @@ export function TemplatesTab() {
                     <Button size="sm" variant="outline" onClick={() => openEditTemplate(template)}>
                       <Edit className="w-4 h-4" />
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => handleDeleteTemplate(template.id)} className="text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20">
+                    <Button size="sm" variant="outline" onClick={() => setDeleteTemplateId(template.id)} className="text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20">
                       <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>
@@ -758,6 +758,32 @@ export function TemplatesTab() {
           }));
         }}
       />
+
+      {/* Delete Template Confirmation Dialog */}
+      <AlertDialog open={!!deleteTemplateId} onOpenChange={(open) => { if (!open) setDeleteTemplateId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Template?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Delete this template? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={async () => {
+                if (deleteTemplateId) {
+                  await handleDeleteTemplate(deleteTemplateId);
+                  setDeleteTemplateId(null);
+                }
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

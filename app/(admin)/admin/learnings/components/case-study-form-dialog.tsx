@@ -122,12 +122,6 @@ async function uploadPdfFile(
   const compressed = await compressPdf(file);
   const uploadFile = compressed.file;
 
-  // Compression result logged only in development
-  if (compressed.wasCompressed && process.env.NODE_ENV === 'development') {
-    // eslint-disable-next-line no-console
-    console.log(`[PDF Upload] Compressed ${file.name}: ${compressed.savings}% saved`);
-  }
-
   // Phase 2: Request signed URL
   onStageChange('requesting-url');
   onProgress(0);

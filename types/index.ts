@@ -526,6 +526,38 @@ export interface DashboardStats {
   current_rank: number | null;
   total_resources: number;
   cohort_avg: number | null;
+  completed_resources: number;
+}
+
+// Admin dashboard types
+export interface AdminDashboardStats {
+  totalStudents: number;
+  activeCohorts: number;
+  totalCohorts: number;
+  totalSessions: number;
+  upcomingSessionsCount: number;
+  totalLearnings: number;
+}
+
+export interface AdminDashboardSession {
+  id: string;
+  title: string;
+  scheduled_at: string;
+  duration_minutes: number;
+  meeting_url: string;
+  cohortId: string;
+  cohortName: string;
+  cohortTag: string;
+}
+
+export interface AdminDashboardLearning {
+  id: string;
+  title: string;
+  type: string;
+  created_at: string;
+  cohortId: string;
+  cohortName: string;
+  cohortTag: string;
 }
 
 // API Response types

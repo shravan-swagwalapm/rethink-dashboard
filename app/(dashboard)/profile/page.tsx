@@ -45,6 +45,7 @@ import {
 import { PageHeader } from '@/components/ui/page-header';
 import { format } from 'date-fns';
 import { MotionContainer, MotionItem, MotionFadeIn } from '@/components/ui/motion';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import type { Invoice } from '@/types';
 import { generateQRCode, downloadQRCode } from '@/lib/qr-code';
 import { ProfileCardPreviewModal } from '@/components/ProfileCardPreviewModal';
@@ -98,6 +99,7 @@ export default function ProfilePage() {
   const [copied, setCopied] = useState(false);
   const [generatingCard, setGeneratingCard] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [showRegenerateDialog, setShowRegenerateDialog] = useState(false);
 
   useEffect(() => {
     if (profile) {
@@ -184,17 +186,12 @@ export default function ProfilePage() {
       const data = await res.json();
 
       if (res.ok) {
-        console.log('Upload successful, avatar URL:', data.avatar_url);
-        console.log('Current profile before update:', profile);
-
         // Update cache key to force image refresh with cache-busting
         const newCacheKey = Date.now();
         setAvatarCacheKey(newCacheKey);
 
         // Also refresh from Supabase
         await refreshProfile();
-
-        console.log('Profile after refresh - avatar_url:', data.avatar_url);
 
         setAvatarFile(null);
         setAvatarPreview(null);
@@ -255,10 +252,6 @@ export default function ProfilePage() {
   };
 
   const handleRegenerateCard = async () => {
-    if (!confirm('This will create a new URL and deactivate your old one. Continue?')) {
-      return;
-    }
-
     setGeneratingCard(true);
     try {
       const res = await fetch('/api/profile/card', {
@@ -698,7 +691,7 @@ export default function ProfilePage() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={handleRegenerateCard}
+                  onClick={() => setShowRegenerateDialog(true)}
                   disabled={generatingCard}
                   className="hover:bg-teal-50 dark:hover:bg-teal-900/20"
                 >
@@ -865,6 +858,29 @@ export default function ProfilePage() {
           profile={profile}
         />
       )}
+
+      {/* Regenerate URL Confirmation Dialog */}
+      <AlertDialog open={showRegenerateDialog} onOpenChange={setShowRegenerateDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Regenerate Profile URL?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will create a new URL and deactivate your old one. Anyone using the old link will no longer be able to view your profile.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                await handleRegenerateCard();
+                setShowRegenerateDialog(false);
+              }}
+            >
+              Regenerate
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

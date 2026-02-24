@@ -14,7 +14,6 @@ export async function GET(request: Request) {
 
   // Login mode is determined by the PATH, not query params
   const loginMode = 'admin';
-  console.log('Auth callback (ADMIN path): Processing OAuth callback');
 
   if (code) {
     const supabase = await createClient();
@@ -112,14 +111,7 @@ export async function GET(request: Request) {
     const isAdminRole = userRole === 'admin' || userRole === 'company_user';
     const shouldGoToAdmin = loginMode === 'admin' && isAdminRole;
 
-    console.log(
-      'Auth callback (ADMIN path): userRole =', userRole,
-      ', isAdminRole =', isAdminRole,
-      ', shouldGoToAdmin =', shouldGoToAdmin
-    );
-
     if (shouldGoToAdmin) {
-      console.log('Auth callback: Redirecting to /admin');
       await trackLogin(data.session.user.id, 'google_oauth');
       const response = NextResponse.redirect(`${origin}/admin`);
 
@@ -135,7 +127,6 @@ export async function GET(request: Request) {
     } else {
       // User tried admin login but doesn't have admin role
       // Sign them out and redirect with error
-      console.log('Auth callback: User is not admin, signing out and showing error');
       await supabase.auth.signOut();
       return NextResponse.redirect(`${origin}/login?error=not_admin`);
     }

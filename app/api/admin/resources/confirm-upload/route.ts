@@ -54,14 +54,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('[Confirm Upload] Confirming upload:', {
-      filePath,
-      moduleId,
-      title,
-      contentType,
-      fileSize: fileSize ? `${(fileSize / 1024 / 1024).toFixed(2)} MB` : 'unknown',
-    });
-
     const adminClient = await createAdminClient();
 
     // Step 1: Verify file exists in storage
@@ -101,8 +93,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('[Confirm Upload] File verified in storage:', filePath);
-
     // Step 2: Verify module exists
     const { data: module, error: moduleError } = await adminClient
       .from('learning_modules')
@@ -117,8 +107,6 @@ export async function POST(request: NextRequest) {
         { status: 404 }
       );
     }
-
-    console.log('[Confirm Upload] Module verified:', module.title);
 
     // Step 3: Create resource record in module_resources
     const { data: resource, error: insertError } = await adminClient
@@ -156,13 +144,6 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
-
-    console.log('[Confirm Upload] Resource created successfully:', {
-      resourceId: resource.id,
-      title: resource.title,
-      filePath: resource.file_path,
-      moduleTitle: module.title,
-    });
 
     return NextResponse.json({ resource });
 

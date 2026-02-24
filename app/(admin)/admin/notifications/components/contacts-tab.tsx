@@ -29,6 +29,7 @@ import {
   CheckCircle2,
   AlertCircle,
 } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { CSVImportDialog } from '@/components/admin/notifications/csv-import-dialog';
 import { CohortImportDialog } from '@/components/admin/notifications/cohort-import-dialog';
@@ -51,6 +52,7 @@ export function ContactsTab() {
     description: '',
     tags: [] as string[],
   });
+  const [deleteTarget, setDeleteTarget] = useState<{ type: 'list' | 'contact'; id: string; name: string } | null>(null);
   const [contactFormData, setContactFormData] = useState({
     email: '',
     phone: '',
@@ -161,8 +163,6 @@ export function ContactsTab() {
   };
 
   const handleDeleteList = async (id: string) => {
-    if (!confirm('Delete this contact list and all its contacts? This action cannot be undone.')) return;
-
     try {
       const response = await fetch(`/api/admin/notifications/contacts?id=${id}&type=list`, {
         method: 'DELETE',
@@ -255,8 +255,6 @@ export function ContactsTab() {
   };
 
   const handleDeleteContact = async (id: string) => {
-    if (!confirm('Delete this contact? This action cannot be undone.')) return;
-
     try {
       const response = await fetch(`/api/admin/notifications/contacts?id=${id}&type=contact`, {
         method: 'DELETE',
@@ -379,7 +377,7 @@ export function ContactsTab() {
                           variant="ghost"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleDeleteList(list.id);
+                            setDeleteTarget({ type: 'list', id: list.id, name: list.name });
                           }}
                         >
                           <Trash2 className="h-3 w-3" />
@@ -502,7 +500,7 @@ export function ContactsTab() {
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                onClick={() => handleDeleteContact(contact.id)}
+                                onClick={() => setDeleteTarget({ type: 'contact', id: contact.id, name: contact.name || contact.email || 'this contact' })}
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
@@ -841,6 +839,40 @@ export function ContactsTab() {
           onImportComplete={handleImportComplete}
         />
       )}
+
+      {/* Shared Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete {deleteTarget?.type === 'list' ? 'Contact List' : 'Contact'}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget?.type === 'list'
+                ? `Delete "${deleteTarget.name}" and all its contacts? This action cannot be undone.`
+                : `Delete "${deleteTarget?.name}"? This action cannot be undone.`
+              }
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={async () => {
+                if (!deleteTarget) return;
+                if (deleteTarget.type === 'list') {
+                  await handleDeleteList(deleteTarget.id);
+                } else {
+                  await handleDeleteContact(deleteTarget.id);
+                }
+                setDeleteTarget(null);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

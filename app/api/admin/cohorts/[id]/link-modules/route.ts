@@ -39,8 +39,6 @@ export async function POST(
 
   try {
     const body = await req.json();
-    console.log('[LINK] Step 1: Request received', { cohortId, body });
-
     // Validate input
     const validation = linkModulesSchema.safeParse(body);
     if (!validation.success) {
@@ -52,7 +50,6 @@ export async function POST(
     }
 
     const { source_cohort_id, module_ids } = validation.data;
-    console.log('[LINK] Step 2: Validation passed', { source_cohort_id, module_ids });
 
     if (!source_cohort_id) {
       console.error('[LINK] Step 3: Missing source_cohort_id');
@@ -72,17 +69,14 @@ export async function POST(
     if (source_cohort_id === 'global') {
       // Link global library modules
       query = query.eq('is_global', true);
-      console.log('[LINK] Step 3: Querying global modules');
     } else {
       // Link modules from specific cohort
       query = query.eq('cohort_id', source_cohort_id);
-      console.log('[LINK] Step 3: Querying cohort modules', { source_cohort_id });
     }
 
     // If specific module IDs provided, filter to those
     if (module_ids && Array.isArray(module_ids) && module_ids.length > 0) {
       query = query.in('id', module_ids);
-      console.log('[LINK] Step 4: Filtering to specific modules', { count: module_ids.length });
     }
 
     const { data: modules, error: fetchError } = await query;
@@ -91,8 +85,6 @@ export async function POST(
       console.error('[LINK] Step 4: Database error fetching modules', fetchError);
       throw fetchError;
     }
-
-    console.log('[LINK] Step 4: Modules fetched', { count: modules?.length || 0 });
 
     if (!modules || modules.length === 0) {
       console.warn('[LINK] Step 5: No modules found to link');
@@ -104,7 +96,6 @@ export async function POST(
 
     // Determine link type
     const linkType = source_cohort_id === 'global' ? 'global' : 'cohort';
-    console.log('[LINK] Step 5: Determined link type', { linkType });
 
     // CRITICAL: Prevent circular links (Cohort A → Cohort B → Cohort A)
     if (linkType === 'cohort') {
@@ -113,8 +104,6 @@ export async function POST(
         .select('id, name, linked_cohort_id')
         .eq('id', source_cohort_id)
         .single();
-
-      console.log('[LINK] Step 6: Checked for circular links', { sourceCohort });
 
       if (sourceCohort?.linked_cohort_id === cohortId) {
         console.error('[LINK] Step 6: Circular link detected');
@@ -127,14 +116,6 @@ export async function POST(
 
     // Use atomic PostgreSQL function for transaction safety
     // DELETE + INSERT in single transaction prevents data loss
-    console.log('[LINK] Step 7: Calling atomic_update_cohort_link', {
-      p_cohort_id: cohortId,
-      p_source_cohort_id: source_cohort_id === 'global' ? null : source_cohort_id,
-      p_link_type: linkType,
-      module_count: modules.length,
-      p_linked_by: auth.userId,
-    });
-
     const { data: result, error: rpcError } = await adminClient.rpc('atomic_update_cohort_link', {
       p_cohort_id: cohortId,
       p_source_cohort_id: source_cohort_id === 'global' ? null : source_cohort_id,
@@ -148,8 +129,6 @@ export async function POST(
       throw rpcError;
     }
 
-    console.log('[LINK] Step 7: RPC result', result);
-
     // Check function result
     if (!result || !result.success) {
       console.error('[LINK] Step 8: Function returned failure', result);
@@ -159,7 +138,6 @@ export async function POST(
       );
     }
 
-    console.log('[LINK] Step 8: Success! Returning response');
     return NextResponse.json({
       message: `Successfully linked ${result.inserted_count} modules from ${linkType === 'global' ? 'Global Library' : 'source cohort'}`,
       links_created: result.inserted_count,

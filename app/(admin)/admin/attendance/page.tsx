@@ -31,6 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { BarChart3, Settings, Webhook, TestTube, LinkIcon, Mail, UserPlus, Trash2, Loader2, AlertCircle, CheckSquare } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -72,6 +73,7 @@ export default function AdminAttendancePage() {
   const [selectedEmail, setSelectedEmail] = useState<string>('');
   const [selectedUserId, setSelectedUserId] = useState<string>('');
   const [linking, setLinking] = useState(false);
+  const [deleteAliasId, setDeleteAliasId] = useState<string | null>(null);
   const hasFetchedRef = useRef(false);
 
   const fetchData = useCallback(async (force = false) => {
@@ -165,8 +167,6 @@ export default function AdminAttendancePage() {
   };
 
   const handleDeleteAlias = async (aliasId: string) => {
-    if (!confirm('Remove this email alias?')) return;
-
     try {
       const response = await fetch(`/api/admin/attendance/aliases?id=${aliasId}`, {
         method: 'DELETE',
@@ -405,7 +405,7 @@ export default function AdminAttendancePage() {
                         size="sm"
                         variant="ghost"
                         className="text-destructive"
-                        onClick={() => handleDeleteAlias(alias.id)}
+                        onClick={() => setDeleteAliasId(alias.id)}
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>
@@ -419,6 +419,32 @@ export default function AdminAttendancePage() {
       </Card>
 
       </MotionFadeIn>
+
+      {/* Remove Alias Confirmation Dialog */}
+      <AlertDialog open={!!deleteAliasId} onOpenChange={(open) => { if (!open) setDeleteAliasId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Email Alias?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove the email alias. Future attendance from this email will no longer be matched to the linked user.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={async () => {
+                if (deleteAliasId) {
+                  await handleDeleteAlias(deleteAliasId);
+                  setDeleteAliasId(null);
+                }
+              }}
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Link Email Dialog */}
       <Dialog open={showLinkDialog} onOpenChange={setShowLinkDialog}>

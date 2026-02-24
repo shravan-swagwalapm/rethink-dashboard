@@ -2,7 +2,7 @@
 
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Users, TrendingUp, Trophy, FolderOpen } from 'lucide-react';
+import { Users, TrendingUp, Trophy, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SpotlightCard } from '@/components/ui/spotlight-card';
 import { MotionContainer, MotionItem } from '@/components/ui/motion';
@@ -15,22 +15,42 @@ interface StatsCardsProps {
     current_rank: number | null;
     total_resources: number;
     cohort_avg?: number | null;
+    completed_resources: number;
   };
   loading?: boolean;
 }
 
+interface StatCardProps {
+  card: {
+    title: string;
+    value: number;
+    icon: React.ComponentType<{ className?: string }>;
+    description: string;
+    trend?: 'up' | 'down';
+  };
+  index: number;
+  stats?: StatsCardsProps['stats'];
+}
+
 // Stats card component with animation
-function StatCard({ card, index, stats }: any) {
+function StatCard({ card, index, stats }: StatCardProps) {
   const isAttendance = card.title === 'Attendance';
   const isRank = card.title === 'Current Rank';
+  const isProgress = card.title === 'Progress';
 
   const numericValue = isRank
     ? (stats?.current_rank || 0)
-    : (typeof card.value === 'number' ? card.value : parseInt(card.value) || 0);
+    : (typeof card.value === 'number' ? card.value : parseInt(String(card.value)) || 0);
 
   const animatedValue = useAnimatedCounter({ target: numericValue, duration: 1500 });
 
-  const displayValue = isRank && !stats?.current_rank
+  const completedResources = stats?.completed_resources || 0;
+  const totalResources = stats?.total_resources || 0;
+  const progressPercent = totalResources > 0 ? Math.round((completedResources / totalResources) * 100) : 0;
+
+  const displayValue = isProgress
+    ? `${animatedValue} / ${totalResources}`
+    : isRank && !stats?.current_rank
     ? '—'
     : isAttendance
     ? `${animatedValue}%`
@@ -64,7 +84,7 @@ function StatCard({ card, index, stats }: any) {
                 card.title === 'Cohort Members' && 'from-teal-500 to-teal-600 dark:from-teal-600 dark:to-teal-700 shadow-accent/30',
                 card.title === 'Attendance' && 'from-green-500 to-emerald-600 dark:from-green-600 dark:to-emerald-700 shadow-emerald-500/30',
                 card.title === 'Current Rank' && 'from-amber-500 to-orange-600 dark:from-amber-600 dark:to-orange-700 shadow-amber-500/30',
-                card.title === 'Total Resources' && 'from-sky-500 to-blue-600 dark:from-sky-600 dark:to-blue-700 shadow-blue-500/30'
+                card.title === 'Progress' && 'from-violet-500 to-purple-600 dark:from-violet-600 dark:to-purple-700 shadow-violet-500/30'
               )}
             >
               <card.icon className="w-7 h-7 text-white drop-shadow-lg" />
@@ -127,6 +147,15 @@ function StatCard({ card, index, stats }: any) {
             <p className="text-xs text-muted-foreground dark:text-gray-500 mt-1">
               {card.description}
             </p>
+            {/* Mini progress bar for Progress card */}
+            {isProgress && (
+              <div className="mt-2 h-1.5 w-full rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-violet-500 to-purple-600 transition-all duration-1000"
+                  style={{ width: `${progressPercent}%` }}
+                />
+              </div>
+            )}
           </div>
         </div>
 
@@ -135,7 +164,7 @@ function StatCard({ card, index, stats }: any) {
           style={{
             color: card.title === 'Cohort Members' ? '#14b8a6' :
                    card.title === 'Attendance' ? '#10b981' :
-                   card.title === 'Current Rank' ? '#f59e0b' : '#0ea5e9'
+                   card.title === 'Current Rank' ? '#f59e0b' : '#8b5cf6'
           }}
         />
       </CardContent>
@@ -159,7 +188,7 @@ export function StatsCards({ stats, loading }: StatsCardsProps) {
       description: stats?.cohort_avg != null
         ? `Cohort avg: ${Math.round(stats.cohort_avg)}%`
         : 'Session attendance rate',
-      trend: stats?.attendance_percentage && stats.attendance_percentage >= 75 ? 'up' : 'down',
+      trend: (stats?.attendance_percentage && stats.attendance_percentage >= 75 ? 'up' : 'down') as 'up' | 'down',
     },
     {
       title: 'Current Rank',
@@ -168,10 +197,10 @@ export function StatsCards({ stats, loading }: StatsCardsProps) {
       description: 'Position in leaderboard',
     },
     {
-      title: 'Total Resources',
-      value: stats?.total_resources || 0,
-      icon: FolderOpen,
-      description: 'Available resources',
+      title: 'Progress',
+      value: stats?.completed_resources || 0,
+      icon: CheckCircle2,
+      description: `${stats?.completed_resources || 0} of ${stats?.total_resources || 0} completed`,
     },
   ];
 

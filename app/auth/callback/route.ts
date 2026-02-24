@@ -14,8 +14,6 @@ export async function GET(request: Request) {
   const token_hash = searchParams.get('token_hash');
   const type = searchParams.get('type');
 
-  console.log('Auth callback (USER path): Processing callback', { hasCode: !!code, hasTokenHash: !!token_hash, type });
-
   // Handle magic link (OTP) verification
   if (token_hash && type) {
     const supabase = await createClient();
@@ -41,7 +39,6 @@ export async function GET(request: Request) {
     // this is NOT a separate login method, so we skip tracking to avoid double-counting.
 
     // User mode always redirects to dashboard
-    console.log('Auth callback (USER path): OTP session verified, redirecting to /dashboard');
     return NextResponse.redirect(`${origin}/dashboard`);
   }
 
@@ -116,7 +113,6 @@ export async function GET(request: Request) {
       if (existingProfiles && existingProfiles.length > 0) {
         const existingProfile = existingProfiles[0];
         if (existingProfile.cohort_id) {
-          console.log('Auth callback: Found existing profile with cohort_id, copying to new profile');
           await adminClient
             .from('profiles')
             .update({
@@ -140,7 +136,6 @@ export async function GET(request: Request) {
     await trackLogin(data.session.user.id, 'google_oauth');
 
     // User mode always redirects to dashboard
-    console.log('Auth callback (USER path): Redirecting to /dashboard');
     const response = NextResponse.redirect(`${origin}/dashboard`);
 
     // Set intended role cookie for multi-role users

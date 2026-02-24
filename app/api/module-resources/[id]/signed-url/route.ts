@@ -118,14 +118,6 @@ export async function GET(
     const isOfficeDoc = ['doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx'].includes(fileType);
     const expirySeconds = isOfficeDoc ? 3600 : 900;
 
-    console.log('[ModuleResource SignedURL] Generating URL:', {
-      resourceId: id,
-      title: resource.title,
-      fileType: resource.file_type,
-      filePath: resource.file_path,
-      expirySeconds,
-    });
-
     // Generate signed URL from Supabase Storage
     const { data: signedUrl, error: signedError } = await supabase.storage
       .from('resources')
@@ -138,8 +130,6 @@ export async function GET(
         { status: 500 }
       );
     }
-
-    console.log('[ModuleResource SignedURL] Generated successfully for:', resource.title);
 
     return NextResponse.json({
       url: signedUrl.signedUrl,
