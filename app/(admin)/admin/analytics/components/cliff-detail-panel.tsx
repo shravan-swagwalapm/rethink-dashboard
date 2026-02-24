@@ -194,32 +194,32 @@ export function CliffDetailPanel({ open, onOpenChange, meeting, onApply, onDismi
           </Card>
 
           {/* Editable duration + actions */}
-          {!isDismissed && (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="formal-duration">Effective Duration (minutes)</Label>
-                <Input
-                  id="formal-duration"
-                  type="number"
-                  min={1}
-                  value={editableDuration}
-                  onChange={(e) => setEditableDuration(e.target.value)}
-                  className="w-32"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Detected: {cliff.effectiveEndMinutes} min &middot; Full meeting: {meeting.actualDurationMinutes || meeting.duration} min
-                </p>
-              </div>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="formal-duration">Effective Duration (minutes)</Label>
+              <Input
+                id="formal-duration"
+                type="number"
+                min={1}
+                value={editableDuration}
+                onChange={(e) => setEditableDuration(e.target.value)}
+                className="w-32"
+              />
+              <p className="text-xs text-muted-foreground">
+                Detected: {cliff.effectiveEndMinutes} min &middot; Full meeting: {meeting.actualDurationMinutes || meeting.duration} min
+              </p>
+            </div>
 
-              <div className="flex gap-2">
-                <Button
-                  onClick={handleApply}
-                  disabled={applying || dismissing || !editableDuration}
-                  className="gap-2"
-                >
-                  {applying && <Loader2 className="w-4 h-4 animate-spin" />}
-                  {isApplied ? 'Update & Recalculate' : 'Apply & Recalculate'}
-                </Button>
+            <div className="flex gap-2">
+              <Button
+                onClick={handleApply}
+                disabled={applying || dismissing || !editableDuration}
+                className="gap-2"
+              >
+                {applying && <Loader2 className="w-4 h-4 animate-spin" />}
+                {isDismissed ? 'Re-apply & Recalculate' : isApplied ? 'Update & Recalculate' : 'Apply & Recalculate'}
+              </Button>
+              {!isDismissed && (
                 <Button
                   variant="outline"
                   onClick={handleDismiss}
@@ -229,9 +229,9 @@ export function CliffDetailPanel({ open, onOpenChange, meeting, onApply, onDismi
                   {dismissing && <Loader2 className="w-4 h-4 animate-spin" />}
                   Dismiss
                 </Button>
-              </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
       </SheetContent>
     </Sheet>

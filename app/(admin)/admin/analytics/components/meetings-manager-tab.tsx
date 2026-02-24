@@ -729,29 +729,34 @@ export function MeetingsManagerTab({ cohorts }: MeetingsManagerTabProps) {
                             {meeting.uniqueParticipantCount ?? '—'}
                           </TableCell>
                           <TableCell>
-                            {meeting.cliffDetection?.detected ? (
-                              <button
-                                onClick={() => {
-                                  setSelectedCliffMeeting(meeting);
-                                  setCliffDetailOpen(true);
-                                }}
-                                className="inline-flex items-center"
-                              >
-                                <Badge
-                                  variant="outline"
-                                  className={
-                                    meeting.cliffDetection?.confidence === 'high'
-                                      ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/20 cursor-pointer'
-                                      : meeting.cliffDetection?.confidence === 'medium'
-                                      ? 'bg-amber-500/10 text-amber-500 border-amber-500/20 hover:bg-amber-500/20 cursor-pointer'
-                                      : 'bg-orange-500/10 text-orange-500 border-orange-500/20 hover:bg-orange-500/20 cursor-pointer'
-                                  }
+                            {meeting.cliffDetection?.detected ? (() => {
+                              const isDismissed = meeting.cliffDetection && 'dismissed' in meeting.cliffDetection && (meeting.cliffDetection as unknown as Record<string, unknown>).dismissed === true;
+                              return (
+                                <button
+                                  onClick={() => {
+                                    setSelectedCliffMeeting(meeting);
+                                    setCliffDetailOpen(true);
+                                  }}
+                                  className="inline-flex items-center"
                                 >
-                                  {meeting.formalEndMinutes ? '⚡' : '⏳'}{' '}
-                                  {meeting.cliffDetection?.effectiveEndMinutes}m
-                                </Badge>
-                              </button>
-                            ) : meeting.cliffDetection && !meeting.cliffDetection?.detected ? (
+                                  <Badge
+                                    variant="outline"
+                                    className={
+                                      isDismissed
+                                        ? 'bg-muted/50 text-muted-foreground border-muted-foreground/20 hover:bg-muted cursor-pointer'
+                                        : meeting.cliffDetection?.confidence === 'high'
+                                        ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/20 cursor-pointer'
+                                        : meeting.cliffDetection?.confidence === 'medium'
+                                        ? 'bg-amber-500/10 text-amber-500 border-amber-500/20 hover:bg-amber-500/20 cursor-pointer'
+                                        : 'bg-orange-500/10 text-orange-500 border-orange-500/20 hover:bg-orange-500/20 cursor-pointer'
+                                    }
+                                  >
+                                    {isDismissed ? '✕' : meeting.formalEndMinutes ? '⚡' : '⏳'}{' '}
+                                    {meeting.cliffDetection?.effectiveEndMinutes}m
+                                  </Badge>
+                                </button>
+                              );
+                            })() : meeting.cliffDetection && !meeting.cliffDetection?.detected ? (
                               <span className="text-xs text-muted-foreground">— none</span>
                             ) : (
                               <span className="text-xs text-muted-foreground">—</span>
