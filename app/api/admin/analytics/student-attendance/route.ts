@@ -108,11 +108,12 @@ export async function GET(request: NextRequest) {
       const studentAttendance = (attendanceRecords || []).filter((a) => a.user_id === sid);
 
       const sessionsAttended = studentAttendance.length;
+      const totalSessions = sessions.length;
       const avgPercentage =
-        sessionsAttended > 0
+        totalSessions > 0
           ? Math.round(
               (studentAttendance.reduce((sum, a) => sum + (a.attendance_percentage || 0), 0) /
-                sessionsAttended) *
+                totalSessions) *
                 100
             ) / 100
           : 0;

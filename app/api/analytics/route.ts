@@ -237,11 +237,12 @@ async function getMentorTeamAttendance(supabase: any, cohortId: string | null) {
     const studentAttendance = (attendanceRecords || []).filter((a: { user_id: string }) => a.user_id === sid);
 
     const sessionsAttended = studentAttendance.length;
+    const totalSessions = sessions.length;
     const avgPercentage =
-      sessionsAttended > 0
+      totalSessions > 0
         ? Math.round(
             (studentAttendance.reduce((sum: number, a: { attendance_percentage: number }) => sum + (a.attendance_percentage || 0), 0) /
-              sessionsAttended) *
+              totalSessions) *
               100
           ) / 100
         : 0;
@@ -352,11 +353,12 @@ async function getLeaderboard(supabase: any, _currentUserId: string, cohortId: s
     const studentRecords = (attendanceRecords || []).filter((a: { user_id: string }) => a.user_id === sid);
 
     const sessionsAttended = studentRecords.length;
+    const totalSessions = sessions.length;
     const avgPercentage =
-      sessionsAttended > 0
+      totalSessions > 0
         ? Math.round(
             (studentRecords.reduce((sum: number, a: { attendance_percentage: number }) => sum + (a.attendance_percentage || 0), 0) /
-              sessionsAttended) *
+              totalSessions) *
               100
           ) / 100
         : 0;

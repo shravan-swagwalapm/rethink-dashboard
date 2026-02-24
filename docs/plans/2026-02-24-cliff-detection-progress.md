@@ -63,6 +63,20 @@
 
 ---
 
+## Post-Cliff: Additional Bug Fix (same session)
+
+### Leaderboard Attendance Average Bug
+**Problem**: Students who attended 1/3 sessions with 96% ranked higher than students who attended 3/3 with 95%. Average attendance divided by `sessionsAttended` instead of `totalSessions`, treating missed sessions as non-existent rather than 0%.
+
+**Fix**: Changed divisor from `sessionsAttended` to `sessions.length` in 3 places:
+1. `app/api/analytics/route.ts` — getLeaderboard() function
+2. `app/api/analytics/route.ts` — getMentorTeamAttendance() function
+3. `app/api/admin/analytics/student-attendance/route.ts` — student average calculation
+
+**Impact**: Avi Giri (1/3 sessions, 96.01%) will drop from rank #2 to much lower (effective avg: ~32%). Students who attended all sessions will correctly rank higher.
+
+---
+
 ## Key Decisions (for context after compaction)
 
 1. **Algorithm**: Uses each participant's FINAL leave time (last segment's leave_time). Breaks are invisible — only final departures matter. Meeting-end stayers (leave within 2 min of end) excluded.
