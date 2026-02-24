@@ -281,7 +281,7 @@ export async function calculateSessionAttendance(
     // Merge overlapping segments
     const mergedSegments = mergeOverlappingSegments(participant.segments);
     const totalMinutes = totalMinutesFromSegments(mergedSegments);
-    const percentage = Math.round((totalMinutes / resolvedDuration) * 100 * 100) / 100;
+    const percentage = Math.min(100, Math.round((totalMinutes / resolvedDuration) * 100 * 100) / 100);
 
     // Total duration in seconds
     const totalDurationSeconds = Math.round(totalMinutes * 60);

@@ -15,64 +15,115 @@ interface CliffTimelineProps {
 }
 
 export function CliffTimeline({ histogram, effectiveEndMinutes, totalMeetingMinutes }: CliffTimelineProps) {
-  const { maxDepartures, buckets } = useMemo(() => {
-    const max = Math.max(...histogram.map(b => b.departures), 1);
-    return { maxDepartures: max, buckets: histogram };
-  }, [histogram]);
+  const chartData = useMemo(() => {
+    if (histogram.length === 0) return null;
 
-  if (buckets.length === 0) {
+    const totalParticipants = histogram.reduce((sum, b) => sum + b.departures, 0);
+
+    // Show last ~50 minutes of the meeting
+    const cropMin = Math.max(0, Math.floor(totalMeetingMinutes - 50));
+    const visible = histogram.filter(b => b.minute >= cropMin);
+    if (visible.length === 0) return null;
+
+    // Calculate "remaining" at the start of our visible window
+    const departuresBefore = histogram
+      .filter(b => b.minute < cropMin)
+      .reduce((sum, b) => sum + b.departures, 0);
+    let remaining = totalParticipants - departuresBefore;
+
+    // Build display buckets with running remaining count
+    const buckets = visible.map(b => {
+      const startRemaining = remaining;
+      remaining -= b.departures;
+      return {
+        minute: b.minute,
+        departures: b.departures,
+        isCliff: b.isCliff,
+        remainingAfter: remaining,
+        startRemaining,
+      };
+    });
+
+    const maxDepartures = Math.max(...buckets.map(b => b.departures), 1);
+
+    return { buckets, maxDepartures, startRemaining: totalParticipants - departuresBefore };
+  }, [histogram, totalMeetingMinutes]);
+
+  if (!chartData) {
     return <p className="text-sm text-muted-foreground">No departure data available</p>;
   }
 
+  const { buckets, maxDepartures, startRemaining } = chartData;
+
   return (
     <div className="space-y-2">
-      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Departure Timeline</p>
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          Who left when
+        </p>
+        <p className="text-xs text-muted-foreground">
+          Starting: <span className="text-foreground font-medium">{startRemaining}</span> students
+        </p>
+      </div>
 
-      {/* Bar chart */}
-      <div className="flex items-end gap-px h-32 px-1">
-        {buckets.map((bucket, i) => {
-          const heightPct = (bucket.departures / maxDepartures) * 100;
-          const isEffectiveEnd = effectiveEndMinutes !== undefined &&
-            bucket.minute <= effectiveEndMinutes &&
-            bucket.minute + 5 > effectiveEndMinutes;
+      {/* Bar chart with remaining count */}
+      <div className="space-y-0">
+        {buckets.filter(b => b.departures > 0 || b.isCliff).map((bucket, i) => {
+          const barWidth = Math.max((bucket.departures / maxDepartures) * 100, bucket.departures > 0 ? 4 : 0);
 
           return (
-            <div
-              key={i}
-              className="flex-1 flex flex-col items-center justify-end group relative"
-            >
-              {/* Tooltip on hover */}
-              {bucket.departures > 0 && (
-                <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-popover text-popover-foreground text-xs px-2 py-1 rounded shadow-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 pointer-events-none">
-                  {bucket.minute}m: {bucket.departures} left
-                </div>
-              )}
+            <div key={i} className="flex items-center gap-2 py-[3px]">
+              {/* Time label */}
+              <span className="text-[10px] text-muted-foreground w-12 text-right shrink-0 tabular-nums">
+                {bucket.minute}m
+              </span>
 
               {/* Bar */}
-              <div
-                className={`w-full min-w-[4px] rounded-t transition-colors ${
-                  bucket.isCliff
-                    ? 'bg-primary'
-                    : bucket.departures > 0
-                    ? 'bg-muted-foreground/30'
-                    : 'bg-muted/20'
-                } ${isEffectiveEnd ? 'ring-2 ring-primary ring-offset-1 ring-offset-background' : ''}`}
-                style={{ height: `${Math.max(heightPct, bucket.departures > 0 ? 4 : 1)}%` }}
-              />
+              <div className="flex-1 h-5 relative">
+                {bucket.departures > 0 && (
+                  <div
+                    className={`h-full rounded-sm ${bucket.isCliff ? 'bg-primary' : 'bg-muted-foreground/30'}`}
+                    style={{ width: `${barWidth}%` }}
+                  />
+                )}
+              </div>
+
+              {/* Departure count */}
+              <span className={`text-xs w-8 text-right shrink-0 tabular-nums ${
+                bucket.isCliff ? 'text-primary font-semibold' : 'text-muted-foreground'
+              }`}>
+                {bucket.departures > 0 ? `-${bucket.departures}` : ''}
+              </span>
+
+              {/* Remaining count */}
+              <span className="text-[10px] text-muted-foreground w-10 text-right shrink-0 tabular-nums">
+                {bucket.remainingAfter} left
+              </span>
             </div>
           );
         })}
       </div>
 
-      {/* X-axis labels */}
-      <div className="flex justify-between text-[10px] text-muted-foreground px-1">
-        <span>0 min</span>
-        {effectiveEndMinutes && (
-          <span className="text-primary font-medium">
-            &uarr; Formal End ({effectiveEndMinutes}m)
+      {/* Formal end marker */}
+      {effectiveEndMinutes && (
+        <div className="flex items-center gap-2 pt-1 border-t border-dashed border-primary/30">
+          <span className="text-[10px] text-primary font-medium">
+            Session likely ended at {effectiveEndMinutes}m
           </span>
-        )}
-        <span>{totalMeetingMinutes} min</span>
+          <span className="text-[10px] text-muted-foreground">
+            &mdash; everything after is QnA
+          </span>
+        </div>
+      )}
+
+      {/* Legend */}
+      <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+        <span className="flex items-center gap-1">
+          <span className="inline-block w-2.5 h-2.5 rounded-sm bg-primary" /> Mass departure
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="inline-block w-2.5 h-2.5 rounded-sm bg-muted-foreground/30" /> Normal
+        </span>
       </div>
     </div>
   );

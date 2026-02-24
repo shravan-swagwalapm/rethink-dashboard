@@ -60,7 +60,7 @@ interface MeetingsManagerTabProps {
 function getStatusBadge(meeting: ZoomMeeting) {
   if (meeting.hasAttendance && meeting.isProperSession) {
     return (
-      <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-200">
+      <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800">
         <CheckCircle2 className="w-3 h-3 mr-1" />
         Complete
       </Badge>
@@ -68,7 +68,7 @@ function getStatusBadge(meeting: ZoomMeeting) {
   }
   if (meeting.hasAttendance && !meeting.isProperSession) {
     return (
-      <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-200">
+      <Badge variant="outline" className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800">
         <Clock className="w-3 h-3 mr-1" />
         Needs Session
       </Badge>
@@ -76,14 +76,14 @@ function getStatusBadge(meeting: ZoomMeeting) {
   }
   if (meeting.linkedSessionId && !meeting.hasAttendance) {
     return (
-      <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-200">
+      <Badge variant="outline" className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800">
         <Clock className="w-3 h-3 mr-1" />
         Pending
       </Badge>
     );
   }
   return (
-    <Badge variant="outline" className="bg-gray-500/10 text-gray-500 border-gray-200">
+    <Badge variant="outline" className="bg-gray-500/10 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700">
       <Minus className="w-3 h-3 mr-1" />
       Zoom Only
     </Badge>
@@ -455,12 +455,13 @@ export function MeetingsManagerTab({ cohorts }: MeetingsManagerTabProps) {
     );
 
     let applied = 0;
+    let failed = 0;
     for (const result of highConfidence) {
       const meeting = meetings.find((m: ZoomMeeting) => m.linkedSessionId === result.sessionId);
       if (!meeting || !result.effectiveEndMinutes) continue;
 
       try {
-        await fetch('/api/admin/analytics/apply-cliff', {
+        const res = await fetch('/api/admin/analytics/apply-cliff', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -469,13 +470,57 @@ export function MeetingsManagerTab({ cohorts }: MeetingsManagerTabProps) {
             zoomMeetingUuid: meeting.uuid,
           }),
         });
-        applied++;
+        if (res.ok) applied++;
+        else failed++;
       } catch {
-        // Continue with next
+        failed++;
       }
     }
 
-    toast.success(`Applied formal end to ${applied} sessions. Attendance recalculated.`);
+    if (failed > 0) {
+      toast.error(`Applied ${applied} sessions, ${failed} failed.`);
+    } else {
+      toast.success(`Applied formal end to ${applied} sessions.`);
+    }
+    setBulkDialogOpen(false);
+    syncFromZoom(); // Refresh data
+  }, [bulkResults, meetings, syncFromZoom]);
+
+  const handleApplyAllDetected = useCallback(async () => {
+    if (!bulkResults?.results) return;
+
+    const detected = bulkResults.results.filter(
+      (r: { status: string }) => r.status === 'detected'
+    );
+
+    let applied = 0;
+    let failed = 0;
+    for (const result of detected) {
+      const meeting = meetings.find((m: ZoomMeeting) => m.linkedSessionId === result.sessionId);
+      if (!meeting || !result.effectiveEndMinutes) continue;
+
+      try {
+        const res = await fetch('/api/admin/analytics/apply-cliff', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId: result.sessionId,
+            formalEndMinutes: result.effectiveEndMinutes,
+            zoomMeetingUuid: meeting.uuid,
+          }),
+        });
+        if (res.ok) applied++;
+        else failed++;
+      } catch {
+        failed++;
+      }
+    }
+
+    if (failed > 0) {
+      toast.error(`Applied ${applied} sessions, ${failed} failed.`);
+    } else {
+      toast.success(`Applied formal end to ${applied} sessions.`);
+    }
     setBulkDialogOpen(false);
     syncFromZoom(); // Refresh data
   }, [bulkResults, meetings, syncFromZoom]);
@@ -876,6 +921,7 @@ export function MeetingsManagerTab({ cohorts }: MeetingsManagerTabProps) {
         onOpenChange={setBulkDialogOpen}
         results={bulkResults}
         onApplyAllHigh={handleApplyAllHighConfidence}
+        onApplyAll={handleApplyAllDetected}
       />
     </div>
   );

@@ -105,7 +105,7 @@ export function CliffDetailPanel({ open, onOpenChange, meeting, onApply, onDismi
           </SheetDescription>
         </SheetHeader>
 
-        <div className="space-y-6 mt-6">
+        <div className="space-y-6 mt-6 px-4">
           {/* Status banner */}
           {isApplied && (
             <div className="flex items-center gap-2 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
@@ -128,37 +128,27 @@ export function CliffDetailPanel({ open, onOpenChange, meeting, onApply, onDismi
           <Card>
             <CardContent className="pt-4 space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Confidence</span>
+                <span className="text-sm font-medium">Detection Confidence</span>
                 <Badge variant="outline" className={confidenceColor}>
                   {confidenceIcon}
                   <span className="ml-1 capitalize">{cliff.confidence}</span>
                 </Badge>
               </div>
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div>
-                  <p className="text-muted-foreground">Departures in cliff</p>
-                  <p className="font-medium">{cliff.departuresInCliff} of {cliff.totalFinalDepartures}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Cliff ratio</p>
-                  <p className="font-medium">{cliff.cliffRatio ? `${Math.round(cliff.cliffRatio * 100)}%` : '\u2014'}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Spike ratio</p>
-                  <p className="font-medium">{cliff.spikeRatio ? `${cliff.spikeRatio.toFixed(1)}x` : '\u2014'}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Meeting-end stayers</p>
-                  <p className="font-medium">{cliff.meetingEndStayers}</p>
-                </div>
-              </div>
-              <div className="pt-2 border-t">
+
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                <span className="text-foreground font-medium">{cliff.totalParticipants} students</span> were on the call.
+                {' '}At minute {Math.round(cliff.cliffWindowStartMin ?? 0)}, <span className="text-foreground font-medium">{cliff.departuresInCliff} left together</span> within 10 minutes
+                {cliff.spikeRatio ? <> &mdash; <span className="text-foreground font-medium">{cliff.spikeRatio.toFixed(1)}x</span> the normal rate</> : ''}.
+                {cliff.meetingEndStayers ? <> The remaining {cliff.meetingEndStayers} stayed for QnA until Zoom closed.</> : ''}
+              </p>
+
+              <div className="pt-2 border-t space-y-2">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Cliff window</span>
-                  <span className="font-medium">{cliff.cliffWindowStartMin}\u2013{cliff.cliffWindowEndMin} min</span>
+                  <span className="text-muted-foreground">Mass departure at</span>
+                  <span className="font-medium">{Math.round(cliff.cliffWindowStartMin ?? 0)}&ndash;{Math.round(cliff.cliffWindowEndMin ?? 0)} min</span>
                 </div>
-                <div className="flex items-center justify-between text-sm mt-1">
-                  <span className="text-muted-foreground">Effective end</span>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Session likely ended at</span>
                   <span className="font-medium text-primary">{cliff.effectiveEndMinutes} min</span>
                 </div>
               </div>

@@ -29,35 +29,48 @@ export async function POST() {
       return NextResponse.json({ summary: { total: 0 }, results: [] });
     }
 
+    // Batch-fetch all zoom_import_logs upfront (fixes N+1 query)
+    const sessionIds = sessions.map(s => s.id);
+    const { data: allImportLogs } = await supabase
+      .from('zoom_import_logs')
+      .select('session_id, zoom_meeting_uuid, created_at')
+      .in('session_id', sessionIds)
+      .order('created_at', { ascending: false });
+
+    // Group by session_id, take latest per session
+    const latestUuidBySession = new Map<string, string>();
+    for (const log of allImportLogs || []) {
+      if (!latestUuidBySession.has(log.session_id)) {
+        latestUuidBySession.set(log.session_id, log.zoom_meeting_uuid);
+      }
+    }
+
     const results: Array<{
       sessionId: string;
       title: string;
       status: 'detected' | 'no_cliff' | 'skipped' | 'error';
       confidence?: string;
       effectiveEndMinutes?: number;
+      actualDurationMinutes?: number;
       studentsImpacted?: number;
       error?: string;
     }> = [];
 
     for (const session of sessions) {
-      // Skip already-dismissed cliffs
+      // Skip already-dismissed or already-applied cliffs
       const cliffData = session.cliff_detection as Record<string, unknown> | null;
       if (cliffData?.dismissed) {
         results.push({ sessionId: session.id, title: session.title, status: 'skipped', error: 'Previously dismissed' });
         continue;
       }
+      if (cliffData?.appliedAt) {
+        results.push({ sessionId: session.id, title: session.title, status: 'skipped', error: 'Already applied' });
+        continue;
+      }
 
       try {
-        // Get meeting UUID from import logs or session
-        const { data: importLog } = await supabase
-          .from('zoom_import_logs')
-          .select('zoom_meeting_uuid')
-          .eq('session_id', session.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single();
-
-        const meetingUuid = importLog?.zoom_meeting_uuid || session.zoom_meeting_id;
+        // Get meeting UUID from pre-fetched import logs or fall back to session
+        const meetingUuid = latestUuidBySession.get(session.id) || session.zoom_meeting_id;
         if (!meetingUuid) {
           results.push({ sessionId: session.id, title: session.title, status: 'skipped', error: 'No meeting UUID' });
           continue;
@@ -118,6 +131,7 @@ export async function POST() {
             status: 'detected',
             confidence: detection.confidence,
             effectiveEndMinutes: detection.effectiveEndMinutes,
+            actualDurationMinutes: session.actual_duration_minutes || session.duration_minutes,
             studentsImpacted: detection.studentsImpacted,
           });
         } else {

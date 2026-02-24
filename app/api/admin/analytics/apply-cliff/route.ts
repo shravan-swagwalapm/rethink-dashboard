@@ -15,11 +15,14 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { sessionId, formalEndMinutes, zoomMeetingUuid } = body;
+    const { sessionId, zoomMeetingUuid } = body;
+    const formalEndMinutes = typeof body.formalEndMinutes === 'number' && body.formalEndMinutes > 0
+      ? Math.round(body.formalEndMinutes)
+      : null;
 
     if (!sessionId || !formalEndMinutes || !zoomMeetingUuid) {
       return NextResponse.json(
-        { error: 'sessionId, formalEndMinutes, and zoomMeetingUuid are required' },
+        { error: 'sessionId, formalEndMinutes (positive integer), and zoomMeetingUuid are required' },
         { status: 400 }
       );
     }

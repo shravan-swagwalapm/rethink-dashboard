@@ -79,7 +79,7 @@ async function getStudentOwnAttendance(supabase: any, userId: string, cohortId: 
   // Get countable sessions for the cohort
   const { data: sessions } = await supabase
     .from('sessions')
-    .select('id, title, scheduled_at, duration_minutes, actual_duration_minutes')
+    .select('id, title, scheduled_at, duration_minutes, actual_duration_minutes, formal_end_minutes')
     .eq('counts_for_students', true)
     .eq('cohort_id', cohortId)
     .lt('scheduled_at', new Date().toISOString())
@@ -115,7 +115,7 @@ async function getStudentOwnAttendance(supabase: any, userId: string, cohortId: 
   }
 
   // Build attendance data
-  const attendance = sessions.map((session: { id: string; title: string; scheduled_at: string; actual_duration_minutes: number | null; duration_minutes: number }) => {
+  const attendance = sessions.map((session: { id: string; title: string; scheduled_at: string; actual_duration_minutes: number | null; duration_minutes: number; formal_end_minutes: number | null }) => {
     const record = attendanceRecords?.find((a: { session_id: string }) => a.session_id === session.id);
     const recordSegments = record ? segmentsByAttendanceId.get(record.id) || [] : [];
 
@@ -123,11 +123,14 @@ async function getStudentOwnAttendance(supabase: any, userId: string, cohortId: 
       sessionId: session.id,
       title: session.title,
       date: session.scheduled_at,
-      totalDuration: session.actual_duration_minutes || session.duration_minutes,
+      totalDuration: session.formal_end_minutes || session.actual_duration_minutes || session.duration_minutes,
       attended: !!record,
       percentage: record?.attendance_percentage || 0,
       durationAttended: record?.duration_seconds
-        ? Math.round(record.duration_seconds / 60)
+        ? Math.min(
+            Math.round(record.duration_seconds / 60),
+            session.formal_end_minutes || session.actual_duration_minutes || session.duration_minutes
+          )
         : 0,
       joinCount: recordSegments.length,
       segments: recordSegments.map((seg: { join_time: string; leave_time: string; duration_seconds: number | null }) => ({
@@ -140,11 +143,12 @@ async function getStudentOwnAttendance(supabase: any, userId: string, cohortId: 
 
   // Calculate stats
   const attendedSessions = attendance.filter((a: { attended: boolean }) => a.attended);
+  const totalSessions = sessions.length;
   const avgPercentage =
-    attendedSessions.length > 0
+    totalSessions > 0
       ? Math.round(
           (attendedSessions.reduce((sum: number, a: { percentage: number }) => sum + a.percentage, 0) /
-            attendedSessions.length) *
+            totalSessions) *
             100
         ) / 100
       : 0;
@@ -173,7 +177,7 @@ async function getMentorTeamAttendance(supabase: any, cohortId: string | null) {
   // Get countable sessions for this cohort
   const { data: sessions } = await supabase
     .from('sessions')
-    .select('id, title, scheduled_at, duration_minutes, actual_duration_minutes')
+    .select('id, title, scheduled_at, duration_minutes, actual_duration_minutes, formal_end_minutes')
     .eq('counts_for_students', true)
     .eq('cohort_id', cohortId)
     .lt('scheduled_at', new Date().toISOString())
@@ -247,11 +251,12 @@ async function getMentorTeamAttendance(supabase: any, cohortId: string | null) {
           ) / 100
         : 0;
 
-    const sessionDetails = sessions.map((session: { id: string; title: string; scheduled_at: string; actual_duration_minutes: number | null; duration_minutes: number }) => {
+    const sessionDetails = sessions.map((session: { id: string; title: string; scheduled_at: string; actual_duration_minutes: number | null; duration_minutes: number; formal_end_minutes: number | null }) => {
       const attendance = studentAttendance.find((a: { session_id: string }) => a.session_id === session.id);
       const attendanceSegments = attendance
         ? segmentsByAttendanceId.get(attendance.id) || []
         : [];
+      const effectiveDuration = session.formal_end_minutes || session.actual_duration_minutes || session.duration_minutes;
 
       return {
         sessionId: session.id,
@@ -259,9 +264,9 @@ async function getMentorTeamAttendance(supabase: any, cohortId: string | null) {
         date: session.scheduled_at,
         percentage: attendance?.attendance_percentage || 0,
         durationAttended: attendance?.duration_seconds
-          ? Math.round(attendance.duration_seconds / 60)
+          ? Math.min(Math.round(attendance.duration_seconds / 60), effectiveDuration)
           : 0,
-        totalDuration: session.actual_duration_minutes || session.duration_minutes,
+        totalDuration: effectiveDuration,
         attended: !!attendance,
         segments: (attendanceSegments as { join_time: string; leave_time: string; duration_seconds: number | null }[]).map((seg) => ({
           join: seg.join_time,
@@ -314,7 +319,7 @@ async function getLeaderboard(supabase: any, _currentUserId: string, cohortId: s
   // Get countable sessions for this cohort
   const { data: sessions } = await supabase
     .from('sessions')
-    .select('id, title, scheduled_at, duration_minutes, actual_duration_minutes')
+    .select('id, title, scheduled_at, duration_minutes, actual_duration_minutes, formal_end_minutes')
     .eq('counts_for_students', true)
     .eq('cohort_id', cohortId)
     .lt('scheduled_at', new Date().toISOString())

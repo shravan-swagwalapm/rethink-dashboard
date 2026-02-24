@@ -152,8 +152,8 @@ export function detectFormalEnd(
   }
 
   // ── Step 8: Histogram ─────────────────────────────────────
-  const cliffWindowStartMin = bestWindow.startMin;
-  const cliffWindowEndMin = bestWindow.startMin + WINDOW_SIZE;
+  const cliffWindowStartMin = Math.round(bestWindow.startMin);
+  const cliffWindowEndMin = Math.round(bestWindow.startMin + WINDOW_SIZE);
 
   const bucketSize = 5;
   const bucketCount = Math.ceil(totalMeetingMinutes / bucketSize);

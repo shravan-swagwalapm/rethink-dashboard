@@ -54,12 +54,12 @@ interface StudentData {
 
 function getAttendanceBadge(percentage: number) {
   if (percentage >= 75) {
-    return <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-200">{percentage}%</Badge>;
+    return <Badge variant="outline" className="bg-green-500/10 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800">{percentage}%</Badge>;
   }
   if (percentage >= 50) {
-    return <Badge variant="outline" className="bg-yellow-500/10 text-yellow-600 border-yellow-200">{percentage}%</Badge>;
+    return <Badge variant="outline" className="bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800">{percentage}%</Badge>;
   }
-  return <Badge variant="outline" className="bg-red-500/10 text-red-600 border-red-200">{percentage}%</Badge>;
+  return <Badge variant="outline" className="bg-red-500/10 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800">{percentage}%</Badge>;
 }
 
 function getAttendanceColor(percentage: number) {
@@ -110,7 +110,7 @@ function SessionCard({ session }: { session: SessionDetail }) {
             </div>
             <div className="flex items-center gap-2">
               {session.attended ? getAttendanceBadge(session.percentage) : (
-                <Badge variant="outline" className="bg-gray-500/10 text-gray-500 border-gray-200">Absent</Badge>
+                <Badge variant="outline" className="bg-gray-500/10 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700">Absent</Badge>
               )}
               <ChevronDown className={`w-4 h-4 transition-transform ${open ? 'rotate-180' : ''}`} />
             </div>

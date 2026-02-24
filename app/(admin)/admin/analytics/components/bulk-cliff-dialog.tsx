@@ -20,6 +20,7 @@ interface BulkResult {
   status: 'detected' | 'no_cliff' | 'skipped' | 'error';
   confidence?: string;
   effectiveEndMinutes?: number;
+  actualDurationMinutes?: number;
   studentsImpacted?: number;
   error?: string;
 }
@@ -41,21 +42,31 @@ interface BulkCliffDialogProps {
   onOpenChange: (open: boolean) => void;
   results: { summary: BulkSummary; results: BulkResult[] } | null;
   onApplyAllHigh: () => Promise<void>;
+  onApplyAll: () => Promise<void>;
 }
 
-export function BulkCliffDialog({ open, onOpenChange, results, onApplyAllHigh }: BulkCliffDialogProps) {
-  const [applying, setApplying] = useState(false);
+export function BulkCliffDialog({ open, onOpenChange, results, onApplyAllHigh, onApplyAll }: BulkCliffDialogProps) {
+  const [applying, setApplying] = useState<'high' | 'all' | null>(null);
 
   if (!results) return null;
 
   const { summary, results: items } = results;
 
-  const handleApplyAll = async () => {
-    setApplying(true);
+  const handleApplyHigh = async () => {
+    setApplying('high');
     try {
       await onApplyAllHigh();
     } finally {
-      setApplying(false);
+      setApplying(null);
+    }
+  };
+
+  const handleApplyAll = async () => {
+    setApplying('all');
+    try {
+      await onApplyAll();
+    } finally {
+      setApplying(null);
     }
   };
 
@@ -132,7 +143,7 @@ export function BulkCliffDialog({ open, onOpenChange, results, onApplyAllHigh }:
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{item.title}</p>
                     <p className="text-xs text-muted-foreground">
-                      {item.effectiveEndMinutes}m effective · {item.studentsImpacted} students
+                      Formal end: {item.effectiveEndMinutes}m of {item.actualDurationMinutes}m actual · {item.studentsImpacted} students
                     </p>
                   </div>
                   {getConfidenceBadge(item.confidence)}
@@ -150,17 +161,35 @@ export function BulkCliffDialog({ open, onOpenChange, results, onApplyAllHigh }:
           </div>
         </ScrollArea>
 
+        {/* Hint about individual review */}
+        {summary.mediumConfidence + summary.lowConfidence > 0 && (
+          <p className="text-xs text-muted-foreground">
+            To review individually, close this dialog and click any session&apos;s cliff badge in the table.
+          </p>
+        )}
+
         <DialogFooter className="gap-2 sm:gap-0">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Close
           </Button>
+          {summary.mediumConfidence + summary.lowConfidence > 0 && (
+            <Button
+              variant="outline"
+              onClick={handleApplyAll}
+              disabled={applying !== null || summary.detected === 0}
+              className="gap-2"
+            >
+              {applying === 'all' && <Loader2 className="w-4 h-4 animate-spin" />}
+              Apply All ({summary.detected})
+            </Button>
+          )}
           <Button
-            onClick={handleApplyAll}
-            disabled={applying || summary.highConfidence === 0}
+            onClick={handleApplyHigh}
+            disabled={applying !== null || summary.highConfidence === 0}
             className="gap-2"
           >
-            {applying && <Loader2 className="w-4 h-4 animate-spin" />}
-            Apply All High-Confidence ({summary.highConfidence})
+            {applying === 'high' && <Loader2 className="w-4 h-4 animate-spin" />}
+            Apply High-Confidence ({summary.highConfidence})
           </Button>
         </DialogFooter>
       </DialogContent>
