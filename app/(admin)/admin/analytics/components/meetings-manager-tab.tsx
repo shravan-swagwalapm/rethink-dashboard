@@ -390,6 +390,17 @@ export function MeetingsManagerTab({ cohorts }: MeetingsManagerTabProps) {
     const meeting = meetings.find((m) => m.linkedSessionId === sessionId);
     if (!meeting) return;
 
+    // Optimistic update: close panel immediately, recalculation runs in background
+    const previousState = { formalEndMinutes: meeting.formalEndMinutes, cliffDetection: meeting.cliffDetection };
+    setMeetings((prev) =>
+      prev.map((m) =>
+        m.linkedSessionId === sessionId
+          ? { ...m, formalEndMinutes, cliffDetection: { ...(m.cliffDetection || { detected: true }), appliedAt: new Date().toISOString() } as CliffDetectionResult }
+          : m
+      )
+    );
+    setCliffDetailOpen(false);
+
     try {
       const res = await fetch('/api/admin/analytics/apply-cliff', {
         method: 'POST',
@@ -405,24 +416,34 @@ export function MeetingsManagerTab({ cohorts }: MeetingsManagerTabProps) {
 
       const data = await res.json();
       toast.success(`Formal end applied: ${formalEndMinutes} min. ${data.attendance?.imported || 0} students recalculated.`);
-
-      // Update local state
+    } catch {
+      // Revert optimistic update on failure
       setMeetings((prev) =>
         prev.map((m) =>
           m.linkedSessionId === sessionId
-            ? { ...m, formalEndMinutes, cliffDetection: { ...(m.cliffDetection || { detected: true }), appliedAt: new Date().toISOString() } as CliffDetectionResult }
+            ? { ...m, formalEndMinutes: previousState.formalEndMinutes, cliffDetection: previousState.cliffDetection }
             : m
         )
       );
-      setCliffDetailOpen(false);
-    } catch {
-      toast.error('Failed to apply formal end');
+      toast.error('Failed to apply formal end. Reverted.');
     }
   }, [meetings]);
 
   const handleDismissCliff = useCallback(async (sessionId: string) => {
     const meeting = meetings.find((m) => m.linkedSessionId === sessionId);
     if (!meeting) return;
+
+    // Optimistic update: close panel and update UI immediately
+    // The API call (which includes attendance recalculation) runs in the background
+    const previousState = { formalEndMinutes: meeting.formalEndMinutes, cliffDetection: meeting.cliffDetection };
+    setMeetings((prev) =>
+      prev.map((m) =>
+        m.linkedSessionId === sessionId
+          ? { ...m, formalEndMinutes: null, cliffDetection: { ...(m.cliffDetection || { detected: false }), dismissed: true } as CliffDetectionResult }
+          : m
+      )
+    );
+    setCliffDetailOpen(false);
 
     try {
       const res = await fetch('/api/admin/analytics/apply-cliff', {
@@ -434,16 +455,16 @@ export function MeetingsManagerTab({ cohorts }: MeetingsManagerTabProps) {
       if (!res.ok) throw new Error('Dismiss failed');
 
       toast.success('Cliff dismissed. Attendance recalculated with full duration.');
+    } catch {
+      // Revert optimistic update on failure
       setMeetings((prev) =>
         prev.map((m) =>
           m.linkedSessionId === sessionId
-            ? { ...m, formalEndMinutes: null, cliffDetection: { ...(m.cliffDetection || { detected: false }), dismissed: true } as CliffDetectionResult }
+            ? { ...m, formalEndMinutes: previousState.formalEndMinutes, cliffDetection: previousState.cliffDetection }
             : m
         )
       );
-      setCliffDetailOpen(false);
-    } catch {
-      toast.error('Failed to dismiss cliff');
+      toast.error('Failed to dismiss cliff. Reverted.');
     }
   }, [meetings]);
 
