@@ -1149,3 +1149,205 @@ This auto-resolves duration for every session and recalculates with uncapped per
 
 **Deployment Status**: Deployed & manually verified ✅
 **Hard Refresh Required**: Yes (Cmd+Shift+R)
+
+---
+
+# Session 10: Five Admin Bug Fixes (2026-02-16)
+
+**Commit**: `98a42e5` — pushed to `origin/main`
+**Scope**: Admin-only changes — zero student-side impact
+**Files Changed**: 13 (3 new, 10 modified)
+
+## Bugs Fixed
+
+### Bug 1: Phone Number Missing from "Create New User" Dialog
+**Problem**: Create User dialog had Email, Full Name, and Role Assignments but no phone field. `profiles.phone` existed in DB and bulk upload supported it, but single-user creation didn't.
+
+**Fix**:
+- `app/(admin)/admin/users/components/create-user-dialog.tsx` — Added phone state, input field with `+919876543210` placeholder, included in API payload, reset on close
+- `app/api/admin/users/create/route.ts` — Destructured `phone` from body, added `phone: phone || null` to profile update
+
+### Bug 2: Cannot Edit Email/Phone from Admin Dashboard
+**Problem**: User dropdown only had "Edit Roles", "Send Email", and "Delete User". No way to edit contact details.
+
+**Fix** (4 files, 1 new):
+- `app/(admin)/admin/users/components/edit-profile-dialog.tsx` — **NEW** dialog with email/phone/name editing, amber warning when email changes
+- `app/(admin)/admin/users/components/user-table.tsx` — Added "Edit Profile" dropdown item with `UserPen` icon
+- `app/(admin)/admin/users/page.tsx` — Added state management and rendered EditProfileDialog
+- `app/api/admin/users/route.ts` — Extended PUT handler: Supabase Auth email update first → profiles table sync second. Abort if auth fails.
+
+**Critical detail**: Email updates sync TWO places — `auth.users.email` (login) and `profiles.email` (display). Auth updated first; if it fails, profiles untouched.
+
+### Bug 3: RSVP Counts Not Clickable (Can't See Who RSVPed)
+**Problem**: Sessions table showed `✓1 ✕0` but clicking did nothing. Admin couldn't see WHO RSVPed.
+
+**Fix** (3 files, 2 new):
+- `app/api/admin/sessions/[id]/rsvps/route.ts` — **NEW** API endpoint fetching RSVPs joined with profiles, returns `{ yes: [...], no: [...] }`
+- `app/(admin)/admin/sessions/components/rsvp-list-dialog.tsx` — **NEW** dialog showing Attending/Not Attending sections with avatar, name, email, phone, timestamp. Search filter when >5 RSVPs
+- `app/(admin)/admin/sessions/page.tsx` — Changed RSVP cell from `<div>` to clickable `<button>` that opens dialog
+
+### Bug 4: Cannot Edit Video/Article URLs After Creation
+**Problem**: Edit Resource dialog hid the URL field for videos/articles because `type` was hardcoded to `'file'` during creation.
+
+**Root cause (two-part)**:
+1. `edit-resource-dialog.tsx` line 93: URL field only showed for `type='link'`
+2. `resources/route.ts` line 123: ALL resources got `type: 'file'` hardcoded, even those with external URLs
+
+**Fix**:
+- `app/(admin)/admin/resources/components/edit-resource-dialog.tsx` — Changed condition to `(resource?.type === 'link' || resource?.external_url)` so URL field appears for any resource that HAS a URL
+- `app/api/admin/resources/route.ts` — Changed to `type: externalUrl ? 'link' : 'file'` for correct type going forward
+
+**Data safety**: Legacy resources with URLs but `type='file'` work without DB migration — the dialog fix handles them transparently.
+
+### Bug 5: Learnings PDFs Appearing in Resources (Dual Insert Bug)
+**Problem**: PDFs uploaded via Admin Learnings also appeared in student Resources > PDFs tab.
+
+**Root cause**: Small files (<4MB) used `/api/admin/resources/upload` which inserted into `resources` table, then learnings page ALSO created a `module_resources` record. Dual insert = PDF in both tables.
+
+**Fix** (2 files, 1 new):
+- `app/api/admin/learnings/upload/route.ts` — **NEW** learnings-specific upload: storage upload + `module_resources` record ONLY (not `resources`). Supports "storage-only" mode for file replacement
+- `app/(admin)/admin/learnings/components/resource-form-dialog.tsx` — Both `handleCreate` and `handleUpdate` now use `/api/admin/learnings/upload` instead of `/api/admin/resources/upload`
+
+## Code Review Findings & Fixes
+
+1. **useEffect dependency warning** in RsvpListDialog — `fetchRsvps` not in dependency array. Fixed by wrapping in `useCallback`
+2. **ESLint `prefer-const`** in resource-form-dialog.tsx — `let` variables never reassigned after refactor. Replaced with `null` literals
+3. **Unused `error` variable** in rsvp-list-dialog catch block — Changed `catch (error)` to `catch`
+
+## Build & Lint Status
+
+- `npm run build` — PASSED (0 TypeScript errors)
+- `npm run lint` — PASSED (only pre-existing issues in untouched files)
+
+## Lessons Learned
+
+40. **Dual insert bugs from shared upload endpoints**: When two features (Learnings + Resources) share an upload endpoint, the endpoint may insert into the wrong table for one of them. Create feature-specific endpoints that only write to the correct table.
+
+41. **Two-part UI/API bugs compound**: The edit-resource URL bug required BOTH a dialog condition fix (show URL field when `external_url` exists) AND an API fix (set correct `type` on creation). Fixing only one wouldn't fully resolve the issue.
+
+42. **Email updates require dual-store sync**: Supabase stores email in both `auth.users` (login) and `profiles` (display). Update auth FIRST — if it fails, abort entirely. If profiles fails, auth email is already changed (eventual consistency acceptable).
+
+43. **`useCallback` for fetch functions in useEffect**: When a fetch function is used inside useEffect and depends on props/state, wrap it in `useCallback` to avoid stale closure bugs and satisfy the exhaustive-deps lint rule.
+
+---
+
+**Deployment Status**: Deployed via Vercel (auto-deploy on push to main) ✅
+**Student Impact**: None — all changes under `(admin)` route group and `api/admin/` routes
+
+---
+
+# Session 11: Health Status Classification Bug + Sortable Table Headers (2026-02-18)
+
+**Commit**: `6673d3f` — pushed to `origin/main`
+**Scope**: Admin usage analytics — zero student-side impact
+**Files Changed**: 1 (`app/api/admin/usage/cohort/route.ts`)
+
+## Bugs Fixed
+
+### Bug 1: All Students Shown as "At-Risk" — 0/86 Active (CRITICAL)
+
+**Problem**: Usage analytics dashboard showed 0 active students out of 86. Even Shravan with 6 logins in the last 26 minutes was classified as "At-Risk".
+
+**Root Cause (two-part)**:
+
+1. **`computeHealthStatus()` too strict** — Line 42 required BOTH `daysSinceLogin <= 3` AND `completionPercent > 50` for "active" status. This is an AND gate — login activity alone was never sufficient.
+
+2. **Content completion always 0%** — Cohorts with no `cohort_module_links` or no `module_resources` result in `completion.total = 0`, which defaults `completionPercent` to 0 for every student. Nobody could ever pass the >50% gate.
+
+**Old logic (broken)**:
+```
+active  = login ≤3 days AND completion >50%  ← nearly impossible
+at_risk = login ≤7 days OR completion 30-50%
+inactive = everything else
+```
+
+**New logic (fixed)**:
+```
+active   = login ≤7 days                          ← login recency is primary signal
+at_risk  = login ≤14 days OR completion ≥30%       ← 14-day intervention window
+inactive = login 14+ days AND completion <30%
+```
+
+**Fix**: `app/api/admin/usage/cohort/route.ts` — Rewrote `computeHealthStatus()` to use login recency as the primary signal. Content completion is now a secondary lifeline, not a gate.
+
+### Feature: Sortable Column Headers on Student Table (already implemented)
+
+Verified that sortable headers (NAME, LOGINS, LAST LOGIN, CONTENT, STATUS) were already in place from a prior session. Three-click cycle: ascending → descending → reset to default. Arrow icons indicate sort state.
+
+## Lessons Learned
+
+44. **Login recency is a leading indicator; content completion is lagging.** Using completion as a hard gate for "active" status means new cohorts (where nobody has finished content yet) will never show active students, regardless of login frequency. Always use the leading indicator as the primary classifier.
+
+45. **AND gates in status classification compound false negatives.** When two conditions must both be true, the probability of passing drops multiplicatively. For health status, an OR-based approach (either recent login OR high completion) is more resilient than AND.
+
+---
+
+## Session 12: Cliff Detection — Automatic Formal Session End (2026-02-24)
+
+**Problem**: Zoom meetings run longer than the "formal" session because the instructor tells students "session is over" and stays online for QnA. Students who leave when told get penalized in attendance because the denominator uses the full Zoom meeting duration (including QnA time). Example: 4.5-hour session, instructor says "done" at 3h 50m — student who left gets 230/270 = 85% instead of ~100%.
+
+**Solution**: Cliff Detection — automatically detect the "formal end" by analyzing mass departure patterns. When an instructor says "session is over," it creates a statistically detectable cluster of students leaving within a ~10-minute window.
+
+### Algorithm Design
+- Uses each participant's **FINAL leave time** (last segment's leave_time) — breaks are invisible since break-takers rejoin
+- 10-minute sliding window scans last 50% of meeting
+- Multi-criteria validation: ≥25% ratio + ≥3-5 absolute departures + ≥2.5x spike ratio
+- Meeting-end stayers (leave within 2 min of end) excluded from analysis
+- Confidence scoring: High (auto-apply), Medium (suggest), Low (manual review)
+
+### Data Model
+- `sessions.formal_end_minutes` (INTEGER) — highest-priority denominator for attendance calculation
+- `sessions.cliff_detection` (JSONB) — full detection result for UI display and audit trail
+- Duration priority chain: formal_end_minutes > caller override > Zoom API > actual_duration_minutes > duration_minutes
+
+### New Files (8)
+- `supabase/migrations/026_cliff_detection.sql` — Schema migration
+- `lib/services/cliff-detector.ts` — Pure detection algorithm (~200 lines)
+- `app/api/admin/analytics/detect-cliff/route.ts` — Single session detection
+- `app/api/admin/analytics/apply-cliff/route.ts` — Apply (POST) + Dismiss (DELETE)
+- `app/api/admin/analytics/detect-cliffs-bulk/route.ts` — Bulk detection for all sessions
+- `app/(admin)/admin/analytics/components/cliff-detail-panel.tsx` — Sheet with detection summary + timeline
+- `app/(admin)/admin/analytics/components/cliff-timeline.tsx` — Tailwind-only bar chart visualization
+- `app/(admin)/admin/analytics/components/bulk-cliff-dialog.tsx` — Bulk results dialog
+
+### Modified Files (4)
+- `lib/services/attendance-calculator.ts` — Duration priority chain update (formal_end_minutes is P1)
+- `app/api/admin/analytics/sync-zoom/route.ts` — Added cliff fields to enriched meeting response
+- `app/(admin)/admin/analytics/components/meetings-manager-tab.tsx` — Cliff column, Detect button, detail panel wiring
+- `app/(admin)/admin/analytics/components/student-attendance-tab.tsx` — Cliff badge on session cards
+
+### Commits (13)
+- `b43576a` — docs: cliff detection design document
+- `09de07c` — docs: implementation plan (13 tasks)
+- `a6f93b5` — feat: database migration
+- `68ebed5` — feat: cliff detector service (spec review: 18/18 pass)
+- `375fbb3` — feat: attendance calculator priority chain update
+- `dc5f94c` — feat: detect-cliff API route
+- `1bf5397` — feat: apply-cliff + dismiss API routes
+- `83eb583` — feat: bulk cliff detection API route
+- `ce2d56f` — feat: sync-zoom response with cliff data
+- `a22d915` — feat: cliff detail panel + timeline visualization
+- `2496633` — feat: bulk cliff detection dialog
+- `b0ba600` — feat: cliff column + UI wiring in meetings manager
+- `45adc90` — feat: cliff badge in student attendance tab
+
+### Verification Gates (4/4 passed)
+- Gate 1 (Foundation): Build passes, 18/18 edge cases, duration chain correct, NULL = no regression
+- Gate 2 (API Security): All 4 routes use verifyAdmin() + createAdminClient(), input validation, no key exposure, 200ms rate limiting
+- Gate 3 (UI/UX): Dark mode, responsive (Sheet/Dialog), accessible (labels/tooltips), loading + error states
+- Gate 4 (Integration): Build + lint pass, all files created/modified as planned
+
+## Lessons Learned
+
+46. **Use FINAL leave time to ignore breaks.** When analyzing departure patterns, don't look at per-segment join/leave — instead take the last segment's leave_time. Students who take breaks rejoin, so their "final departure" is their actual last leave. Breaks become invisible with zero parameters to tune.
+
+47. **Multi-criteria validation prevents false positives.** A single threshold (e.g., "more than X people left") would false-positive on breaks or network glitches. Requiring ALL of: ratio, absolute count, spike ratio, AND position > 50% of meeting simultaneously makes the algorithm robust.
+
+48. **Persist detection state for UI audit trails.** Storing the full `CliffDetectionResult` as JSONB (not just the derived `formal_end_minutes`) allows the admin UI to show the detection reasoning, histogram, and confidence — making it reviewable and undoable.
+
+---
+
+**Deployment Status**: Deployed via Vercel (auto-deploy on push to main) ✅
+**Student Impact**: Retroactive — past sessions can be re-analyzed and attendance percentages corrected
+**Hard Refresh Required**: Yes (Cmd+Shift+R)
+**Post-Deploy**: Run migration `026_cliff_detection.sql` in Supabase Dashboard SQL Editor
