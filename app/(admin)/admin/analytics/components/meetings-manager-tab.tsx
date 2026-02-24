@@ -19,11 +19,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { RefreshCw, Calculator, CheckCircle2, Clock, Minus, Video, Loader2, Plus, Eye, Info, Pencil, Check, X } from 'lucide-react';
+import { RefreshCw, Calculator, CheckCircle2, Clock, Minus, Video, Loader2, Plus, Eye, Info, Pencil, Check, X, Zap } from 'lucide-react';
 import { AttendancePreviewDialog } from './attendance-preview-dialog';
+import { CliffDetailPanel } from './cliff-detail-panel';
+import { BulkCliffDialog } from './bulk-cliff-dialog';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import type { CliffDetectionResult } from '@/lib/services/cliff-detector';
 
 interface Cohort {
   id: string;
@@ -46,6 +49,8 @@ interface ZoomMeeting {
   hasAttendance: boolean;
   uniqueParticipantCount: number | null;
   isProperSession: boolean;
+  cliffDetection: CliffDetectionResult | null;
+  formalEndMinutes: number | null;
 }
 
 interface MeetingsManagerTabProps {
@@ -100,6 +105,12 @@ export function MeetingsManagerTab({ cohorts }: MeetingsManagerTabProps) {
   const [previewTopic, setPreviewTopic] = useState('');
   const [editingDurationId, setEditingDurationId] = useState<string | null>(null);
   const [editDurationValue, setEditDurationValue] = useState('');
+  const [selectedCliffMeeting, setSelectedCliffMeeting] = useState<ZoomMeeting | null>(null);
+  const [cliffDetailOpen, setCliffDetailOpen] = useState(false);
+  const [bulkDetecting, setBulkDetecting] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [bulkResults, setBulkResults] = useState<any>(null);
+  const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
 
   const syncFromZoom = useCallback(async () => {
     setLoading(true);
@@ -358,6 +369,117 @@ export function MeetingsManagerTab({ cohorts }: MeetingsManagerTabProps) {
     (m) => m.countsForStudents && !m.hasAttendance
   ).length;
 
+  const handleBulkDetect = useCallback(async () => {
+    setBulkDetecting(true);
+    try {
+      const res = await fetch('/api/admin/analytics/detect-cliffs-bulk', { method: 'POST' });
+      if (!res.ok) throw new Error('Bulk detection failed');
+      const data = await res.json();
+      setBulkResults(data);
+      setBulkDialogOpen(true);
+      // Refresh meetings to show updated cliff data
+      syncFromZoom();
+    } catch {
+      toast.error('Failed to detect formal ends');
+    } finally {
+      setBulkDetecting(false);
+    }
+  }, [syncFromZoom]);
+
+  const handleApplyCliff = useCallback(async (sessionId: string, formalEndMinutes: number) => {
+    const meeting = meetings.find((m) => m.linkedSessionId === sessionId);
+    if (!meeting) return;
+
+    try {
+      const res = await fetch('/api/admin/analytics/apply-cliff', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId,
+          formalEndMinutes,
+          zoomMeetingUuid: meeting.uuid,
+        }),
+      });
+
+      if (!res.ok) throw new Error('Apply failed');
+
+      const data = await res.json();
+      toast.success(`Formal end applied: ${formalEndMinutes} min. ${data.attendance?.imported || 0} students recalculated.`);
+
+      // Update local state
+      setMeetings((prev) =>
+        prev.map((m) =>
+          m.linkedSessionId === sessionId
+            ? { ...m, formalEndMinutes, cliffDetection: { ...(m.cliffDetection || { detected: true }), appliedAt: new Date().toISOString() } as CliffDetectionResult }
+            : m
+        )
+      );
+      setCliffDetailOpen(false);
+    } catch {
+      toast.error('Failed to apply formal end');
+    }
+  }, [meetings]);
+
+  const handleDismissCliff = useCallback(async (sessionId: string) => {
+    const meeting = meetings.find((m) => m.linkedSessionId === sessionId);
+    if (!meeting) return;
+
+    try {
+      const res = await fetch('/api/admin/analytics/apply-cliff', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId, zoomMeetingUuid: meeting.uuid }),
+      });
+
+      if (!res.ok) throw new Error('Dismiss failed');
+
+      toast.success('Cliff dismissed. Attendance recalculated with full duration.');
+      setMeetings((prev) =>
+        prev.map((m) =>
+          m.linkedSessionId === sessionId
+            ? { ...m, formalEndMinutes: null, cliffDetection: { ...(m.cliffDetection || { detected: false }), dismissed: true } as CliffDetectionResult }
+            : m
+        )
+      );
+      setCliffDetailOpen(false);
+    } catch {
+      toast.error('Failed to dismiss cliff');
+    }
+  }, [meetings]);
+
+  const handleApplyAllHighConfidence = useCallback(async () => {
+    if (!bulkResults?.results) return;
+
+    const highConfidence = bulkResults.results.filter(
+      (r: { status: string; confidence?: string }) => r.status === 'detected' && r.confidence === 'high'
+    );
+
+    let applied = 0;
+    for (const result of highConfidence) {
+      const meeting = meetings.find((m: ZoomMeeting) => m.linkedSessionId === result.sessionId);
+      if (!meeting || !result.effectiveEndMinutes) continue;
+
+      try {
+        await fetch('/api/admin/analytics/apply-cliff', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId: result.sessionId,
+            formalEndMinutes: result.effectiveEndMinutes,
+            zoomMeetingUuid: meeting.uuid,
+          }),
+        });
+        applied++;
+      } catch {
+        // Continue with next
+      }
+    }
+
+    toast.success(`Applied formal end to ${applied} sessions. Attendance recalculated.`);
+    setBulkDialogOpen(false);
+    syncFromZoom(); // Refresh data
+  }, [bulkResults, meetings, syncFromZoom]);
+
   return (
     <div className="space-y-4">
       {/* Actions bar */}
@@ -381,6 +503,15 @@ export function MeetingsManagerTab({ cohorts }: MeetingsManagerTabProps) {
             Calculate All Pending ({pendingCount})
           </Button>
         )}
+        <Button
+          variant="outline"
+          onClick={handleBulkDetect}
+          disabled={bulkDetecting}
+          className="gap-2"
+        >
+          {bulkDetecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+          Detect Formal Ends
+        </Button>
       </div>
 
       {/* Meetings table */}
@@ -446,6 +577,14 @@ export function MeetingsManagerTab({ cohorts }: MeetingsManagerTabProps) {
                             Unique <Info className="w-3 h-3 text-muted-foreground" />
                           </TooltipTrigger>
                           <TooltipContent>Deduplicated participants after attendance calculation.</TooltipContent>
+                        </Tooltip>
+                      </TableHead>
+                      <TableHead>
+                        <Tooltip>
+                          <TooltipTrigger className="flex items-center gap-1">
+                            Formal End <Info className="w-3 h-3 text-muted-foreground" />
+                          </TooltipTrigger>
+                          <TooltipContent>Auto-detected session end (excludes QnA). Click to review.</TooltipContent>
                         </Tooltip>
                       </TableHead>
                       <TableHead>Cohort</TableHead>
@@ -522,6 +661,35 @@ export function MeetingsManagerTab({ cohorts }: MeetingsManagerTabProps) {
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
                             {meeting.uniqueParticipantCount ?? '—'}
+                          </TableCell>
+                          <TableCell>
+                            {meeting.cliffDetection?.detected ? (
+                              <button
+                                onClick={() => {
+                                  setSelectedCliffMeeting(meeting);
+                                  setCliffDetailOpen(true);
+                                }}
+                                className="inline-flex items-center"
+                              >
+                                <Badge
+                                  variant="outline"
+                                  className={
+                                    meeting.cliffDetection?.confidence === 'high'
+                                      ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/20 cursor-pointer'
+                                      : meeting.cliffDetection?.confidence === 'medium'
+                                      ? 'bg-amber-500/10 text-amber-500 border-amber-500/20 hover:bg-amber-500/20 cursor-pointer'
+                                      : 'bg-orange-500/10 text-orange-500 border-orange-500/20 hover:bg-orange-500/20 cursor-pointer'
+                                  }
+                                >
+                                  {meeting.formalEndMinutes ? '⚡' : '⏳'}{' '}
+                                  {meeting.cliffDetection?.effectiveEndMinutes}m
+                                </Badge>
+                              </button>
+                            ) : meeting.cliffDetection && !meeting.cliffDetection?.detected ? (
+                              <span className="text-xs text-muted-foreground">— none</span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
                           </TableCell>
                           <TableCell>
                             <Select
@@ -691,6 +859,23 @@ export function MeetingsManagerTab({ cohorts }: MeetingsManagerTabProps) {
         sessionId={previewSessionId}
         meetingTopic={previewTopic}
         onClose={() => setPreviewSessionId(null)}
+      />
+
+      {/* Cliff Detail Panel */}
+      <CliffDetailPanel
+        open={cliffDetailOpen}
+        onOpenChange={setCliffDetailOpen}
+        meeting={selectedCliffMeeting}
+        onApply={handleApplyCliff}
+        onDismiss={handleDismissCliff}
+      />
+
+      {/* Bulk Cliff Detection Dialog */}
+      <BulkCliffDialog
+        open={bulkDialogOpen}
+        onOpenChange={setBulkDialogOpen}
+        results={bulkResults}
+        onApplyAllHigh={handleApplyAllHighConfidence}
       />
     </div>
   );
