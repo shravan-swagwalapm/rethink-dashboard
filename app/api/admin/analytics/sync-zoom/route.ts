@@ -31,7 +31,7 @@ export async function GET() {
     // Get all sessions with zoom_meeting_id to find linked ones
     const { data: linkedSessions } = await supabase
       .from('sessions')
-      .select('id, zoom_meeting_id, title, cohort_id, counts_for_students, actual_duration_minutes, duration_minutes')
+      .select('id, zoom_meeting_id, title, cohort_id, counts_for_students, actual_duration_minutes, duration_minutes, cliff_detection, formal_end_minutes')
       .not('zoom_meeting_id', 'is', null);
 
     const sessionByMeetingId = new Map(
@@ -144,6 +144,8 @@ export async function GET() {
         hasAttendance: linkedSession ? attendanceCountBySession.has(linkedSession.id) : false,
         uniqueParticipantCount: linkedSession ? (attendanceCountBySession.get(linkedSession.id) || null) : null,
         isProperSession: linkedSession ? !!linkedSession.cohort_id : false,
+        cliffDetection: linkedSession?.cliff_detection || null,
+        formalEndMinutes: linkedSession?.formal_end_minutes || null,
       };
     });
 
