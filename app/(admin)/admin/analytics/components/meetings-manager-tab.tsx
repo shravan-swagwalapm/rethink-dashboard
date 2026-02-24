@@ -751,7 +751,7 @@ export function MeetingsManagerTab({ cohorts }: MeetingsManagerTabProps) {
                                         : 'bg-orange-500/10 text-orange-500 border-orange-500/20 hover:bg-orange-500/20 cursor-pointer'
                                     }
                                   >
-                                    {isDismissed ? '✕' : meeting.formalEndMinutes ? '⚡' : '⏳'}{' '}
+                                    {isDismissed ? '✕' : '⚡'}{' '}
                                     {meeting.cliffDetection?.effectiveEndMinutes}m
                                   </Badge>
                                 </button>

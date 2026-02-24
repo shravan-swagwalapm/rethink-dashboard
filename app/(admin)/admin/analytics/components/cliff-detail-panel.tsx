@@ -111,7 +111,15 @@ export function CliffDetailPanel({ open, onOpenChange, meeting, onApply, onDismi
             <div className="flex items-center gap-2 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
               <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
               <p className="text-sm text-emerald-600 dark:text-emerald-400">
-                Applied: Using {meeting.formalEndMinutes} min as effective duration
+                Admin override: Using {meeting.formalEndMinutes} min as effective duration
+              </p>
+            </div>
+          )}
+          {!isApplied && !isDismissed && (
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-primary/10 border border-primary/20">
+              <Zap className="w-4 h-4 text-primary shrink-0" />
+              <p className="text-sm text-primary">
+                Auto-applied: Using detected {cliff.effectiveEndMinutes} min as effective duration
               </p>
             </div>
           )}
@@ -217,7 +225,7 @@ export function CliffDetailPanel({ open, onOpenChange, meeting, onApply, onDismi
                 className="gap-2"
               >
                 {applying && <Loader2 className="w-4 h-4 animate-spin" />}
-                {isDismissed ? 'Re-apply & Recalculate' : isApplied ? 'Update & Recalculate' : 'Apply & Recalculate'}
+                {isDismissed ? 'Re-apply & Recalculate' : isApplied ? 'Update & Recalculate' : 'Override & Recalculate'}
               </Button>
               {!isDismissed && (
                 <Button

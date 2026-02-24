@@ -160,35 +160,49 @@ export async function calculateSessionAttendance(
 ): Promise<{ imported: number; unmatched: number; actualDurationUsed: number }> {
   const supabase = await createAdminClient();
 
-  // Fetch session record FIRST (needed for formal_end_minutes priority check)
+  // Fetch session record FIRST (needed for duration priority chain)
   const { data: sessionRecord } = await supabase
     .from('sessions')
-    .select('actual_duration_minutes, duration_minutes, formal_end_minutes')
+    .select('actual_duration_minutes, duration_minutes, formal_end_minutes, cliff_detection')
     .eq('id', sessionId)
     .single();
 
   // Duration priority chain:
-  // 1. formal_end_minutes (cliff-adjusted, from session record)
-  // 2. Caller-provided actualDurationMinutes
-  // 3. Zoom API actual duration
-  // 4. session.actual_duration_minutes
-  // 5. session.duration_minutes (scheduled)
+  // 1. formal_end_minutes (admin-overridden value, from session record)
+  // 2. Detected cliff effectiveEndMinutes (auto-applied unless dismissed)
+  // 3. Caller-provided actualDurationMinutes
+  // 4. Zoom API actual duration
+  // 5. session.actual_duration_minutes
+  // 6. session.duration_minutes (scheduled)
   let resolvedDuration = 0;
   let durationSource = 'none';
 
-  // Priority 1: formal_end_minutes (cliff-adjusted)
+  // Priority 1: formal_end_minutes (admin explicitly set this value)
   if (sessionRecord?.formal_end_minutes && sessionRecord.formal_end_minutes > 0) {
     resolvedDuration = sessionRecord.formal_end_minutes;
     durationSource = 'formal_end_minutes';
   }
 
-  // Priority 2: Caller-provided override
+  // Priority 2: Auto-apply detected cliff (unless dismissed)
+  if (!resolvedDuration && sessionRecord?.cliff_detection) {
+    const cliff = sessionRecord.cliff_detection as Record<string, unknown>;
+    const isDetected = cliff.detected === true;
+    const isDismissed = cliff.dismissed === true;
+    const effectiveEnd = typeof cliff.effectiveEndMinutes === 'number' ? cliff.effectiveEndMinutes : 0;
+
+    if (isDetected && !isDismissed && effectiveEnd > 0) {
+      resolvedDuration = effectiveEnd;
+      durationSource = 'cliff_detection.effectiveEndMinutes (auto)';
+    }
+  }
+
+  // Priority 3: Caller-provided override
   if (!resolvedDuration && actualDurationMinutes && actualDurationMinutes > 0) {
     resolvedDuration = actualDurationMinutes;
     durationSource = 'caller';
   }
 
-  // Priority 3: Zoom API actual duration
+  // Priority 4: Zoom API actual duration
   if (!resolvedDuration) {
     try {
       const zoomDetails = await zoomService.getPastMeetingDetails(zoomMeetingUuid);
