@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUserContext } from '@/contexts/user-context';
 import { getClient } from '@/lib/supabase/client';
@@ -10,7 +10,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { StudentPageLoader } from '@/components/ui/page-loader';
-import { Calendar, Clock, Video, ChevronRight, BookOpen, FolderOpen, Shield, Presentation, FileText, ExternalLink } from 'lucide-react';
+import { Calendar, Clock, Video, ChevronRight, BookOpen, FolderOpen, Shield, Presentation, FileText, ExternalLink, AlertCircle, RefreshCw } from 'lucide-react';
+import { fetchWithTimeout } from '@/lib/fetch-with-timeout';
 import Link from 'next/link';
 import { format, isToday, isTomorrow, parseISO } from 'date-fns';
 import { InvoiceCard } from '@/components/dashboard/invoice-card';
@@ -28,6 +29,62 @@ interface RecentLearningAsset extends ModuleResource {
     progress_seconds: number;
     last_viewed_at: string | null;
   };
+}
+
+// ─── SWR Cache for instant return visits ────────────────────────────
+const DASHBOARD_CACHE_KEY = 'rethink-dashboard-cache-';
+const CACHE_MAX_AGE = 5 * 60 * 1000; // 5 minutes
+
+interface DashboardCache {
+  timestamp: number;
+  stats: DashboardStats | null;
+  upcomingSessions: Session[];
+  recentModules: LearningModule[];
+  recentResources: Resource[];
+  recentLearningAssets: RecentLearningAsset[];
+  invoices: InvoiceWithCohort[];
+  pendingInvoiceAmount: number;
+  cohortStartDate: string | null;
+  cohortName: string;
+}
+
+function getDashboardCache(cohortId: string): DashboardCache | null {
+  try {
+    const raw = localStorage.getItem(`${DASHBOARD_CACHE_KEY}${cohortId}`);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function setDashboardCache(cohortId: string, data: Omit<DashboardCache, 'timestamp'>) {
+  try {
+    localStorage.setItem(
+      `${DASHBOARD_CACHE_KEY}${cohortId}`,
+      JSON.stringify({ ...data, timestamp: Date.now() })
+    );
+  } catch {
+    // localStorage full or unavailable — non-critical
+  }
+}
+
+// ─── Timeout wrapper for Supabase queries ───────────────────────────
+// Each query gets its own timeout + catch so one failure doesn't block others
+const QUERY_TIMEOUT = 10_000;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function safeQuery(promise: Promise<any>, fallback: any): Promise<{ value: any; failed: boolean }> {
+  let timeoutId: ReturnType<typeof setTimeout>;
+  return Promise.race([
+    promise.then((value: any) => {  // eslint-disable-line @typescript-eslint/no-explicit-any
+      clearTimeout(timeoutId);
+      return { value, failed: false };
+    }),
+    new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => reject(new Error('Query timeout')), QUERY_TIMEOUT);
+    }),
+  ]).catch(() => ({ value: fallback, failed: true }));
 }
 
 // Helper function to get icon for content type
@@ -122,6 +179,9 @@ export default function DashboardPage() {
   const [cohortStartDate, setCohortStartDate] = useState<Date | null>(null);
   const [cohortName, setCohortName] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const [isStale, setIsStale] = useState(false);
 
   // Admin-specific state
   const [adminStats, setAdminStats] = useState<AdminDashboardStats | null>(null);
@@ -185,142 +245,209 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetchDashboardData = async () => {
       if (!profile) {
-        // Don't get stuck in loading state if profile doesn't exist
         setLoading(false);
         return;
       }
 
-      const supabase = getClient();
+      // Reset loading on retry (unless we have cached data to show)
+      if (retryCount > 0 && !getDashboardCache(activeCohortId || '')) {
+        setLoading(true);
+      }
 
-      try {
-        // Admin role: fetch system-wide data
-        if (isAdmin) {
-          const response = await fetch('/api/admin/dashboard-stats');
+      // ── Admin path (simple: one API call with timeout) ──
+      if (isAdmin) {
+        try {
+          const response = await fetchWithTimeout('/api/admin/dashboard-stats');
           if (response.ok) {
             const data = await response.json();
             setAdminStats(data.stats);
             setAdminSessions(data.upcomingSessions || []);
             setAdminLearnings(data.recentLearnings || []);
+            setError(null);
+          } else {
+            setError('Failed to load admin dashboard. The server returned an error.');
           }
+        } catch (err) {
+          setError(
+            err instanceof DOMException && err.name === 'AbortError'
+              ? 'Dashboard took too long to load. Please check your connection.'
+              : 'Something went wrong loading the dashboard.'
+          );
+        } finally {
           setLoading(false);
-          return;
         }
+        return;
+      }
 
-        // Student role: fetch cohort-specific data
-        if (activeCohortId) {
-          const [
-            cohortResult,
-            attendanceResult,
-            rankingResult,
-            resourcesCountResult,
-            sessionsResult,
-            modulesResult,
-            resourcesResult,
-            invoicesResult,
-            learningAssetsResult,
-            leaderboardResult,
-            progressResult,
-          ] = await Promise.all([
-            // Fetch cohort info
-            supabase
-              .from('cohorts')
-              .select('*')
-              .eq('id', activeCohortId)
-              .single(),
-            // Fetch attendance
-            supabase
-              .from('attendance')
-              .select('attendance_percentage')
-              .eq('user_id', profile.id),
-            // Fetch ranking
-            supabase
-              .from('rankings')
-              .select('rank')
-              .eq('user_id', profile.id)
-              .eq('cohort_id', activeCohortId)
-              .single(),
-            // Fetch total resources count for the cohort
-            supabase
-              .from('resources')
-              .select('*', { count: 'exact', head: true })
-              .eq('cohort_id', activeCohortId),
-            // Fetch upcoming sessions (via session_cohorts junction table)
-            supabase
-              .from('sessions')
-              .select('*, session_cohorts!inner(cohort_id)')
-              .eq('session_cohorts.cohort_id', activeCohortId)
-              .gte('scheduled_at', new Date().toISOString())
-              .order('scheduled_at', { ascending: true })
-              .limit(3),
-            // Fetch recent learning modules (with override logic)
+      // ── Student path ──
+      if (!activeCohortId) {
+        setLoading(false);
+        return;
+      }
+
+      // Layer 3: SWR — hydrate from cache for instant display on return visits
+      const cached = getDashboardCache(activeCohortId);
+      if (cached) {
+        setStats(cached.stats);
+        setUpcomingSessions(cached.upcomingSessions);
+        setRecentModules(cached.recentModules);
+        setRecentResources(cached.recentResources);
+        setRecentLearningAssets(cached.recentLearningAssets);
+        setInvoices(cached.invoices);
+        setPendingInvoiceAmount(cached.pendingInvoiceAmount);
+        if (cached.cohortStartDate) setCohortStartDate(new Date(cached.cohortStartDate));
+        setCohortName(cached.cohortName);
+        setLoading(false); // Show cached dashboard immediately
+        if (Date.now() - cached.timestamp > CACHE_MAX_AGE) {
+          setIsStale(true);
+        }
+      }
+
+      // Layer 1+2: Fetch fresh data with per-query timeouts + partial data handling
+      // Each query is wrapped in safeQuery() so failures return fallbacks, never block others
+      const supabase = getClient();
+
+      try {
+        const [
+          cohortResult,
+          attendanceResult,
+          rankingResult,
+          resourcesCountResult,
+          sessionsResult,
+          modulesResult,
+          resourcesResult,
+          invoicesResult,
+          learningAssetsResult,
+          leaderboardResult,
+          progressResult,
+        ] = await Promise.all([
+          // Supabase queries — each gets individual 10s timeout via safeQuery
+          safeQuery(
+            supabase.from('cohorts').select('*').eq('id', activeCohortId).single(),
+            { data: null, error: null, count: null, status: 0, statusText: '' }
+          ),
+          safeQuery(
+            supabase.from('attendance').select('attendance_percentage').eq('user_id', profile.id),
+            { data: null, error: null, count: null, status: 0, statusText: '' }
+          ),
+          safeQuery(
+            supabase.from('rankings').select('rank').eq('user_id', profile.id).eq('cohort_id', activeCohortId).single(),
+            { data: null, error: null, count: null, status: 0, statusText: '' }
+          ),
+          safeQuery(
+            supabase.from('resources').select('*', { count: 'exact', head: true }).eq('cohort_id', activeCohortId),
+            { data: null, error: null, count: 0, status: 0, statusText: '' }
+          ),
+          safeQuery(
+            supabase.from('sessions').select('*, session_cohorts!inner(cohort_id)').eq('session_cohorts.cohort_id', activeCohortId).gte('scheduled_at', new Date().toISOString()).order('scheduled_at', { ascending: true }).limit(3),
+            { data: null, error: null, count: null, status: 0, statusText: '' }
+          ),
+          safeQuery(
             fetchRecentModules(activeCohortId),
-            // Fetch recent resources
-            supabase
-              .from('resources')
-              .select('*')
-              .eq('cohort_id', activeCohortId)
-              .eq('type', 'file')
-              .order('created_at', { ascending: false })
-              .limit(4),
-            // Fetch invoices (uses API route for proper auth)
-            fetch('/api/invoices')
-              .then(r => r.ok ? r.json() : { invoices: [], stats: { pending_amount: 0 } })
-              .catch(() => ({ invoices: [], stats: { pending_amount: 0 } })),
-            // Fetch recent learning assets (recordings, presentations, etc.)
-            fetch(`/api/learnings/recent?cohort_id=${activeCohortId}&limit=4`)
-              .then(r => r.ok ? r.json() : { recent: [] })
-              .catch(() => ({ recent: [] })),
-            // Fetch cohort avg attendance (from leaderboard API)
-            fetch(`/api/analytics?view=leaderboard&cohort_id=${activeCohortId}`)
-              .then(r => r.ok ? r.json() : { cohortAvg: null })
-              .catch(() => ({ cohortAvg: null })),
-            // Fetch completion progress
-            fetch('/api/learnings/progress')
-              .then(r => r.ok ? r.json() : { progress: [] })
-              .catch(() => ({ progress: [] })),
-          ]);
+            { data: null, error: null, count: null, status: 0, statusText: '' }
+          ),
+          safeQuery(
+            supabase.from('resources').select('*').eq('cohort_id', activeCohortId).eq('type', 'file').order('created_at', { ascending: false }).limit(4),
+            { data: null, error: null, count: null, status: 0, statusText: '' }
+          ),
+          // API route calls — fetchWithTimeout + single catch at end for correct failed tracking
+          fetchWithTimeout('/api/invoices')
+            .then(r => r.ok ? r.json() : Promise.reject('not ok'))
+            .then(value => ({ value, failed: false }))
+            .catch(() => ({ value: { invoices: [], stats: { pending_amount: 0 } }, failed: true })),
+          fetchWithTimeout(`/api/learnings/recent?cohort_id=${activeCohortId}&limit=4`)
+            .then(r => r.ok ? r.json() : Promise.reject('not ok'))
+            .then(value => ({ value, failed: false }))
+            .catch(() => ({ value: { recent: [] }, failed: true })),
+          fetchWithTimeout(`/api/analytics?view=leaderboard&cohort_id=${activeCohortId}`)
+            .then(r => r.ok ? r.json() : Promise.reject('not ok'))
+            .then(value => ({ value, failed: false }))
+            .catch(() => ({ value: { cohortAvg: null }, failed: true })),
+          fetchWithTimeout('/api/learnings/progress')
+            .then(r => r.ok ? r.json() : Promise.reject('not ok'))
+            .then(value => ({ value, failed: false }))
+            .catch(() => ({ value: { progress: [] }, failed: true })),
+        ]);
 
-          const completedCount = progressResult.progress?.filter((p: { is_completed: boolean }) => p.is_completed).length || 0;
+        // Count how many queries failed (for error state decision)
+        const allResults = [
+          cohortResult, attendanceResult, rankingResult, resourcesCountResult,
+          sessionsResult, modulesResult, resourcesResult,
+          invoicesResult, learningAssetsResult, leaderboardResult, progressResult,
+        ];
+        const failCount = allResults.filter(r => r.failed).length;
 
-          // Process cohort data
-          const cohort = cohortResult.data;
-          if (cohort) {
-            setCohortName(cohort.name);
-            if (cohort.start_date) {
-              setCohortStartDate(new Date(cohort.start_date));
-            }
+        // Process results — same logic as before, using .value from safeQuery
+        const completedCount = progressResult.value?.progress?.filter(
+          (p: { is_completed: boolean }) => p.is_completed
+        ).length || 0;
+
+        const cohort = cohortResult.value?.data;
+        if (cohort) {
+          setCohortName(cohort.name);
+          if (cohort.start_date) {
+            setCohortStartDate(new Date(cohort.start_date));
           }
-
-          // Calculate average attendance
-          const attendance = attendanceResult.data;
-          const avgAttendance = attendance?.length
-            ? attendance.reduce((acc: number, a: { attendance_percentage: number | null }) => acc + (a.attendance_percentage || 0), 0) / attendance.length
-            : 0;
-
-          // Set stats
-          setStats({
-            total_students: leaderboardResult.totalStudents ?? leaderboardResult.leaderboard?.length ?? 0,
-            attendance_percentage: Math.round(avgAttendance),
-            current_rank: rankingResult.data?.rank || null,
-            total_resources: resourcesCountResult.count || 0,
-            cohort_avg: leaderboardResult.cohortAvg ?? null,
-            completed_resources: completedCount,
-          });
-
-          // Set sessions, modules, and resources
-          setUpcomingSessions(sessionsResult.data || []);
-          setRecentModules(modulesResult.data || []);
-          setRecentResources(resourcesResult.data || []);
-
-          // Set invoices
-          setInvoices(invoicesResult.invoices || []);
-          setPendingInvoiceAmount(invoicesResult.stats?.pending_amount || 0);
-
-          // Set learning assets
-          setRecentLearningAssets(learningAssetsResult.recent || []);
         }
-      } catch (error) {
-        console.error('Error fetching dashboard data:', error);
+
+        const attendance = attendanceResult.value?.data;
+        const avgAttendance = attendance?.length
+          ? attendance.reduce((acc: number, a: { attendance_percentage: number | null }) => acc + (a.attendance_percentage || 0), 0) / attendance.length
+          : 0;
+
+        const newStats: DashboardStats = {
+          total_students: leaderboardResult.value?.totalStudents ?? leaderboardResult.value?.leaderboard?.length ?? 0,
+          attendance_percentage: Math.round(avgAttendance),
+          current_rank: rankingResult.value?.data?.rank || null,
+          total_resources: resourcesCountResult.value?.count || 0,
+          cohort_avg: leaderboardResult.value?.cohortAvg ?? null,
+          completed_resources: completedCount,
+        };
+
+        const newSessions = sessionsResult.value?.data || [];
+        const newModules = modulesResult.value?.data || [];
+        const newResources = resourcesResult.value?.data || [];
+        const newInvoices = invoicesResult.value?.invoices || [];
+        const newPendingAmount = invoicesResult.value?.stats?.pending_amount || 0;
+        const newLearningAssets = learningAssetsResult.value?.recent || [];
+
+        // Update state
+        setStats(newStats);
+        setUpcomingSessions(newSessions);
+        setRecentModules(newModules);
+        setRecentResources(newResources);
+        setInvoices(newInvoices);
+        setPendingInvoiceAmount(newPendingAmount);
+        setRecentLearningAssets(newLearningAssets);
+
+        // Layer 3: Cache fresh results for future visits
+        setDashboardCache(activeCohortId, {
+          stats: newStats,
+          upcomingSessions: newSessions,
+          recentModules: newModules,
+          recentResources: newResources,
+          recentLearningAssets: newLearningAssets,
+          invoices: newInvoices,
+          pendingInvoiceAmount: newPendingAmount,
+          cohortStartDate: cohort?.start_date || null,
+          cohortName: cohort?.name || '',
+        });
+
+        // If ALL queries failed and we had no cache, show error
+        if (failCount === allResults.length && !cached) {
+          setError('Unable to load dashboard. Please check your connection and try again.');
+        } else {
+          setError(null);
+          setIsStale(false);
+        }
+      } catch (err) {
+        // Unexpected error (not individual query failures — those are caught by safeQuery)
+        console.error('Dashboard fetch error:', err);
+        if (!cached) {
+          setError('Something went wrong loading your dashboard.');
+        } else {
+          setIsStale(true);
+        }
       } finally {
         setLoading(false);
       }
@@ -329,7 +456,8 @@ export default function DashboardPage() {
     if (!userLoading) {
       fetchDashboardData();
     }
-  }, [profile, userLoading, activeCohortId, isAdmin]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile, userLoading, activeCohortId, isAdmin, retryCount]);
 
   const getSessionTimeLabel = (date: string) => {
     const sessionDate = parseISO(date);
@@ -362,6 +490,58 @@ export default function DashboardPage() {
   // This prevents flash of empty content
   if (userLoading || loading) {
     return <StudentPageLoader message="Loading your dashboard..." />;
+  }
+
+  // Layer 4: Error state — user always has a way forward
+  if (error && !stats && !isAdmin) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Card className="max-w-md w-full">
+          <CardContent className="pt-8 pb-8 text-center space-y-4">
+            <div className="w-16 h-16 mx-auto rounded-full bg-amber-50 dark:bg-amber-950/30 flex items-center justify-center">
+              <AlertCircle className="w-8 h-8 text-amber-500" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-lg">Unable to load dashboard</h3>
+              <p className="text-sm text-muted-foreground mt-1">{error}</p>
+            </div>
+            <Button
+              onClick={() => { setError(null); setRetryCount(c => c + 1); }}
+              className="gap-2"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Try again
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Admin error state
+  if (error && isAdmin) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Card className="max-w-md w-full">
+          <CardContent className="pt-8 pb-8 text-center space-y-4">
+            <div className="w-16 h-16 mx-auto rounded-full bg-amber-50 dark:bg-amber-950/30 flex items-center justify-center">
+              <AlertCircle className="w-8 h-8 text-amber-500" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-lg">Unable to load dashboard</h3>
+              <p className="text-sm text-muted-foreground mt-1">{error}</p>
+            </div>
+            <Button
+              onClick={() => { setError(null); setRetryCount(c => c + 1); }}
+              className="gap-2"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Try again
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   // Admin role: Show system-wide dashboard
@@ -552,6 +732,24 @@ export default function DashboardPage() {
     <div className="space-y-6">
       {/* Welcome Banner */}
       <WelcomeBanner cohortStartDate={cohortStartDate} cohortName={cohortName} />
+
+      {/* Stale data indicator — shown when cache is displayed but refresh failed */}
+      {isStale && (
+        <div className="flex items-center justify-between px-4 py-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
+          <p className="text-sm text-amber-700 dark:text-amber-400">
+            Showing cached data. Refresh to get latest.
+          </p>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => { setIsStale(false); setRetryCount(c => c + 1); }}
+            className="gap-1 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-950/40"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            Refresh
+          </Button>
+        </div>
+      )}
 
       {/* Stats Cards */}
       <MotionFadeIn>
