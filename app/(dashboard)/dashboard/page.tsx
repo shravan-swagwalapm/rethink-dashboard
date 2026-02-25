@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUserContext } from '@/contexts/user-context';
-import { getClient } from '@/lib/supabase/client';
 import { WelcomeBanner } from '@/components/dashboard/welcome-banner';
 import { StatsCards } from '@/components/dashboard/stats-cards';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,7 +16,7 @@ import { format, isToday, isTomorrow, parseISO } from 'date-fns';
 import { InvoiceCard } from '@/components/dashboard/invoice-card';
 import { toast } from 'sonner';
 import { MotionContainer, MotionItem, MotionFadeIn } from '@/components/ui/motion';
-import type { Session, DashboardStats, LearningModule, Resource, Invoice, Cohort, ModuleResource, ModuleResourceType, AdminDashboardStats, AdminDashboardSession, AdminDashboardLearning } from '@/types';
+import type { Session, DashboardStats, LearningModule, Resource, Invoice, Cohort, ModuleResource, ModuleResourceType, AdminDashboardStats, AdminDashboardSession, AdminDashboardLearning, StudentDashboardResponse } from '@/types';
 
 interface InvoiceWithCohort extends Invoice {
   cohort?: Cohort;
@@ -32,7 +31,7 @@ interface RecentLearningAsset extends ModuleResource {
 }
 
 // ─── SWR Cache for instant return visits ────────────────────────────
-const DASHBOARD_CACHE_KEY = 'rethink-dashboard-cache-';
+const DASHBOARD_CACHE_KEY = 'rethink-dashboard-v2-';
 const CACHE_MAX_AGE = 5 * 60 * 1000; // 5 minutes
 
 interface DashboardCache {
@@ -69,23 +68,6 @@ function setDashboardCache(cohortId: string, data: Omit<DashboardCache, 'timesta
   }
 }
 
-// ─── Timeout wrapper for Supabase queries ───────────────────────────
-// Each query gets its own timeout + catch so one failure doesn't block others
-const QUERY_TIMEOUT = 10_000;
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function safeQuery(promise: Promise<any>, fallback: any): Promise<{ value: any; failed: boolean }> {
-  let timeoutId: ReturnType<typeof setTimeout>;
-  return Promise.race([
-    promise.then((value: any) => {  // eslint-disable-line @typescript-eslint/no-explicit-any
-      clearTimeout(timeoutId);
-      return { value, failed: false };
-    }),
-    new Promise<never>((_, reject) => {
-      timeoutId = setTimeout(() => reject(new Error('Query timeout')), QUERY_TIMEOUT);
-    }),
-  ]).catch(() => ({ value: fallback, failed: true }));
-}
 
 // Helper function to get icon for content type
 function getContentIcon(type: ModuleResourceType) {
@@ -188,61 +170,10 @@ export default function DashboardPage() {
   const [adminSessions, setAdminSessions] = useState<AdminDashboardSession[]>([]);
   const [adminLearnings, setAdminLearnings] = useState<AdminDashboardLearning[]>([]);
 
-  /**
-   * Fetch recent learning modules with override logic
-   * Respects cohort linking: shows modules from linked source (cohort or global)
-   */
-  const fetchRecentModules = async (cohortId: string) => {
-    const supabase = getClient();
-
-    try {
-      // Step 1: Get cohort's active link configuration
-      const { data: cohort } = await supabase
-        .from('cohorts')
-        .select('id, active_link_type, linked_cohort_id')
-        .eq('id', cohortId)
-        .single();
-
-      if (!cohort) {
-        return { data: null, error: null };
-      }
-
-      // Step 2: Build query based on override logic
-      let query = supabase
-        .from('learning_modules')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(4);
-
-      switch (cohort.active_link_type) {
-        case 'global':
-          // Show ONLY global modules
-          query = query.eq('is_global', true);
-          break;
-        case 'cohort':
-          // Show ONLY linked cohort's modules
-          if (cohort.linked_cohort_id) {
-            query = query.eq('cohort_id', cohort.linked_cohort_id);
-          } else {
-            // Fallback if linked_cohort_id is missing
-            query = query.eq('cohort_id', cohortId);
-          }
-          break;
-        case 'own':
-        default:
-          // Show own modules
-          query = query.eq('cohort_id', cohortId);
-          break;
-      }
-
-      return await query;
-    } catch (error) {
-      console.error('Error fetching recent modules:', error);
-      return { data: null, error };
-    }
-  };
-
   useEffect(() => {
+    // AbortController prevents stale data from wrong cohort when user switches quickly
+    const abortController = new AbortController();
+
     const fetchDashboardData = async () => {
       if (!profile) {
         setLoading(false);
@@ -257,7 +188,8 @@ export default function DashboardPage() {
       // ── Admin path (simple: one API call with timeout) ──
       if (isAdmin) {
         try {
-          const response = await fetchWithTimeout('/api/admin/dashboard-stats');
+          const response = await fetchWithTimeout('/api/admin/dashboard-stats', { signal: abortController.signal });
+          if (abortController.signal.aborted) return;
           if (response.ok) {
             const data = await response.json();
             setAdminStats(data.stats);
@@ -268,13 +200,14 @@ export default function DashboardPage() {
             setError('Failed to load admin dashboard. The server returned an error.');
           }
         } catch (err) {
+          if (abortController.signal.aborted) return;
           setError(
             err instanceof DOMException && err.name === 'AbortError'
               ? 'Dashboard took too long to load. Please check your connection.'
               : 'Something went wrong loading the dashboard.'
           );
         } finally {
-          setLoading(false);
+          if (!abortController.signal.aborted) setLoading(false);
         }
         return;
       }
@@ -285,7 +218,7 @@ export default function DashboardPage() {
         return;
       }
 
-      // Layer 3: SWR — hydrate from cache for instant display on return visits
+      // SWR — hydrate from cache for instant display on return visits
       const cached = getDashboardCache(activeCohortId);
       if (cached) {
         setStats(cached.stats);
@@ -303,159 +236,82 @@ export default function DashboardPage() {
         }
       }
 
-      // Layer 1+2: Fetch fresh data with per-query timeouts + partial data handling
-      // Each query is wrapped in safeQuery() so failures return fallbacks, never block others
-      const supabase = getClient();
-
+      // Single BFF call replaces 11 parallel client→server requests
       try {
-        const [
-          cohortResult,
-          attendanceResult,
-          rankingResult,
-          resourcesCountResult,
-          sessionsResult,
-          modulesResult,
-          resourcesResult,
-          invoicesResult,
-          learningAssetsResult,
-          leaderboardResult,
-          progressResult,
-        ] = await Promise.all([
-          // Supabase queries — each gets individual 10s timeout via safeQuery
-          safeQuery(
-            supabase.from('cohorts').select('*').eq('id', activeCohortId).single(),
-            { data: null, error: null, count: null, status: 0, statusText: '' }
-          ),
-          safeQuery(
-            supabase.from('attendance').select('attendance_percentage').eq('user_id', profile.id),
-            { data: null, error: null, count: null, status: 0, statusText: '' }
-          ),
-          safeQuery(
-            supabase.from('rankings').select('rank').eq('user_id', profile.id).eq('cohort_id', activeCohortId).single(),
-            { data: null, error: null, count: null, status: 0, statusText: '' }
-          ),
-          safeQuery(
-            supabase.from('resources').select('*', { count: 'exact', head: true }).eq('cohort_id', activeCohortId),
-            { data: null, error: null, count: 0, status: 0, statusText: '' }
-          ),
-          safeQuery(
-            supabase.from('sessions').select('*, session_cohorts!inner(cohort_id)').eq('session_cohorts.cohort_id', activeCohortId).gte('scheduled_at', new Date().toISOString()).order('scheduled_at', { ascending: true }).limit(3),
-            { data: null, error: null, count: null, status: 0, statusText: '' }
-          ),
-          safeQuery(
-            fetchRecentModules(activeCohortId),
-            { data: null, error: null, count: null, status: 0, statusText: '' }
-          ),
-          safeQuery(
-            supabase.from('resources').select('*').eq('cohort_id', activeCohortId).eq('type', 'file').order('created_at', { ascending: false }).limit(4),
-            { data: null, error: null, count: null, status: 0, statusText: '' }
-          ),
-          // API route calls — fetchWithTimeout + single catch at end for correct failed tracking
-          fetchWithTimeout('/api/invoices')
-            .then(r => r.ok ? r.json() : Promise.reject('not ok'))
-            .then(value => ({ value, failed: false }))
-            .catch(() => ({ value: { invoices: [], stats: { pending_amount: 0 } }, failed: true })),
-          fetchWithTimeout(`/api/learnings/recent?cohort_id=${activeCohortId}&limit=4`)
-            .then(r => r.ok ? r.json() : Promise.reject('not ok'))
-            .then(value => ({ value, failed: false }))
-            .catch(() => ({ value: { recent: [] }, failed: true })),
-          fetchWithTimeout(`/api/analytics?view=leaderboard&cohort_id=${activeCohortId}`)
-            .then(r => r.ok ? r.json() : Promise.reject('not ok'))
-            .then(value => ({ value, failed: false }))
-            .catch(() => ({ value: { cohortAvg: null }, failed: true })),
-          fetchWithTimeout('/api/learnings/progress')
-            .then(r => r.ok ? r.json() : Promise.reject('not ok'))
-            .then(value => ({ value, failed: false }))
-            .catch(() => ({ value: { progress: [] }, failed: true })),
-        ]);
+        const response = await fetchWithTimeout(
+          `/api/dashboard/student?cohort_id=${activeCohortId}`,
+          { signal: abortController.signal },
+          15_000
+        );
 
-        // Count how many queries failed (for error state decision)
-        const allResults = [
-          cohortResult, attendanceResult, rankingResult, resourcesCountResult,
-          sessionsResult, modulesResult, resourcesResult,
-          invoicesResult, learningAssetsResult, leaderboardResult, progressResult,
-        ];
-        const failCount = allResults.filter(r => r.failed).length;
+        if (abortController.signal.aborted) return;
 
-        // Process results — same logic as before, using .value from safeQuery
-        const completedCount = progressResult.value?.progress?.filter(
-          (p: { is_completed: boolean }) => p.is_completed
-        ).length || 0;
+        if (!response.ok) {
+          throw new Error(`BFF returned ${response.status}`);
+        }
 
-        const cohort = cohortResult.value?.data;
-        if (cohort) {
-          setCohortName(cohort.name);
-          if (cohort.start_date) {
-            setCohortStartDate(new Date(cohort.start_date));
+        const data: StudentDashboardResponse = await response.json();
+
+        // Hydrate state from BFF response
+        if (data.cohort) {
+          setCohortName(data.cohort.name);
+          if (data.cohort.start_date) {
+            setCohortStartDate(new Date(data.cohort.start_date));
           }
         }
 
-        const attendance = attendanceResult.value?.data;
-        const avgAttendance = attendance?.length
-          ? attendance.reduce((acc: number, a: { attendance_percentage: number | null }) => acc + (a.attendance_percentage || 0), 0) / attendance.length
-          : 0;
+        setStats(data.stats);
+        setUpcomingSessions(data.upcomingSessions);
+        setRecentModules(data.recentModules);
+        setRecentResources(data.recentResources);
+        setRecentLearningAssets(data.recentLearningAssets);
+        setInvoices(data.invoices);
+        setPendingInvoiceAmount(data.pendingInvoiceAmount);
 
-        const newStats: DashboardStats = {
-          total_students: leaderboardResult.value?.totalStudents ?? leaderboardResult.value?.leaderboard?.length ?? 0,
-          attendance_percentage: Math.round(avgAttendance),
-          current_rank: rankingResult.value?.data?.rank || null,
-          total_resources: resourcesCountResult.value?.count || 0,
-          cohort_avg: leaderboardResult.value?.cohortAvg ?? null,
-          completed_resources: completedCount,
-        };
-
-        const newSessions = sessionsResult.value?.data || [];
-        const newModules = modulesResult.value?.data || [];
-        const newResources = resourcesResult.value?.data || [];
-        const newInvoices = invoicesResult.value?.invoices || [];
-        const newPendingAmount = invoicesResult.value?.stats?.pending_amount || 0;
-        const newLearningAssets = learningAssetsResult.value?.recent || [];
-
-        // Update state
-        setStats(newStats);
-        setUpcomingSessions(newSessions);
-        setRecentModules(newModules);
-        setRecentResources(newResources);
-        setInvoices(newInvoices);
-        setPendingInvoiceAmount(newPendingAmount);
-        setRecentLearningAssets(newLearningAssets);
-
-        // Layer 3: Cache fresh results for future visits
+        // Cache fresh results for future visits
         setDashboardCache(activeCohortId, {
-          stats: newStats,
-          upcomingSessions: newSessions,
-          recentModules: newModules,
-          recentResources: newResources,
-          recentLearningAssets: newLearningAssets,
-          invoices: newInvoices,
-          pendingInvoiceAmount: newPendingAmount,
-          cohortStartDate: cohort?.start_date || null,
-          cohortName: cohort?.name || '',
+          stats: data.stats,
+          upcomingSessions: data.upcomingSessions,
+          recentModules: data.recentModules,
+          recentResources: data.recentResources,
+          recentLearningAssets: data.recentLearningAssets,
+          invoices: data.invoices,
+          pendingInvoiceAmount: data.pendingInvoiceAmount,
+          cohortStartDate: data.cohort?.start_date || null,
+          cohortName: data.cohort?.name || '',
         });
 
-        // If ALL queries failed and we had no cache, show error
-        if (failCount === allResults.length && !cached) {
+        // Partial failure handling via _meta
+        if (data._meta.failedQueries === data._meta.totalQueries && !cached) {
           setError('Unable to load dashboard. Please check your connection and try again.');
+        } else if (data._meta.failedQueries > 0) {
+          // Show stale banner for any partial failures (with or without cache)
+          setIsStale(true);
         } else {
           setError(null);
           setIsStale(false);
         }
       } catch (err) {
-        // Unexpected error (not individual query failures — those are caught by safeQuery)
-        console.error('Dashboard fetch error:', err);
+        if (abortController.signal.aborted) return;
         if (!cached) {
-          setError('Something went wrong loading your dashboard.');
+          setError(
+            err instanceof DOMException && err.name === 'AbortError'
+              ? 'Dashboard took too long to load. Please check your connection.'
+              : 'Something went wrong loading your dashboard.'
+          );
         } else {
           setIsStale(true);
         }
       } finally {
-        setLoading(false);
+        if (!abortController.signal.aborted) setLoading(false);
       }
     };
 
     if (!userLoading) {
       fetchDashboardData();
     }
+
+    return () => abortController.abort();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile, userLoading, activeCohortId, isAdmin, retryCount]);
 

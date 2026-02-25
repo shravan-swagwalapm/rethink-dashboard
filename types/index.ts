@@ -405,8 +405,18 @@ export interface CaseStudy {
   due_date: string | null;
   order_index: number;
   created_at: string;
+  // New submission module fields
+  end_week_number: number | null;
+  max_score: number;
+  grace_period_minutes: number;
+  submissions_closed: boolean;
+  is_archived: boolean;
+  leaderboard_published: boolean;
+  problem_updated_at: string | null;
   // Joined data (populated by API)
   solutions?: CaseStudySolution[];
+  submissions?: CaseStudySubmission[];
+  rubric_criteria?: RubricCriteria[];
 }
 
 export interface CaseStudySolution {
@@ -420,6 +430,93 @@ export interface CaseStudySolution {
   order_index: number;
   created_at: string;
 }
+
+// Case Study Submissions & Reviews
+export type SubmissionVisibility =
+  | 'draft'
+  | 'submitted'
+  | 'admin_reviewed'
+  | 'mentor_visible'
+  | 'subgroup_published'
+  | 'cohort_published';
+
+export interface CaseStudySubmission {
+  id: string;
+  case_study_id: string;
+  subgroup_id: string;
+  submitted_by: string | null;
+  submitted_at: string | null;
+  is_late: boolean;
+  deadline_override: string | null;
+  visibility: SubmissionVisibility;
+  created_at: string;
+  updated_at: string;
+  // Joined data
+  subgroup_name?: string;
+  submitted_by_name?: string;
+  attachments?: SubmissionAttachment[];
+  reviews?: CaseStudyReview[];
+  attachment_count?: number;
+  link_count?: number;
+}
+
+export interface SubmissionAttachment {
+  id: string;
+  submission_id: string;
+  type: 'file' | 'link';
+  file_path: string | null;
+  file_name: string | null;
+  file_size: number | null;
+  file_type: string | null;
+  link_url: string | null;
+  link_label: string | null;
+  uploaded_by: string;
+  created_at: string;
+  // Joined
+  uploaded_by_name?: string;
+}
+
+export interface CaseStudyReview {
+  id: string;
+  submission_id: string;
+  reviewer_id: string;
+  reviewer_role: 'admin' | 'mentor';
+  score: number | null;
+  comment: string | null;
+  overridden: boolean;
+  created_at: string;
+  updated_at: string;
+  // Joined
+  reviewer_name?: string;
+  rubric_scores?: RubricScore[];
+}
+
+export interface RubricCriteria {
+  id: string;
+  case_study_id: string;
+  label: string;
+  max_score: number;
+  order_index: number;
+  created_at: string;
+}
+
+export interface RubricScore {
+  id: string;
+  review_id: string;
+  criteria_id: string;
+  score: number;
+  comment: string | null;
+  // Joined
+  criteria_label?: string;
+  criteria_max_score?: number;
+}
+
+// Student-facing status (no internal state leaked)
+export type StudentSubmissionStatus =
+  | 'not_submitted'
+  | 'submitted'
+  | 'under_review'
+  | 'feedback_available';
 
 // Groups
 export interface Group {
@@ -558,6 +655,50 @@ export interface AdminDashboardLearning {
   cohortId: string;
   cohortName: string;
   cohortTag: string;
+}
+
+// Student BFF Dashboard Response
+export interface StudentDashboardResponse {
+  cohort: { name: string; start_date: string | null } | null;
+  stats: DashboardStats;
+  upcomingSessions: Session[];
+  recentModules: LearningModule[];
+  recentResources: Resource[];
+  recentLearningAssets: RecentLearningAssetSummary[];
+  invoices: InvoiceWithCohortSummary[];
+  pendingInvoiceAmount: number;
+  _meta: {
+    totalQueries: number;
+    failedQueries: number;
+    failedSections: string[];
+  };
+}
+
+export interface RecentLearningAssetSummary {
+  id: string;
+  module_id: string | null;
+  title: string;
+  description?: string | null;
+  content_type: ModuleResourceType;
+  google_drive_id: string | null;
+  external_url: string | null;
+  duration_seconds: number | null;
+  thumbnail_url: string | null;
+  order_index: number;
+  session_number: number | null;
+  created_at: string;
+  file_path?: string | null;
+  file_type?: string | null;
+  file_size?: number | null;
+  progress?: {
+    is_completed: boolean;
+    progress_seconds: number;
+    last_viewed_at: string | null;
+  };
+}
+
+export interface InvoiceWithCohortSummary extends Invoice {
+  cohort?: Cohort;
 }
 
 // API Response types
