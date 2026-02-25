@@ -56,9 +56,16 @@ function LoginContent() {
     }
   }, [searchParams]);
 
-  // Check for existing session
+  // Check for existing session (skip if user just signed out)
+  const justSignedOut = searchParams.get('signedout') === '1';
   useEffect(() => {
     const checkSession = async () => {
+      if (justSignedOut) {
+        // User just signed out — clear any leftover local session
+        // (handles flaky network where global signOut failed)
+        await supabase.auth.signOut({ scope: 'local' });
+        return;
+      }
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -79,7 +86,7 @@ function LoginContent() {
     });
 
     return () => subscription.unsubscribe();
-  }, [supabase, router]);
+  }, [supabase, router, justSignedOut]);
 
   // OTP expiry countdown
   useEffect(() => {

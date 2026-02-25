@@ -197,14 +197,19 @@ export function useUser() {
     setUser(null);
     setProfile(null);
 
+    const supabase = getClient();
     try {
-      const supabase = getClient();
-      // Use scope: 'global' to sign out from all sessions
+      // Try global sign out (revokes refresh token server-side)
       await supabase.auth.signOut({ scope: 'global' });
-      // Reset the client singleton to clear any cached session
-      resetClient();
     } catch {
-      // Always reset client even on error to ensure clean state
+      // Network failed — fall back to local-only sign out
+      // scope: 'local' clears localStorage tokens without needing network
+      try {
+        await supabase.auth.signOut({ scope: 'local' });
+      } catch {
+        // Ignore — resetClient below will recreate a clean client
+      }
+    } finally {
       resetClient();
     }
   };
