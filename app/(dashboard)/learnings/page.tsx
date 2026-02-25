@@ -35,6 +35,7 @@ import {
   AlertCircle,
   Download,
   Youtube,
+  RefreshCw,
 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { cn } from '@/lib/utils';
@@ -171,6 +172,8 @@ export default function LearningsPage() {
   const [modules, setModules] = useState<ModuleWithResources[]>([]);
   const [caseStudies, setCaseStudies] = useState<CaseStudy[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedResource, setSelectedResource] = useState<ModuleResource | null>(null);
   const [selectedCaseStudy, setSelectedCaseStudy] = useState<{
@@ -232,14 +235,22 @@ export default function LearningsPage() {
           }
 
           // Step 1: Fetch cohort state to determine active link
-          const { data: cohortData } = await supabase
+          const { data: cohortData, error: cohortError } = await supabase
             .from('cohorts')
             .select('id, active_link_type, linked_cohort_id')
             .eq('id', activeCohortId)
             .single();
 
-          if (!cohortData) {
-            throw new Error('Cohort not found');
+          if (cohortError || !cohortData) {
+            // Distinguish network failure from actual missing cohort
+            const isNetworkError = cohortError?.message?.includes('fetch') ||
+              cohortError?.message?.includes('network') ||
+              cohortError?.message?.includes('timeout') ||
+              cohortError?.code === 'PGRST116'; // PostgREST "not found" is a real missing row
+            if (!cohortError || isNetworkError) {
+              throw new Error('Unable to load your learnings. Please check your connection and try again.');
+            }
+            throw new Error('Cohort not found. Please contact your administrator.');
           }
 
           // Store for reuse by case studies query below
@@ -366,16 +377,24 @@ export default function LearningsPage() {
           setActiveWeek(firstWeek.toString());
         }
       } catch (error) {
-        console.error('Error fetching data:', error);
+        setFetchError(
+          error instanceof Error
+            ? error.message
+            : 'Something went wrong loading your learnings.'
+        );
       } finally {
         setLoading(false);
       }
     };
 
     if (!userLoading) {
+      // Reset loading on retry
+      if (retryCount > 0) setLoading(true);
+      setFetchError(null);
       fetchData();
     }
-  }, [profile, userLoading, activeCohortId, isAdmin]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile, userLoading, activeCohortId, isAdmin, retryCount]);
 
   // Organize content by week
   const weekContent: Record<number, WeekContent> = {};
@@ -1310,17 +1329,38 @@ export default function LearningsPage() {
       )}
 
       {weeks.length === 0 ? (
-        <div className="rounded-2xl border-2 border-dashed border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50 py-20">
-          <div className="flex flex-col items-center justify-center">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-teal-500 to-teal-600 flex items-center justify-center mb-4 shadow-lg shadow-teal-500/25">
-              <BookOpen className="w-8 h-8 text-white" />
+        fetchError ? (
+          <div className="rounded-2xl border-2 border-dashed border-amber-300 dark:border-amber-700 bg-amber-50/50 dark:bg-amber-950/20 py-20">
+            <div className="flex flex-col items-center justify-center">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center mb-4 shadow-lg shadow-amber-500/25">
+                <AlertCircle className="w-8 h-8 text-white" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">Unable to load learnings</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400 text-center max-w-sm mb-4">
+                {fetchError}
+              </p>
+              <Button
+                onClick={() => setRetryCount(c => c + 1)}
+                className="gap-2"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Try again
+              </Button>
             </div>
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">No content yet</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 text-center max-w-sm">
-              Learning content will appear here once your cohort begins. Stay tuned!
-            </p>
           </div>
-        </div>
+        ) : (
+          <div className="rounded-2xl border-2 border-dashed border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50 py-20">
+            <div className="flex flex-col items-center justify-center">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-teal-500 to-teal-600 flex items-center justify-center mb-4 shadow-lg shadow-teal-500/25">
+                <BookOpen className="w-8 h-8 text-white" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">No content yet</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400 text-center max-w-sm">
+                Learning content will appear here once your cohort begins. Stay tuned!
+              </p>
+            </div>
+          </div>
+        )
       ) : (
         <div className="space-y-6">
           {/* Continue Where You Left Off - Shows actual assets */}
