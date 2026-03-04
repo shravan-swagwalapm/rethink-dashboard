@@ -41,6 +41,7 @@ import { CaseStudyFormDialog } from './components/case-study-form-dialog';
 import type { CaseStudyFormData, PendingSolution } from './components/case-study-form-dialog';
 import { ResourceSection } from './components/resource-section';
 import { CaseStudySection } from './components/case-study-section';
+import { SubmissionDashboard } from './components/submission-dashboard';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { MotionContainer, MotionItem, MotionFadeIn } from '@/components/ui/motion';
 import { PageHeader } from '@/components/ui/page-header';
@@ -81,6 +82,9 @@ export default function LearningsPage() {
   // Preview modal
   const [previewResource, setPreviewResource] = useState<ModuleResource | null>(null);
   const [previewCaseStudy, setPreviewCaseStudy] = useState<{ url: string; title: string } | null>(null);
+
+  // Submission dashboard
+  const [submissionDashboardCs, setSubmissionDashboardCs] = useState<CaseStudy | null>(null);
 
   const hasFetchedCohortsRef = useRef(false);
 
@@ -170,6 +174,16 @@ export default function LearningsPage() {
       Promise.all([fetchModules(), fetchCaseStudies(), fetchCohortStats()]).finally(() => setLoading(false));
     }
   }, [selectedCohort, fetchModules, fetchCaseStudies, fetchCohortStats]);
+
+  // Sync submission dashboard with fresh case study data
+  useEffect(() => {
+    if (submissionDashboardCs) {
+      const fresh = caseStudies.find(cs => cs.id === submissionDashboardCs.id);
+      if (fresh) {
+        setSubmissionDashboardCs(fresh);
+      }
+    }
+  }, [caseStudies]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // --- Derived data ---
 
@@ -290,6 +304,8 @@ export default function LearningsPage() {
             problem_file_size: data.problem_file_size,
             solution_visible: data.solution_visible,
             due_date: data.due_date || null,
+            grace_period_minutes: data.grace_period_minutes,
+            max_score: data.max_score,
           }),
         });
         if (!response.ok) throw new Error('Failed to update case study');
@@ -308,6 +324,8 @@ export default function LearningsPage() {
             problem_file_size: data.problem_file_size,
             solution_visible: data.solution_visible,
             due_date: data.due_date || null,
+            grace_period_minutes: data.grace_period_minutes,
+            max_score: data.max_score,
           }),
         });
         if (!response.ok) throw new Error('Failed to create case study');
@@ -667,6 +685,7 @@ export default function LearningsPage() {
                 toast.error('Failed to load problem document');
               }
             }}
+            onViewSubmissions={(cs) => setSubmissionDashboardCs(cs)}
             onPreviewSolution={async (cs) => {
               if (!cs.solutions || cs.solutions.length === 0) return;
               const firstSolution = cs.solutions[0];
@@ -775,7 +794,7 @@ export default function LearningsPage() {
                 ? `Delete "${deleteTarget.title}"? All resources in it will also be deleted. This action cannot be undone.`
                 : deleteTarget?.type === 'resource'
                   ? `Delete "${deleteTarget.title}"? This action cannot be undone.`
-                  : `Delete "${deleteTarget?.title}"? This action cannot be undone.`
+                  : `Delete "${deleteTarget?.title}"? If it has submissions, they will be archived and can be restored. If no submissions exist, this is permanent.`
               }
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -800,6 +819,16 @@ export default function LearningsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Submission Dashboard */}
+      {submissionDashboardCs && (
+        <SubmissionDashboard
+          caseStudy={submissionDashboardCs}
+          open={!!submissionDashboardCs}
+          onClose={() => setSubmissionDashboardCs(null)}
+          onRefresh={() => fetchCaseStudies()}
+        />
+      )}
     </div>
   );
 }

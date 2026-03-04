@@ -27,6 +27,7 @@ import {
   Eye,
   EyeOff,
   Calendar,
+  Inbox,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import type { CaseStudy } from '@/types';
@@ -41,6 +42,7 @@ interface CaseStudySectionProps {
   onToggleVisibility: (caseStudy: CaseStudy) => void;
   onPreviewProblem: (caseStudy: CaseStudy) => void;
   onPreviewSolution: (caseStudy: CaseStudy) => void;
+  onViewSubmissions?: (caseStudy: CaseStudy) => void;
 }
 
 export function CaseStudySection({
@@ -53,6 +55,7 @@ export function CaseStudySection({
   onToggleVisibility,
   onPreviewProblem,
   onPreviewSolution,
+  onViewSubmissions,
 }: CaseStudySectionProps) {
   return (
     <Card className="border-2 dark:border-gray-800 dark:bg-gray-950/50 shadow-sm overflow-hidden">
@@ -157,6 +160,7 @@ export function CaseStudySection({
                       <Switch
                         checked={caseStudy.solution_visible}
                         onCheckedChange={() => onToggleVisibility(caseStudy)}
+                        aria-label={`Toggle solution visibility for ${caseStudy.title}`}
                       />
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -165,6 +169,12 @@ export function CaseStudySection({
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          {onViewSubmissions && (
+                            <DropdownMenuItem onClick={() => onViewSubmissions(caseStudy)}>
+                              <Inbox className="w-4 h-4 mr-2" />
+                              Submissions
+                            </DropdownMenuItem>
+                          )}
                           <DropdownMenuItem onClick={() => onEdit(caseStudy)}>
                             <Pencil className="w-4 h-4 mr-2" />
                             Edit

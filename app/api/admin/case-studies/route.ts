@@ -121,6 +121,9 @@ export async function POST(request: NextRequest) {
         solution_visible: solution_visible || false,
         due_date: due_date || null,
         order_index: order_index || 0,
+        end_week_number: body.end_week_number ?? null,
+        max_score: body.max_score ?? 100,
+        grace_period_minutes: body.grace_period_minutes ?? 5,
       })
       .select()
       .single();
@@ -162,6 +165,16 @@ export async function PUT(request: NextRequest) {
     if (updates.solution_visible !== undefined) updateData.solution_visible = updates.solution_visible;
     if (updates.due_date !== undefined) updateData.due_date = updates.due_date;
     if (updates.order_index !== undefined) updateData.order_index = updates.order_index;
+    if (updates.end_week_number !== undefined) updateData.end_week_number = updates.end_week_number;
+    if (updates.max_score !== undefined) updateData.max_score = updates.max_score;
+    if (updates.grace_period_minutes !== undefined) updateData.grace_period_minutes = updates.grace_period_minutes;
+    if (updates.submissions_closed !== undefined) updateData.submissions_closed = updates.submissions_closed;
+    if (updates.is_archived !== undefined) updateData.is_archived = updates.is_archived;
+    if (updates.leaderboard_published !== undefined) updateData.leaderboard_published = updates.leaderboard_published;
+
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
+    }
 
     const { data: caseStudy, error } = await adminClient
       .from('case_studies')
@@ -196,6 +209,29 @@ export async function DELETE(request: NextRequest) {
 
     const adminClient = await createAdminClient();
 
+    // Check if submissions exist — if so, archive instead of hard delete
+    const { count: submissionCount } = await adminClient
+      .from('case_study_submissions')
+      .select('id', { count: 'exact', head: true })
+      .eq('case_study_id', id);
+
+    if (submissionCount && submissionCount > 0) {
+      // Archive (soft delete) — preserve all submissions and reviews
+      const { error: archiveError } = await adminClient
+        .from('case_studies')
+        .update({ is_archived: true })
+        .eq('id', id);
+
+      if (archiveError) throw archiveError;
+
+      return NextResponse.json({
+        success: true,
+        archived: true,
+        message: `Case study archived (has ${submissionCount} submission(s))`,
+      });
+    }
+
+    // No submissions — safe to hard delete
     // Fetch case study's problem file path
     const { data: caseStudy, error: csError } = await adminClient
       .from('case_studies')
@@ -238,7 +274,6 @@ export async function DELETE(request: NextRequest) {
 
       if (storageError) {
         console.error('Error deleting storage files:', storageError);
-        // Continue with DB deletion even if storage cleanup fails
       }
     }
 
@@ -250,7 +285,7 @@ export async function DELETE(request: NextRequest) {
 
     if (error) throw error;
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, archived: false });
   } catch (error) {
     console.error('Error deleting case study:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

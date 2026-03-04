@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef, useCallback } from 'react';
+import { z } from 'zod';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -45,6 +46,8 @@ export interface CaseStudyFormData {
   problem_file_size: number | null;
   solution_visible: boolean;
   due_date: string;
+  grace_period_minutes: number;
+  max_score: number;
 }
 
 export interface PendingSolution {
@@ -229,6 +232,8 @@ export function CaseStudyFormDialog({
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [dueDate, setDueDate] = useState('');
+  const [gracePeriod, setGracePeriod] = useState('5');
+  const [maxScore, setMaxScore] = useState('100');
   const [solutionVisible, setSolutionVisible] = useState(false);
 
   // Problem PDF state
@@ -282,7 +287,9 @@ export function CaseStudyFormDialog({
     if (open && editingCaseStudy) {
       setTitle(editingCaseStudy.title);
       setDescription(editingCaseStudy.description || '');
-      setDueDate(editingCaseStudy.due_date ? editingCaseStudy.due_date.split('T')[0] : '');
+      setDueDate(editingCaseStudy.due_date ? editingCaseStudy.due_date.slice(0, 16) : '');
+      setGracePeriod((editingCaseStudy as unknown as Record<string, unknown>).grace_period_minutes?.toString() ?? '5');
+      setMaxScore(editingCaseStudy.max_score?.toString() ?? '100');
       setSolutionVisible(editingCaseStudy.solution_visible);
       setProblemFilePath(editingCaseStudy.problem_file_path || null);
       setProblemFileSize(editingCaseStudy.problem_file_size || null);
@@ -315,6 +322,8 @@ export function CaseStudyFormDialog({
       setTitle('');
       setDescription('');
       setDueDate('');
+      setGracePeriod('5');
+      setMaxScore('100');
       setSolutionVisible(false);
       setProblemFilePath(null);
       setProblemFileSize(null);
@@ -407,15 +416,44 @@ export function CaseStudyFormDialog({
     );
   }, []);
 
-  const removeSolution = useCallback((key: string) => {
+  const removeSolution = useCallback(async (key: string) => {
+    const sol = solutions.find(s => s.key === key);
+    if (sol?.existingId) {
+      // Delete from server first
+      try {
+        const res = await fetch(
+          `/api/admin/case-studies/${editingCaseStudy?.id}/solutions?solution_id=${sol.existingId}`,
+          { method: 'DELETE' }
+        );
+        if (!res.ok) {
+          toast.error('Failed to delete solution');
+          return;
+        }
+      } catch {
+        toast.error('Failed to delete solution');
+        return;
+      }
+    }
     setSolutions((prev) => prev.filter((s) => s.key !== key));
-  }, []);
+  }, [solutions, editingCaseStudy?.id]);
 
   // ── Upload all files then save ──────────────────────────────────────────
 
+  const caseStudySchema = z.object({
+    title: z.string().min(1, 'Title is required'),
+    max_score: z.number().int().min(1, 'Min score is 1').max(1000, 'Max score is 1000'),
+    grace_period_minutes: z.number().int().min(0).max(60, 'Max grace period is 60 minutes'),
+  });
+
   const handleSubmit = async () => {
-    if (!title.trim()) {
-      toast.error('Title is required');
+    const parsed = caseStudySchema.safeParse({
+      title: title.trim(),
+      max_score: parseInt(maxScore) || 0,
+      grace_period_minutes: parseInt(gracePeriod) || 0,
+    });
+
+    if (!parsed.success) {
+      toast.error(parsed.error.issues[0].message);
       return;
     }
 
@@ -495,6 +533,8 @@ export function CaseStudyFormDialog({
         problem_file_size: finalProblemSize,
         solution_visible: solutionVisible,
         due_date: dueDate,
+        grace_period_minutes: parseInt(gracePeriod) || 5,
+        max_score: parseInt(maxScore) || 100,
       };
 
       onSave(formData, pendingSolutions.length > 0 ? pendingSolutions : undefined);
@@ -833,21 +873,58 @@ export function CaseStudyFormDialog({
             )}
           </div>
 
-          {/* ── Due Date & Solution Visibility ─────────────────────────── */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          {/* ── Max Score, Due Date, Grace Period & Solution Visibility ── */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            <div className="space-y-2">
+              <Label htmlFor="cs-max-score" className="dark:text-gray-300 font-medium">
+                Max Score
+              </Label>
+              <Input
+                id="cs-max-score"
+                type="number"
+                min={1}
+                max={1000}
+                value={maxScore}
+                onChange={(e) => setMaxScore(e.target.value)}
+                className="dark:bg-gray-950 dark:border-gray-700 dark:text-white h-11 text-base"
+              />
+              <p className="text-xs text-muted-foreground dark:text-gray-500">
+                Maximum possible score (1–1000)
+              </p>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="cs-due" className="dark:text-gray-300 font-medium">
-                Due Date
+                Due Date & Time
               </Label>
               <Input
                 id="cs-due"
-                type="date"
+                type="datetime-local"
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
                 className="dark:bg-gray-950 dark:border-gray-700 dark:text-white h-11 text-base"
               />
               <p className="text-xs text-muted-foreground dark:text-gray-500">
-                Optional submission deadline
+                Optional submission deadline (IST)
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cs-grace" className="dark:text-gray-300 font-medium">
+                Grace Period
+              </Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="cs-grace"
+                  type="number"
+                  min={0}
+                  max={60}
+                  value={gracePeriod}
+                  onChange={(e) => setGracePeriod(e.target.value)}
+                  className="dark:bg-gray-950 dark:border-gray-700 dark:text-white h-11 text-base w-20"
+                />
+                <span className="text-sm text-muted-foreground dark:text-gray-500">minutes</span>
+              </div>
+              <p className="text-xs text-muted-foreground dark:text-gray-500">
+                Late submissions accepted within grace
               </p>
             </div>
             <div className="space-y-2">
