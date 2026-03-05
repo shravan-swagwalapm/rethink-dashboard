@@ -198,20 +198,36 @@ export function useUser() {
     setProfile(null);
 
     const supabase = getClient();
-    try {
-      // Try global sign out (revokes refresh token server-side)
-      await supabase.auth.signOut({ scope: 'global' });
-    } catch {
-      // Network failed — fall back to local-only sign out
-      // scope: 'local' clears localStorage tokens without needing network
-      try {
-        await supabase.auth.signOut({ scope: 'local' });
-      } catch {
-        // Ignore — resetClient below will recreate a clean client
-      }
-    } finally {
-      resetClient();
+
+    // supabase.auth.signOut() returns { error }, it does NOT throw.
+    // When scope: 'global' fails (network error), Supabase skips _removeSession()
+    // internally — auth cookies are never cleared. We must handle this explicitly.
+    const { error } = await supabase.auth.signOut({ scope: 'global' });
+
+    if (error) {
+      // Global failed (network issue) — force local cleanup
+      await supabase.auth.signOut({ scope: 'local' });
     }
+
+    // Nuclear fallback: manually clear Supabase auth cookies.
+    // Even scope: 'local' can fail to clear cookies if the Supabase client
+    // is in a bad state. Belt-and-suspenders: wipe them ourselves.
+    if (typeof document !== 'undefined') {
+      document.cookie.split(';').forEach((c) => {
+        const name = c.trim().split('=')[0];
+        if (name.startsWith('sb-') || name === 'supabase-auth-token') {
+          document.cookie = `${name}=; max-age=0; path=/`;
+        }
+      });
+      // Also clear localStorage keys used by Supabase
+      Object.keys(localStorage).forEach((key) => {
+        if (key.startsWith('sb-') || key.includes('supabase')) {
+          localStorage.removeItem(key);
+        }
+      });
+    }
+
+    resetClient();
   };
 
   const refreshProfile = async (): Promise<boolean> => {

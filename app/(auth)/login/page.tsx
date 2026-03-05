@@ -61,9 +61,28 @@ function LoginContent() {
   useEffect(() => {
     const checkSession = async () => {
       if (justSignedOut) {
-        // User just signed out — clear any leftover local session
-        // (handles flaky network where global signOut failed)
+        // User just signed out — force-clear any leftover session.
+        // scope: 'local' clears client-side tokens without network.
         await supabase.auth.signOut({ scope: 'local' });
+
+        // Also manually clear cookies/localStorage as nuclear fallback
+        // (Supabase's signOut can skip cleanup in edge cases)
+        if (typeof document !== 'undefined') {
+          document.cookie.split(';').forEach((c) => {
+            const name = c.trim().split('=')[0];
+            if (name.startsWith('sb-') || name === 'supabase-auth-token') {
+              document.cookie = `${name}=; max-age=0; path=/`;
+            }
+          });
+          Object.keys(localStorage).forEach((key) => {
+            if (key.startsWith('sb-') || key.includes('supabase')) {
+              localStorage.removeItem(key);
+            }
+          });
+        }
+
+        // Clean the URL so refresh doesn't re-trigger cleanup
+        window.history.replaceState({}, '', '/login');
         return;
       }
       const {
@@ -75,10 +94,13 @@ function LoginContent() {
     };
     checkSession();
 
-    // Listen for auth state changes
+    // Listen for auth state changes — but NOT when user just signed out.
+    // Without this guard, the middleware can refresh cookies before the login
+    // page loads, triggering SIGNED_IN and bouncing the user back to dashboard.
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
+      if (justSignedOut) return;
       if (event === 'SIGNED_IN' && session) {
         toast.success('Signed in successfully!');
         router.push('/dashboard');

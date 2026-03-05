@@ -115,9 +115,19 @@ function AdminLayoutInner({
           variant="ghost"
           className="w-full justify-start gap-2 m-2 mt-3 text-red-500 hover:text-red-600 hover:bg-red-500/10"
           size="sm"
-          onClick={async () => {
-            await signOut();
-            router.push('/login');
+          onClick={() => {
+            const forceRedirectTimeout = setTimeout(() => {
+              window.location.href = '/login?signedout=1';
+            }, 2000);
+            signOut()
+              .then(() => {
+                clearTimeout(forceRedirectTimeout);
+                window.location.href = '/login?signedout=1';
+              })
+              .catch(() => {
+                clearTimeout(forceRedirectTimeout);
+                window.location.href = '/login?signedout=1';
+              });
           }}
         >
           <LogOut className="w-4 h-4" />
