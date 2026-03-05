@@ -271,6 +271,15 @@
   --elevation-2: hsl(228 22% 13%);
   --elevation-3: hsl(228 22% 16%);
 
+  /* Quiet Power — warm-tinted surfaces for premium depth */
+  --qp-surface-0: hsl(230 18% 8%);
+  --qp-surface-1: hsl(228 16% 12%);
+  --qp-surface-2: hsl(226 14% 16%);
+  --qp-surface-3: hsl(224 12% 20%);
+  --qp-divider: hsl(220 10% 90% / 0.07);
+  --qp-hover: hsl(220 10% 90% / 0.04);
+  --qp-accent-bar: 2px;
+
   /* Gradients */
   --gradient-from: hsl(172 60% 42%);
   --gradient-via: hsl(190 65% 45%);
@@ -670,6 +679,156 @@
   .dark .dot-pattern {
     background-image: radial-gradient(hsl(0 0% 100% / 0.03) 1px, transparent 1px);
   }
+
+  /* --- Noise Grain Texture (Quiet Power) --- */
+  .surface-grain {
+    position: relative;
+    isolation: isolate;
+  }
+  .surface-grain::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    opacity: 0.035;
+    pointer-events: none;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-size: 256px 256px;
+  }
+
+  /* --- Progress Bar Shimmer --- */
+  .progress-shimmer {
+    position: relative;
+    overflow: hidden;
+  }
+  .progress-shimmer::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      hsl(0 0% 100% / 0.25) 50%,
+      transparent 100%
+    );
+    animation: progress-shimmer 2s ease-in-out infinite;
+  }
+  @keyframes progress-shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+  }
+
+  /* --- Circular Progress Ring --- */
+  .progress-ring-circle {
+    transition: stroke-dashoffset 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+    transform: rotate(-90deg);
+    transform-origin: 50% 50%;
+  }
+
+  /* --- Icon Badge (small tinted circle for content-type icons) --- */
+  .icon-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    flex-shrink: 0;
+  }
+
+  /* --- Empty State Pulse --- */
+  @keyframes gentle-pulse {
+    0%, 100% { opacity: 0.4; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(1.05); }
+  }
+  .empty-pulse {
+    animation: gentle-pulse 3s ease-in-out infinite;
+  }
+
+  /* --- 3D Haptic Card --- */
+  .card-3d {
+    position: relative;
+    border-top: 1px solid hsl(0 0% 100% / 0.1);
+    border-bottom: 1px solid hsl(0 0% 0% / 0.3);
+    box-shadow:
+      /* Ambient shadow — soft spread */
+      0 2px 8px hsl(0 0% 0% / 0.25),
+      /* Directional shadow — depth */
+      0 8px 24px hsl(0 0% 0% / 0.2),
+      /* Inner top highlight — raised edge */
+      inset 0 1px 0 hsl(0 0% 100% / 0.06);
+    transition: transform 0.2s cubic-bezier(0.33, 1, 0.68, 1),
+                box-shadow 0.2s cubic-bezier(0.33, 1, 0.68, 1);
+  }
+  .card-3d:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      0 4px 12px hsl(0 0% 0% / 0.3),
+      0 12px 32px hsl(0 0% 0% / 0.25),
+      inset 0 1px 0 hsl(0 0% 100% / 0.08);
+  }
+  .card-3d:active {
+    transform: translateY(1px);
+    box-shadow:
+      0 1px 4px hsl(0 0% 0% / 0.3),
+      0 4px 12px hsl(0 0% 0% / 0.2),
+      inset 0 1px 0 hsl(0 0% 100% / 0.04);
+    transition-duration: 0.1s;
+  }
+
+  /* Non-interactive variant — hover lifts but no active press */
+  .card-3d-static {
+    position: relative;
+    border-top: 1px solid hsl(0 0% 100% / 0.1);
+    border-bottom: 1px solid hsl(0 0% 0% / 0.3);
+    box-shadow:
+      0 2px 8px hsl(0 0% 0% / 0.25),
+      0 8px 24px hsl(0 0% 0% / 0.2),
+      inset 0 1px 0 hsl(0 0% 100% / 0.06);
+  }
+
+  /* --- Banner Animations — Cosmic Star Field --- */
+
+  /* Star parallax drift — seamless loop via duplicate layers */
+  @keyframes star-drift-right {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(100%); }
+  }
+  @keyframes star-drift-left {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-100%); }
+  }
+
+  /* Star twinkle — subtle opacity pulse */
+  @keyframes star-twinkle {
+    0%, 100% { opacity: var(--tw-opacity, 0.3); }
+    50% { opacity: calc(var(--tw-opacity, 0.3) * 2.5); }
+  }
+
+  /* Nebula color clouds — slow drift */
+  @keyframes nebula-drift {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    33% { transform: translate(-20px, 15px) scale(1.05); }
+    66% { transform: translate(15px, -10px) scale(0.95); }
+  }
+
+  /* Shooting star — streak across the banner */
+  @keyframes shooting-star {
+    0% { transform: translateX(0) translateY(0); opacity: 0; }
+    2% { opacity: 1; }
+    15% { transform: translateX(1400px) translateY(80px); opacity: 0; }
+    100% { transform: translateX(1400px) translateY(80px); opacity: 0; }
+  }
+
+  /* --- Accent bar utility (left border bookmark) --- */
+  .accent-bar-teal { border-left: var(--qp-accent-bar) solid hsl(172 60% 42%); }
+  .accent-bar-orange { border-left: var(--qp-accent-bar) solid hsl(25 90% 55%); }
+  .accent-bar-blue { border-left: var(--qp-accent-bar) solid hsl(210 80% 55%); }
+  .accent-bar-emerald { border-left: var(--qp-accent-bar) solid hsl(152 55% 45%); }
+  .accent-bar-amber { border-left: var(--qp-accent-bar) solid hsl(38 85% 52%); }
+  .accent-bar-violet { border-left: var(--qp-accent-bar) solid hsl(280 55% 55%); }
 
   /* --- Grid Pattern --- */
   .grid-pattern {

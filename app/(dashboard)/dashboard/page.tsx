@@ -5,153 +5,68 @@ import { useRouter } from 'next/navigation';
 import { useUserContext } from '@/contexts/user-context';
 import { WelcomeBanner } from '@/components/dashboard/welcome-banner';
 import { StatsCards } from '@/components/dashboard/stats-cards';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { StudentPageLoader } from '@/components/ui/page-loader';
-import { Calendar, Clock, Video, ChevronRight, BookOpen, FolderOpen, Shield, Presentation, FileText, ExternalLink, AlertCircle, RefreshCw } from 'lucide-react';
+import {
+  Calendar, Clock, Video, ChevronRight, BookOpen, FolderOpen, Shield,
+  Presentation, FileText, ExternalLink, AlertCircle, RefreshCw, CheckCircle2,
+  Link2, FileDown, CalendarOff, Sparkles,
+} from 'lucide-react';
 import { fetchWithTimeout } from '@/lib/fetch-with-timeout';
 import Link from 'next/link';
 import { format, isToday, isTomorrow, parseISO } from 'date-fns';
 import { InvoiceCard } from '@/components/dashboard/invoice-card';
 import { toast } from 'sonner';
-import { MotionContainer, MotionItem, MotionFadeIn } from '@/components/ui/motion';
+import { MotionFadeIn, MotionContainer, MotionItem } from '@/components/ui/motion';
 import type { Session, DashboardStats, LearningModule, Resource, Invoice, Cohort, ModuleResource, ModuleResourceType, AdminDashboardStats, AdminDashboardSession, AdminDashboardLearning, StudentDashboardResponse } from '@/types';
 
-interface InvoiceWithCohort extends Invoice {
-  cohort?: Cohort;
-}
-
+interface InvoiceWithCohort extends Invoice { cohort?: Cohort; }
 interface RecentLearningAsset extends ModuleResource {
-  progress?: {
-    is_completed: boolean;
-    progress_seconds: number;
-    last_viewed_at: string | null;
-  };
+  progress?: { is_completed: boolean; progress_seconds: number; last_viewed_at: string | null; };
 }
 
-// ─── SWR Cache for instant return visits ────────────────────────────
+// --- SWR Cache ---
 const DASHBOARD_CACHE_KEY = 'rethink-dashboard-v2-';
-const CACHE_MAX_AGE = 5 * 60 * 1000; // 5 minutes
-
+const CACHE_MAX_AGE = 5 * 60 * 1000;
 interface DashboardCache {
-  timestamp: number;
-  stats: DashboardStats | null;
-  upcomingSessions: Session[];
-  recentModules: LearningModule[];
-  recentResources: Resource[];
-  recentLearningAssets: RecentLearningAsset[];
-  invoices: InvoiceWithCohort[];
-  pendingInvoiceAmount: number;
-  cohortStartDate: string | null;
-  cohortName: string;
+  timestamp: number; stats: DashboardStats | null; upcomingSessions: Session[];
+  recentModules: LearningModule[]; recentResources: Resource[];
+  recentLearningAssets: RecentLearningAsset[]; invoices: InvoiceWithCohort[];
+  pendingInvoiceAmount: number; cohortStartDate: string | null; cohortName: string;
 }
-
 function getDashboardCache(cohortId: string): DashboardCache | null {
-  try {
-    const raw = localStorage.getItem(`${DASHBOARD_CACHE_KEY}${cohortId}`);
-    if (!raw) return null;
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
+  try { const raw = localStorage.getItem(`${DASHBOARD_CACHE_KEY}${cohortId}`); return raw ? JSON.parse(raw) : null; } catch { return null; }
 }
-
 function setDashboardCache(cohortId: string, data: Omit<DashboardCache, 'timestamp'>) {
-  try {
-    localStorage.setItem(
-      `${DASHBOARD_CACHE_KEY}${cohortId}`,
-      JSON.stringify({ ...data, timestamp: Date.now() })
-    );
-  } catch {
-    // localStorage full or unavailable — non-critical
-  }
+  try { localStorage.setItem(`${DASHBOARD_CACHE_KEY}${cohortId}`, JSON.stringify({ ...data, timestamp: Date.now() })); } catch {}
 }
 
-
-// Helper function to get icon for content type
-function getContentIcon(type: ModuleResourceType) {
-  switch (type) {
-    case 'video':
-      return Video;
-    case 'slides':
-      return Presentation;
-    case 'document':
-      return FileText;
-    case 'link':
-      return ExternalLink;
-    default:
-      return BookOpen;
-  }
-}
-
-// Helper function to get gradient colors for content type
-function getContentGradient(type: ModuleResourceType): { from: string; to: string; bg: string; hover: string; darkFrom: string; darkTo: string; darkHover: string } {
-  switch (type) {
-    case 'video':
-      return {
-        from: 'from-teal-500',
-        to: 'to-teal-600',
-        bg: 'bg-teal-500/10',
-        hover: 'hover:from-teal-50 hover:to-teal-100',
-        darkFrom: 'dark:from-teal-600',
-        darkTo: 'dark:to-teal-700',
-        darkHover: 'dark:hover:from-teal-950/30 dark:hover:to-teal-950/40',
-      };
-    case 'slides':
-      return {
-        from: 'from-orange-500',
-        to: 'to-orange-600',
-        bg: 'bg-orange-500/10',
-        hover: 'hover:from-orange-50 hover:to-orange-100',
-        darkFrom: 'dark:from-orange-600',
-        darkTo: 'dark:to-orange-700',
-        darkHover: 'dark:hover:from-orange-950/30 dark:hover:to-orange-950/40',
-      };
-    case 'document':
-      return {
-        from: 'from-teal-500',
-        to: 'to-teal-600',
-        bg: 'bg-teal-500/10',
-        hover: 'hover:from-teal-50 hover:to-teal-100',
-        darkFrom: 'dark:from-teal-600',
-        darkTo: 'dark:to-teal-700',
-        darkHover: 'dark:hover:from-teal-950/30 dark:hover:to-teal-950/40',
-      };
-    default:
-      return {
-        from: 'from-gray-500',
-        to: 'to-gray-600',
-        bg: 'bg-gray-500/10',
-        hover: 'hover:from-gray-50 hover:to-gray-100',
-        darkFrom: 'dark:from-gray-600',
-        darkTo: 'dark:to-gray-700',
-        darkHover: 'dark:hover:from-gray-950/30 dark:hover:to-gray-950/40',
-      };
-  }
-}
-
-// Helper function to get content type label
+// --- Helpers ---
 function getContentTypeLabel(type: ModuleResourceType): string {
-  switch (type) {
-    case 'video':
-      return 'Recording';
-    case 'slides':
-      return 'Presentation';
-    case 'document':
-      return 'Document';
-    case 'link':
-      return 'Link';
-    default:
-      return 'Resource';
-  }
+  switch (type) { case 'video': return 'Recording'; case 'slides': return 'Presentation'; case 'document': return 'Document'; case 'link': return 'Link'; default: return 'Resource'; }
+}
+function getAccentBarClass(type: ModuleResourceType): string {
+  switch (type) { case 'video': return 'accent-bar-teal'; case 'slides': return 'accent-bar-orange'; case 'document': return 'accent-bar-blue'; case 'link': return 'accent-bar-emerald'; default: return 'accent-bar-teal'; }
+}
+function getAccentColor(type: ModuleResourceType): string {
+  switch (type) { case 'video': return 'hsl(172 55% 58%)'; case 'slides': return 'hsl(25 80% 62%)'; case 'document': return 'hsl(210 70% 65%)'; case 'link': return 'hsl(152 50% 55%)'; default: return 'hsl(220 10% 55%)'; }
+}
+function getContentTypeIcon(type: ModuleResourceType) {
+  switch (type) { case 'video': return Video; case 'slides': return Presentation; case 'document': return FileText; case 'link': return Link2; default: return FileText; }
+}
+function getFileTypeIcon(fileType?: string | null) {
+  const ext = (fileType || '').toLowerCase();
+  if (ext === 'pdf') return { icon: FileDown, color: 'hsl(0 65% 55%)', bg: 'hsl(0 65% 55% / 0.1)' };
+  if (['doc', 'docx'].includes(ext)) return { icon: FileText, color: 'hsl(210 70% 60%)', bg: 'hsl(210 70% 60% / 0.1)' };
+  if (['ppt', 'pptx'].includes(ext)) return { icon: Presentation, color: 'hsl(25 80% 55%)', bg: 'hsl(25 80% 55% / 0.1)' };
+  return { icon: FileText, color: 'hsl(220 12% 55%)', bg: 'hsl(220 12% 55% / 0.1)' };
 }
 
 export default function DashboardPage() {
   const router = useRouter();
   const { profile, loading: userLoading, isAdmin, activeCohortId } = useUserContext();
   const [stats, setStats] = useState<DashboardStats | null>(null);
-
   const [upcomingSessions, setUpcomingSessions] = useState<Session[]>([]);
   const [recentModules, setRecentModules] = useState<LearningModule[]>([]);
   const [recentResources, setRecentResources] = useState<Resource[]>([]);
@@ -164,709 +79,401 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [isStale, setIsStale] = useState(false);
-
-  // Admin-specific state
   const [adminStats, setAdminStats] = useState<AdminDashboardStats | null>(null);
   const [adminSessions, setAdminSessions] = useState<AdminDashboardSession[]>([]);
   const [adminLearnings, setAdminLearnings] = useState<AdminDashboardLearning[]>([]);
 
   useEffect(() => {
-    // AbortController prevents stale data from wrong cohort when user switches quickly
-    const abortController = new AbortController();
+    const ac = new AbortController();
+    const fetchData = async () => {
+      if (!profile) { setLoading(false); return; }
+      if (retryCount > 0 && !getDashboardCache(activeCohortId || '')) setLoading(true);
 
-    const fetchDashboardData = async () => {
-      if (!profile) {
-        setLoading(false);
-        return;
-      }
-
-      // Reset loading on retry (unless we have cached data to show)
-      if (retryCount > 0 && !getDashboardCache(activeCohortId || '')) {
-        setLoading(true);
-      }
-
-      // ── Admin path (simple: one API call with timeout) ──
       if (isAdmin) {
         try {
-          const response = await fetchWithTimeout('/api/admin/dashboard-stats', { signal: abortController.signal });
-          if (abortController.signal.aborted) return;
-          if (response.ok) {
-            const data = await response.json();
-            setAdminStats(data.stats);
-            setAdminSessions(data.upcomingSessions || []);
-            setAdminLearnings(data.recentLearnings || []);
-            setError(null);
-          } else {
-            setError('Failed to load admin dashboard. The server returned an error.');
-          }
-        } catch (err) {
-          if (abortController.signal.aborted) return;
-          setError(
-            err instanceof DOMException && err.name === 'AbortError'
-              ? 'Dashboard took too long to load. Please check your connection.'
-              : 'Something went wrong loading the dashboard.'
-          );
-        } finally {
-          if (!abortController.signal.aborted) setLoading(false);
-        }
+          const res = await fetchWithTimeout('/api/admin/dashboard-stats', { signal: ac.signal });
+          if (ac.signal.aborted) return;
+          if (res.ok) { const d = await res.json(); setAdminStats(d.stats); setAdminSessions(d.upcomingSessions || []); setAdminLearnings(d.recentLearnings || []); setError(null); }
+          else setError('Failed to load admin dashboard.');
+        } catch (err) { if (ac.signal.aborted) return; setError('Something went wrong loading the dashboard.'); }
+        finally { if (!ac.signal.aborted) setLoading(false); }
         return;
       }
+      if (!activeCohortId) { setLoading(false); return; }
 
-      // ── Student path ──
-      if (!activeCohortId) {
-        setLoading(false);
-        return;
-      }
-
-      // SWR — hydrate from cache for instant display on return visits
       const cached = getDashboardCache(activeCohortId);
       if (cached) {
-        setStats(cached.stats);
-        setUpcomingSessions(cached.upcomingSessions);
-        setRecentModules(cached.recentModules);
-        setRecentResources(cached.recentResources);
-        setRecentLearningAssets(cached.recentLearningAssets);
-        setInvoices(cached.invoices);
-        setPendingInvoiceAmount(cached.pendingInvoiceAmount);
+        setStats(cached.stats); setUpcomingSessions(cached.upcomingSessions); setRecentModules(cached.recentModules);
+        setRecentResources(cached.recentResources); setRecentLearningAssets(cached.recentLearningAssets);
+        setInvoices(cached.invoices); setPendingInvoiceAmount(cached.pendingInvoiceAmount);
         if (cached.cohortStartDate) setCohortStartDate(new Date(cached.cohortStartDate));
-        setCohortName(cached.cohortName);
-        setLoading(false); // Show cached dashboard immediately
-        if (Date.now() - cached.timestamp > CACHE_MAX_AGE) {
-          setIsStale(true);
-        }
+        setCohortName(cached.cohortName); setLoading(false);
+        if (Date.now() - cached.timestamp > CACHE_MAX_AGE) setIsStale(true);
       }
 
-      // Single BFF call replaces 11 parallel client→server requests
       try {
-        const response = await fetchWithTimeout(
-          `/api/dashboard/student?cohort_id=${activeCohortId}`,
-          { signal: abortController.signal },
-          15_000
-        );
-
-        if (abortController.signal.aborted) return;
-
-        if (!response.ok) {
-          throw new Error(`BFF returned ${response.status}`);
-        }
-
-        const data: StudentDashboardResponse = await response.json();
-
-        // Hydrate state from BFF response
-        if (data.cohort) {
-          setCohortName(data.cohort.name);
-          if (data.cohort.start_date) {
-            setCohortStartDate(new Date(data.cohort.start_date));
-          }
-        }
-
-        setStats(data.stats);
-        setUpcomingSessions(data.upcomingSessions);
-        setRecentModules(data.recentModules);
-        setRecentResources(data.recentResources);
-        setRecentLearningAssets(data.recentLearningAssets);
-        setInvoices(data.invoices);
-        setPendingInvoiceAmount(data.pendingInvoiceAmount);
-
-        // Cache fresh results for future visits
-        setDashboardCache(activeCohortId, {
-          stats: data.stats,
-          upcomingSessions: data.upcomingSessions,
-          recentModules: data.recentModules,
-          recentResources: data.recentResources,
-          recentLearningAssets: data.recentLearningAssets,
-          invoices: data.invoices,
-          pendingInvoiceAmount: data.pendingInvoiceAmount,
-          cohortStartDate: data.cohort?.start_date || null,
-          cohortName: data.cohort?.name || '',
-        });
-
-        // Partial failure handling via _meta
-        if (data._meta.failedQueries === data._meta.totalQueries && !cached) {
-          setError('Unable to load dashboard. Please check your connection and try again.');
-        } else if (data._meta.failedQueries > 0) {
-          // Show stale banner for any partial failures (with or without cache)
-          setIsStale(true);
-        } else {
-          setError(null);
-          setIsStale(false);
-        }
+        const res = await fetchWithTimeout(`/api/dashboard/student?cohort_id=${activeCohortId}`, { signal: ac.signal }, 15_000);
+        if (ac.signal.aborted) return;
+        if (!res.ok) throw new Error(`BFF returned ${res.status}`);
+        const data: StudentDashboardResponse = await res.json();
+        if (data.cohort) { setCohortName(data.cohort.name); if (data.cohort.start_date) setCohortStartDate(new Date(data.cohort.start_date)); }
+        setStats(data.stats); setUpcomingSessions(data.upcomingSessions); setRecentModules(data.recentModules);
+        setRecentResources(data.recentResources); setRecentLearningAssets(data.recentLearningAssets);
+        setInvoices(data.invoices); setPendingInvoiceAmount(data.pendingInvoiceAmount);
+        setDashboardCache(activeCohortId, { stats: data.stats, upcomingSessions: data.upcomingSessions, recentModules: data.recentModules, recentResources: data.recentResources, recentLearningAssets: data.recentLearningAssets, invoices: data.invoices, pendingInvoiceAmount: data.pendingInvoiceAmount, cohortStartDate: data.cohort?.start_date || null, cohortName: data.cohort?.name || '' });
+        if (data._meta.failedQueries === data._meta.totalQueries && !cached) setError('Unable to load dashboard.');
+        else if (data._meta.failedQueries > 0) setIsStale(true);
+        else { setError(null); setIsStale(false); }
       } catch (err) {
-        if (abortController.signal.aborted) return;
-        if (!cached) {
-          setError(
-            err instanceof DOMException && err.name === 'AbortError'
-              ? 'Dashboard took too long to load. Please check your connection.'
-              : 'Something went wrong loading your dashboard.'
-          );
-        } else {
-          setIsStale(true);
-        }
-      } finally {
-        if (!abortController.signal.aborted) setLoading(false);
-      }
+        if (ac.signal.aborted) return;
+        if (!cached) setError('Something went wrong loading your dashboard.');
+        else setIsStale(true);
+      } finally { if (!ac.signal.aborted) setLoading(false); }
     };
-
-    if (!userLoading) {
-      fetchDashboardData();
-    }
-
-    return () => abortController.abort();
+    if (!userLoading) fetchData();
+    return () => ac.abort();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile, userLoading, activeCohortId, isAdmin, retryCount]);
 
   const getSessionTimeLabel = (date: string) => {
-    const sessionDate = parseISO(date);
-    if (isToday(sessionDate)) return 'Today';
-    if (isTomorrow(sessionDate)) return 'Tomorrow';
-    return format(sessionDate, 'EEE, MMM d');
+    const d = parseISO(date);
+    if (isToday(d)) return 'Today'; if (isTomorrow(d)) return 'Tomorrow';
+    return format(d, 'EEE, MMM d');
   };
 
   const handleInvoiceDownload = async (invoice: InvoiceWithCohort) => {
-    if (!invoice.pdf_path) {
-      toast.error('No PDF available for this invoice');
-      return;
-    }
-
+    if (!invoice.pdf_path) { toast.error('No PDF available'); return; }
     try {
-      const response = await fetch(`/api/invoices/${invoice.id}/download`);
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to download invoice');
-      }
-
+      const res = await fetch(`/api/invoices/${invoice.id}/download`); const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to download');
       window.open(data.url, '_blank');
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to download invoice');
-    }
+    } catch (e) { toast.error(e instanceof Error ? e.message : 'Failed to download invoice'); }
   };
 
-  // Show full-page loader until BOTH auth AND data are ready
-  // This prevents flash of empty content
-  if (userLoading || loading) {
-    return <StudentPageLoader message="Loading your dashboard..." />;
-  }
+  if (userLoading || loading) return <StudentPageLoader message="Loading your dashboard..." />;
 
-  // Layer 4: Error state — user always has a way forward
-  if (error && !stats && !isAdmin) {
+  if (error && ((!stats && !isAdmin) || isAdmin)) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Card className="max-w-md w-full">
-          <CardContent className="pt-8 pb-8 text-center space-y-4">
-            <div className="w-16 h-16 mx-auto rounded-full bg-amber-50 dark:bg-amber-950/30 flex items-center justify-center">
-              <AlertCircle className="w-8 h-8 text-amber-500" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-lg">Unable to load dashboard</h3>
-              <p className="text-sm text-muted-foreground mt-1">{error}</p>
-            </div>
-            <Button
-              onClick={() => { setError(null); setRetryCount(c => c + 1); }}
-              className="gap-2"
-            >
-              <RefreshCw className="w-4 h-4" />
-              Try again
-            </Button>
-          </CardContent>
-        </Card>
+        <div className="max-w-sm w-full text-center space-y-4">
+          <AlertCircle className="w-8 h-8 text-amber-500 mx-auto" />
+          <div>
+            <h3 className="font-semibold font-heading text-foreground">Unable to load dashboard</h3>
+            <p className="text-sm text-muted-foreground mt-1">{error}</p>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => { setError(null); setRetryCount(c => c + 1); }} className="gap-2">
+            <RefreshCw className="w-3.5 h-3.5" /> Try again
+          </Button>
+        </div>
       </div>
     );
   }
 
-  // Admin error state
-  if (error && isAdmin) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Card className="max-w-md w-full">
-          <CardContent className="pt-8 pb-8 text-center space-y-4">
-            <div className="w-16 h-16 mx-auto rounded-full bg-amber-50 dark:bg-amber-950/30 flex items-center justify-center">
-              <AlertCircle className="w-8 h-8 text-amber-500" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-lg">Unable to load dashboard</h3>
-              <p className="text-sm text-muted-foreground mt-1">{error}</p>
-            </div>
-            <Button
-              onClick={() => { setError(null); setRetryCount(c => c + 1); }}
-              className="gap-2"
-            >
-              <RefreshCw className="w-4 h-4" />
-              Try again
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  // Admin role: Show system-wide dashboard
+  // --- Admin ---
   if (isAdmin) {
     return (
       <div className="space-y-6">
-        {/* Admin Welcome Banner */}
-        <Card className="relative overflow-hidden border-2">
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-teal-500 via-teal-400 to-teal-500" />
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-teal-500 to-teal-500 flex items-center justify-center">
-                <Shield className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <CardTitle className="text-2xl">Admin Overview</CardTitle>
-                <CardDescription>
-                  System-wide dashboard across all cohorts
-                </CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-        </Card>
-
-        {/* System-wide Stats */}
-        <MotionContainer className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <MotionItem>
-            <Card>
-              <CardHeader className="pb-3">
-                <CardDescription>Total Users</CardDescription>
-                <CardTitle className="text-3xl font-bold">{adminStats?.totalStudents || 0}</CardTitle>
-              </CardHeader>
-            </Card>
-          </MotionItem>
-          <MotionItem>
-            <Card>
-              <CardHeader className="pb-3">
-                <CardDescription>Active Cohorts</CardDescription>
-                <CardTitle className="text-3xl font-bold">{adminStats?.activeCohorts || 0}</CardTitle>
-              </CardHeader>
-            </Card>
-          </MotionItem>
-          <MotionItem>
-            <Card>
-              <CardHeader className="pb-3">
-                <CardDescription>Upcoming Sessions</CardDescription>
-                <CardTitle className="text-3xl font-bold">{adminStats?.upcomingSessionsCount || 0}</CardTitle>
-              </CardHeader>
-            </Card>
-          </MotionItem>
-          <MotionItem>
-            <Card>
-              <CardHeader className="pb-3">
-                <CardDescription>Total Learnings</CardDescription>
-                <CardTitle className="text-3xl font-bold">{adminStats?.totalLearnings || 0}</CardTitle>
-              </CardHeader>
-            </Card>
-          </MotionItem>
-        </MotionContainer>
-
-        {/* Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* All Upcoming Sessions */}
-          <Card className="relative overflow-hidden border-2">
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-teal-500 via-teal-400 to-teal-500" />
-            <CardHeader className="flex flex-row items-center justify-between pb-4">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-teal-500 to-teal-500 flex items-center justify-center">
-                    <Calendar className="w-4 h-4 text-white" />
-                  </div>
-                  <CardTitle className="text-xl">All Upcoming Sessions</CardTitle>
-                </div>
-                <CardDescription>Across all cohorts</CardDescription>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {!adminSessions || adminSessions.length === 0 ? (
-                <div className="text-center py-12">
-                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-teal-50 dark:bg-teal-950/30 flex items-center justify-center">
-                    <Calendar className="w-8 h-8 text-teal-500 dark:text-teal-400" />
-                  </div>
-                  <p className="text-sm font-medium">No upcoming sessions</p>
-                  <p className="text-xs text-muted-foreground">Check back later</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {adminSessions.slice(0, 5).map((session, index) => (
-                    <div
-                      key={session.id}
-                      className="group relative flex items-center gap-4 p-4 rounded-xl border bg-gradient-to-br from-teal-50/50 to-teal-50/50 dark:from-teal-950/20 dark:to-teal-950/20 hover:from-teal-50 hover:to-teal-50 dark:hover:from-teal-950/30 dark:hover:to-teal-950/30 transition-all duration-300"
-                    >
-                      <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-teal-500 to-teal-500 flex items-center justify-center text-white">
-                        <Video className="w-6 h-6" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold truncate">{session.title}</p>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Clock className="w-3.5 h-3.5" />
-                          <span>{format(parseISO(session.scheduled_at), 'MMM d, h:mm a')}</span>
-                          <span>•</span>
-                          <span>{session.cohortTag}</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Recent Learnings */}
-          <Card className="relative overflow-hidden border-2">
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-teal-500 via-teal-400 to-teal-500" />
-            <CardHeader className="flex flex-row items-center justify-between pb-4">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-teal-500 to-teal-500 flex items-center justify-center">
-                    <BookOpen className="w-4 h-4 text-white" />
-                  </div>
-                  <CardTitle className="text-xl">Recent Learnings</CardTitle>
-                </div>
-                <CardDescription>Latest content added</CardDescription>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {!adminLearnings || adminLearnings.length === 0 ? (
-                <div className="text-center py-12">
-                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-teal-50 dark:bg-teal-950/30 flex items-center justify-center">
-                    <BookOpen className="w-8 h-8 text-teal-500 dark:text-teal-400" />
-                  </div>
-                  <p className="text-sm font-medium">No learnings yet</p>
-                  <p className="text-xs text-muted-foreground">Add content to get started</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {adminLearnings.slice(0, 5).map((learning, index) => (
-                    <div
-                      key={learning.id}
-                      className="group relative flex items-center gap-4 p-4 rounded-xl border bg-gradient-to-br from-teal-50/50 to-teal-50/50 dark:from-teal-950/20 dark:to-teal-950/20 hover:from-teal-50 hover:to-teal-50 dark:hover:from-teal-950/30 dark:hover:to-teal-950/30 transition-all duration-300"
-                    >
-                      <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-teal-500 to-teal-500 flex items-center justify-center text-white">
-                        <BookOpen className="w-6 h-6" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold truncate">{learning.title}</p>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Badge variant="secondary" className="text-xs">
-                            {learning.type}
-                          </Badge>
-                          <span>•</span>
-                          <span>{learning.cohortTag}</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        <div className="flex items-center gap-4">
+          <div className="w-10 h-10 rounded-xl bg-white/[0.06] flex items-center justify-center">
+            <Shield className="w-5 h-5 text-muted-foreground" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold font-heading">Admin Overview</h1>
+            <p className="text-sm text-muted-foreground">Across all cohorts</p>
+          </div>
         </div>
-      </div>
-    );
-  }
 
-  // Student role without cohort: Show error state
-  if (!activeCohortId) {
-    return (
-      <div className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>No Cohort Assigned</CardTitle>
-            <CardDescription>
-              This role is not assigned to any cohort
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Please contact your administrator to assign you to a cohort.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-      {/* Welcome Banner */}
-      <WelcomeBanner cohortStartDate={cohortStartDate} cohortName={cohortName} />
-
-      {/* Stale data indicator — shown when cache is displayed but refresh failed */}
-      {isStale && (
-        <div className="flex items-center justify-between px-4 py-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
-          <p className="text-sm text-amber-700 dark:text-amber-400">
-            Showing cached data. Refresh to get latest.
-          </p>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => { setIsStale(false); setRetryCount(c => c + 1); }}
-            className="gap-1 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-950/40"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            Refresh
-          </Button>
+        <div className="rounded-xl border border-white/[0.15] bg-card overflow-hidden card-3d-static">
+          <div className="grid grid-cols-2 lg:grid-cols-4">
+            {[
+              { label: 'Users', value: adminStats?.totalStudents || 0 },
+              { label: 'Cohorts', value: adminStats?.activeCohorts || 0 },
+              { label: 'Sessions', value: adminStats?.upcomingSessionsCount || 0 },
+              { label: 'Learnings', value: adminStats?.totalLearnings || 0 },
+            ].map((stat, i) => (
+              <div key={stat.label} className="px-6 py-5 lg:px-7 lg:py-6" style={{ borderRight: i < 3 ? '1px solid hsl(220 10% 90% / 0.07)' : undefined }}>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 font-heading">{stat.label}</p>
+                <p className="text-2xl font-bold text-foreground tabular-nums font-heading">{stat.value}</p>
+              </div>
+            ))}
+          </div>
         </div>
-      )}
 
-      {/* Stats Cards */}
-      <MotionFadeIn>
-        <StatsCards stats={stats || undefined} />
-      </MotionFadeIn>
-
-      {/* Main Content Grid */}
-      <MotionFadeIn delay={0.1}>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Upcoming Sessions */}
-        <Card className="relative overflow-hidden border-2 dark:border-gray-700 dark:bg-gray-900/50 hover:shadow-xl hover:shadow-teal-500/10 transition-all duration-500 hover:-translate-y-0.5">
-          {/* Top accent gradient */}
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-teal-500 via-teal-400 to-teal-500" />
-
-          <CardHeader className="flex flex-row items-center justify-between pb-4">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-teal-500 to-teal-500 flex items-center justify-center">
-                  <Calendar className="w-4 h-4 text-white" />
-                </div>
-                <CardTitle className="text-xl dark:text-white">Upcoming Sessions</CardTitle>
-              </div>
-              <CardDescription className="dark:text-gray-400">Your next learning sessions</CardDescription>
-            </div>
-            <Link href="/calendar">
-              <Button variant="ghost" size="sm" className="gap-1 hover:bg-teal-50 dark:hover:bg-teal-950/30">
-                View all
-                <ChevronRight className="w-4 h-4" />
-              </Button>
-            </Link>
-          </CardHeader>
-          <CardContent>
-            {upcomingSessions.length === 0 ? (
-              <div className="text-center py-12">
-                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-teal-50 dark:bg-teal-950/30 flex items-center justify-center">
-                  <Calendar className="w-8 h-8 text-teal-500 dark:text-teal-400" />
-                </div>
-                <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">No upcoming sessions</p>
-                <p className="text-xs text-muted-foreground dark:text-gray-500">Check back later for new sessions</p>
-              </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <ContentCard title="Upcoming Sessions" icon={Calendar} sub="across cohorts">
+            {!adminSessions?.length ? (
+              <EmptyState icon={CalendarOff} message="No sessions scheduled" />
             ) : (
-              <div className="space-y-3">
-                {upcomingSessions.map((session, index) => (
-                  <Link
-                    key={session.id}
-                    href="/calendar"
-                    className="group relative flex items-center gap-4 p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-gradient-to-br from-teal-50/50 to-teal-50/50 dark:from-teal-950/20 dark:to-teal-950/20 hover:from-teal-50 hover:to-teal-50 dark:hover:from-teal-950/30 dark:hover:to-teal-950/30 transition-all duration-300 hover:shadow-md hover:scale-[1.02]"
-                    style={{
-                      animationDelay: `${index * 100}ms`,
-                      animationFillMode: 'forwards',
-                    }}
-                  >
-                    {/* Session icon */}
-                    <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-teal-500 to-teal-500 dark:from-teal-600 dark:to-teal-700 flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
-                      <Video className="w-6 h-6" />
-                    </div>
-
-                    {/* Session info */}
+              <div className="divide-y divide-white/[0.04]">
+                {adminSessions.slice(0, 5).map((s) => (
+                  <div key={s.id} className="accent-bar-teal flex items-center gap-3 px-5 py-4 hover:bg-white/[0.02] transition-colors">
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold truncate text-gray-900 dark:text-white mb-1">
-                        {session.title}
-                      </p>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground dark:text-gray-400">
-                        <Clock className="w-3.5 h-3.5" />
-                        <span className="font-medium">{format(parseISO(session.scheduled_at), 'h:mm a')}</span>
-                        <span className="text-gray-400">•</span>
-                        <span>{session.duration_minutes} min</span>
-                      </div>
+                      <p className="text-sm font-medium text-foreground truncate">{s.title}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{format(parseISO(s.scheduled_at), 'MMM d, h:mm a')} <span className="mx-1 text-muted-foreground/40">·</span> {s.cohortTag}</p>
                     </div>
-
-                    {/* Time badge */}
-                    <Badge className="bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400 border-teal-200 dark:border-teal-800 font-medium">
-                      {getSessionTimeLabel(session.scheduled_at)}
-                    </Badge>
-                  </Link>
+                  </div>
                 ))}
               </div>
             )}
-          </CardContent>
-        </Card>
-
-        {/* My Learnings - Shows actual resources (recordings, presentations) */}
-        <Card className="relative overflow-hidden border-2 dark:border-gray-700 dark:bg-gray-900/50 hover:shadow-xl hover:shadow-teal-500/10 transition-all duration-500 hover:-translate-y-0.5">
-          {/* Top accent gradient */}
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-teal-500 via-teal-400 to-teal-500" />
-
-          <CardHeader className="flex flex-row items-center justify-between pb-4">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-teal-500 to-teal-500 flex items-center justify-center">
-                  <BookOpen className="w-4 h-4 text-white" />
-                </div>
-                <CardTitle className="text-xl dark:text-white">My Learnings</CardTitle>
-              </div>
-              <CardDescription className="dark:text-gray-400">Continue where you left off</CardDescription>
-            </div>
-            <Link href="/learnings">
-              <Button variant="ghost" size="sm" className="gap-1 hover:bg-teal-50 dark:hover:bg-teal-950/30">
-                View all
-                <ChevronRight className="w-4 h-4" />
-              </Button>
-            </Link>
-          </CardHeader>
-          <CardContent>
-            {recentLearningAssets.length === 0 ? (
-              <div className="text-center py-12">
-                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-teal-50 dark:bg-teal-950/30 flex items-center justify-center">
-                  <BookOpen className="w-8 h-8 text-teal-500 dark:text-teal-400" />
-                </div>
-                <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">No recent activity</p>
-                <p className="text-xs text-muted-foreground dark:text-gray-500">Start learning to see your progress here</p>
-              </div>
+          </ContentCard>
+          <ContentCard title="Recent Learnings" icon={BookOpen} sub="latest content">
+            {!adminLearnings?.length ? (
+              <EmptyState icon={BookOpen} message="No learnings yet" />
             ) : (
-              <div className="space-y-3">
-                {recentLearningAssets.map((asset, index) => {
-                  const Icon = getContentIcon(asset.content_type);
-                  const gradient = getContentGradient(asset.content_type);
-                  const typeLabel = getContentTypeLabel(asset.content_type);
-
-                  return (
-                    <Link
-                      key={asset.id}
-                      href={`/learnings?resource=${asset.id}`}
-                      className={`group relative flex items-center gap-4 p-4 rounded-xl border-2 transition-all duration-300 hover:shadow-md hover:scale-[1.02] ${
-                        asset.content_type === 'video'
-                          ? 'border-teal-200 dark:border-teal-800/50 bg-gradient-to-br from-teal-50/50 to-teal-100/30 dark:from-teal-950/20 dark:to-teal-900/10 hover:border-teal-300 dark:hover:border-teal-700 hover:shadow-teal-500/10'
-                          : asset.content_type === 'slides'
-                          ? 'border-orange-200 dark:border-orange-800/50 bg-gradient-to-br from-orange-50/50 to-orange-100/30 dark:from-orange-950/20 dark:to-orange-900/10 hover:border-orange-300 dark:hover:border-orange-700 hover:shadow-orange-500/10'
-                          : asset.content_type === 'document'
-                          ? 'border-teal-200 dark:border-teal-800/50 bg-gradient-to-br from-teal-50/50 to-teal-100/30 dark:from-teal-950/20 dark:to-teal-900/10 hover:border-teal-300 dark:hover:border-teal-700 hover:shadow-teal-500/10'
-                          : 'border-gray-200 dark:border-gray-700 bg-gradient-to-br from-gray-50/50 to-gray-100/30 dark:from-gray-950/20 dark:to-gray-900/10 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-gray-500/10'
-                      }`}
-                      style={{
-                        animationDelay: `${index * 100}ms`,
-                        animationFillMode: 'forwards',
-                      }}
-                    >
-                      {/* Resource icon with type-specific gradient */}
-                      <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${gradient.from} ${gradient.to} ${gradient.darkFrom} ${gradient.darkTo} flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform duration-300`}>
-                        <Icon className="w-6 h-6" />
-                      </div>
-
-                      {/* Resource info */}
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold truncate text-gray-900 dark:text-white mb-1 group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors">
-                          {asset.title}
-                        </p>
-                        <div className="flex items-center gap-2">
-                          <Badge
-                            variant="secondary"
-                            className={`text-xs font-medium ${
-                              asset.content_type === 'video'
-                                ? 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400'
-                                : asset.content_type === 'slides'
-                                ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
-                                : asset.content_type === 'document'
-                                ? 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400'
-                                : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400'
-                            }`}
-                          >
-                            {typeLabel}
-                          </Badge>
-                          {asset.progress?.is_completed && (
-                            <Badge className="text-xs bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                              Completed
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Chevron */}
-                      <ChevronRight className="w-5 h-5 text-muted-foreground dark:text-gray-500 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
-                    </Link>
-                  );
-                })}
+              <div className="divide-y divide-white/[0.04]">
+                {adminLearnings.slice(0, 5).map((l) => (
+                  <div key={l.id} className="accent-bar-violet flex items-center gap-3 px-5 py-4 hover:bg-white/[0.02] transition-colors">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{l.title}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        <span style={{ color: 'hsl(280 55% 65%)' }}>{l.type}</span>
+                        <span className="mx-1 text-muted-foreground/40">·</span> {l.cohortTag}
+                      </p>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
-          </CardContent>
-        </Card>
+          </ContentCard>
+        </div>
       </div>
-      </MotionFadeIn>
+    );
+  }
 
-      {/* Invoices Card */}
-      {invoices.length > 0 && (
-        <div className="lg:col-span-2">
-          <InvoiceCard
-            invoices={invoices}
-            pendingAmount={pendingInvoiceAmount}
-            onView={handleInvoiceDownload}
-            onDownload={handleInvoiceDownload}
-          />
+  if (!activeCohortId) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="max-w-sm text-center">
+          <h3 className="font-semibold font-heading">No Cohort Assigned</h3>
+          <p className="text-sm text-muted-foreground mt-1">Contact your administrator to get assigned to a cohort.</p>
+        </div>
+      </div>
+    );
+  }
+
+  // --- Student Dashboard ---
+  return (
+    <div className="space-y-5">
+      <WelcomeBanner
+        cohortStartDate={cohortStartDate}
+        cohortName={cohortName}
+        nextSession={upcomingSessions[0]}
+        lastLearning={recentLearningAssets[0]}
+      />
+
+      {isStale && (
+        <div className="flex items-center justify-between px-4 py-2.5 rounded-lg bg-amber-500/[0.06] border border-amber-500/10">
+          <p className="text-sm text-amber-400">Showing cached data</p>
+          <button onClick={() => { setIsStale(false); setRetryCount(c => c + 1); }} className="text-sm text-amber-400 hover:text-amber-300 transition-colors flex items-center gap-1.5">
+            <RefreshCw className="w-3.5 h-3.5" /> Refresh
+          </button>
         </div>
       )}
 
-      {/* Recent Resources */}
-      <Card className="relative overflow-hidden border-2 dark:border-gray-700 dark:bg-gray-900/50 hover:shadow-xl hover:shadow-green-500/10 transition-all duration-500 hover:-translate-y-0.5">
-        {/* Top accent gradient */}
-        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-green-500 via-emerald-500 to-green-500" />
+      <StatsCards stats={stats || undefined} />
 
-        <CardHeader className="flex flex-row items-center justify-between pb-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center">
-                <FolderOpen className="w-4 h-4 text-white" />
-              </div>
-              <CardTitle className="text-xl dark:text-white">Recent Resources</CardTitle>
-            </div>
-            <CardDescription className="dark:text-gray-400">Latest files and documents</CardDescription>
-          </div>
-          <Link href="/resources">
-            <Button variant="ghost" size="sm" className="gap-1 hover:bg-green-50 dark:hover:bg-green-950/30">
-              View all
-              <ChevronRight className="w-4 h-4" />
-            </Button>
+      {/* Content Grid — stretch to match heights */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-stretch">
+        {/* Upcoming Sessions */}
+        <MotionFadeIn delay={0.1} className="h-full">
+          <ContentCard title="Upcoming Sessions" icon={Calendar} link={{ href: '/calendar', label: 'View all' }}>
+            {upcomingSessions.length === 0 ? (
+              <EmptyState
+                icon={CalendarOff}
+                message="You're all caught up"
+                sub="No sessions scheduled right now"
+                link={{ href: '/calendar', label: 'View full calendar' }}
+              />
+            ) : (
+              <MotionContainer delay={0.15} className="divide-y divide-white/[0.04]">
+                {upcomingSessions.map((session) => (
+                  <MotionItem key={session.id}>
+                    <Link
+                      href="/calendar"
+                      className="accent-bar-teal flex items-center gap-3 px-5 py-4 hover:bg-white/[0.02] transition-all group"
+                    >
+                      {/* Date badge */}
+                      <div className="w-10 h-10 rounded-lg bg-white/[0.04] flex flex-col items-center justify-center shrink-0 border border-white/[0.12]">
+                        <span className="text-[10px] font-medium text-muted-foreground uppercase leading-none">
+                          {format(parseISO(session.scheduled_at), 'MMM')}
+                        </span>
+                        <span className="text-sm font-bold text-foreground leading-none mt-0.5 tabular-nums">
+                          {format(parseISO(session.scheduled_at), 'd')}
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[15px] font-medium text-foreground truncate group-hover:text-white transition-colors leading-snug">{session.title}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Clock className="w-3 h-3 text-muted-foreground/60" />
+                          <span className="text-[13px] text-muted-foreground tabular-nums">
+                            {format(parseISO(session.scheduled_at), 'h:mm a')}
+                          </span>
+                          <span className="text-muted-foreground/30">·</span>
+                          <span className="text-[13px] text-muted-foreground">{session.duration_minutes} min</span>
+                        </div>
+                      </div>
+                      <span className="text-[11px] font-medium text-muted-foreground shrink-0 px-2 py-1 rounded-md bg-white/[0.04]">
+                        {getSessionTimeLabel(session.scheduled_at)}
+                      </span>
+                    </Link>
+                  </MotionItem>
+                ))}
+              </MotionContainer>
+            )}
+          </ContentCard>
+        </MotionFadeIn>
+
+        {/* My Learnings */}
+        <MotionFadeIn delay={0.15} className="h-full">
+          <ContentCard title="My Learnings" icon={BookOpen} link={{ href: '/learnings', label: 'View all' }}>
+            {recentLearningAssets.length === 0 ? (
+              <EmptyState
+                icon={BookOpen}
+                message="Start exploring"
+                sub="Your recent learning activity will show here"
+                link={{ href: '/learnings', label: 'Browse learnings' }}
+              />
+            ) : (
+              <MotionContainer delay={0.2} className="divide-y divide-white/[0.04]">
+                {recentLearningAssets.map((asset) => {
+                  const TypeIcon = getContentTypeIcon(asset.content_type);
+                  const accentColor = getAccentColor(asset.content_type);
+                  return (
+                    <MotionItem key={asset.id}>
+                      <Link
+                        href={`/learnings?resource=${asset.id}`}
+                        className={`${getAccentBarClass(asset.content_type)} flex items-center gap-3 px-5 py-4 hover:bg-white/[0.02] transition-all group`}
+                      >
+                        {/* Content type icon badge */}
+                        <div
+                          className="icon-badge"
+                          style={{ background: `${accentColor.replace(')', ' / 0.1)')}` }}
+                        >
+                          <TypeIcon className="w-4 h-4" style={{ color: accentColor }} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[15px] font-medium text-foreground truncate group-hover:text-white transition-colors leading-snug">
+                            {asset.title}
+                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-[13px] font-medium" style={{ color: accentColor }}>
+                              {getContentTypeLabel(asset.content_type)}
+                            </span>
+                            {asset.progress?.is_completed && (
+                              <>
+                                <span className="text-muted-foreground/40">·</span>
+                                <span className="inline-flex items-center gap-1 text-[13px] text-emerald-400">
+                                  <CheckCircle2 className="w-3.5 h-3.5" /> Done
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-muted-foreground/30 group-hover:text-muted-foreground group-hover:translate-x-0.5 transition-all shrink-0" />
+                      </Link>
+                    </MotionItem>
+                  );
+                })}
+              </MotionContainer>
+            )}
+          </ContentCard>
+        </MotionFadeIn>
+      </div>
+
+      {invoices.length > 0 && (
+        <MotionFadeIn delay={0.2}>
+          <InvoiceCard invoices={invoices} pendingAmount={pendingInvoiceAmount} onView={handleInvoiceDownload} onDownload={handleInvoiceDownload} />
+        </MotionFadeIn>
+      )}
+
+      {recentResources.length > 0 && (
+        <MotionFadeIn delay={0.25}>
+          <ContentCard title="Resources" icon={FolderOpen} link={{ href: '/resources', label: 'View all' }}>
+            <MotionContainer delay={0.3} className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 divide-white/[0.04]">
+              {recentResources.map((resource, i) => {
+                const fileInfo = getFileTypeIcon(resource.file_type || resource.category);
+                const FileIcon = fileInfo.icon;
+                return (
+                  <MotionItem key={resource.id}>
+                    <Link
+                      href={`/resources?file=${resource.id}`}
+                      className={`flex items-center gap-3 px-5 py-4 hover:bg-white/[0.02] transition-all group ${
+                        i % 2 === 0 ? 'sm:border-r sm:border-white/[0.04]' : ''
+                      } ${i >= 2 ? 'sm:border-t sm:border-white/[0.04]' : ''}`}
+                    >
+                      <div
+                        className="icon-badge"
+                        style={{ background: fileInfo.bg }}
+                      >
+                        <FileIcon className="w-4 h-4" style={{ color: fileInfo.color }} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[15px] font-medium text-foreground truncate group-hover:text-white transition-colors leading-snug">
+                          {resource.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground uppercase tracking-wider mt-0.5 font-medium">
+                          {resource.file_type?.toUpperCase() || resource.category?.toUpperCase() || 'File'}
+                        </p>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-muted-foreground/30 group-hover:text-muted-foreground group-hover:translate-x-0.5 transition-all shrink-0" />
+                    </Link>
+                  </MotionItem>
+                );
+              })}
+            </MotionContainer>
+          </ContentCard>
+        </MotionFadeIn>
+      )}
+    </div>
+  );
+}
+
+// --- Content Card with icon in header ---
+function ContentCard({ title, icon: Icon, sub, link, children }: {
+  title: string;
+  icon?: React.ComponentType<{ className?: string }>;
+  sub?: string;
+  link?: { href: string; label: string };
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-xl border border-white/[0.15] bg-card overflow-hidden flex flex-col h-full card-3d">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.04]">
+        <div className="flex items-center gap-2.5">
+          {Icon && <Icon className="w-4 h-4 text-muted-foreground/70" />}
+          <h2 className="text-sm font-semibold text-foreground font-heading">{title}</h2>
+          {sub && <span className="text-xs text-muted-foreground hidden sm:inline">· {sub}</span>}
+        </div>
+        {link && (
+          <Link href={link.href} className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1 group">
+            {link.label} <ChevronRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
           </Link>
-        </CardHeader>
-        <CardContent>
-          {recentResources.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-green-50 dark:bg-green-950/30 flex items-center justify-center">
-                <FolderOpen className="w-8 h-8 text-green-500 dark:text-green-400" />
-              </div>
-              <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">No resources yet</p>
-              <p className="text-xs text-muted-foreground dark:text-gray-500">Resources will appear here when uploaded</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {recentResources.map((resource, index) => (
-                <Link
-                  key={resource.id}
-                  href={`/resources?file=${resource.id}`}
-                  className="group flex flex-col gap-3 p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-gradient-to-br from-green-50/50 to-emerald-50/50 dark:from-green-950/20 dark:to-emerald-950/20 hover:from-green-50 hover:to-emerald-50 dark:hover:from-green-950/30 dark:hover:to-emerald-950/30 transition-all duration-300 hover:shadow-lg hover:scale-[1.05]"
-                  style={{
-                    animationDelay: `${index * 50}ms`,
-                    animationFillMode: 'forwards',
-                  }}
-                >
-                  {/* Category-specific icon */}
-                  <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-green-500 to-emerald-600 dark:from-green-600 dark:to-emerald-700 flex items-center justify-center text-white shadow-md group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
-                    {resource.category === 'video' ? <Video className="w-5 h-5" /> :
-                     resource.category === 'article' ? <BookOpen className="w-5 h-5" /> :
-                     resource.category === 'presentation' ? <Presentation className="w-5 h-5" /> :
-                     resource.category === 'pdf' ? <FileText className="w-5 h-5" /> :
-                     <FolderOpen className="w-5 h-5" />}
-                  </div>
+        )}
+      </div>
+      <div className="flex-1">{children}</div>
+    </div>
+  );
+}
 
-                  {/* File info */}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-900 dark:text-white group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors mb-1">
-                      {resource.name}
-                    </p>
-                    <p className="text-xs font-medium text-muted-foreground dark:text-gray-500 uppercase tracking-wider">
-                      {resource.category === 'video' ? 'Video' : resource.category === 'presentation' ? 'Presentation' : resource.file_type?.toUpperCase() || resource.category?.toUpperCase() || 'File'}
-                    </p>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+// --- Rich Empty State ---
+function EmptyState({ icon: Icon, message, sub, link }: {
+  icon: React.ComponentType<{ className?: string }>;
+  message: string;
+  sub?: string;
+  link?: { href: string; label: string };
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center py-12 px-5 h-full">
+      <div className="w-12 h-12 rounded-xl bg-white/[0.04] flex items-center justify-center mb-3 empty-pulse">
+        <Icon className="w-6 h-6 text-muted-foreground/40" />
+      </div>
+      <p className="text-[15px] font-medium text-muted-foreground">{message}</p>
+      {sub && <p className="text-[13px] text-muted-foreground/60 mt-1">{sub}</p>}
+      {link && (
+        <Link href={link.href} className="text-[13px] text-muted-foreground hover:text-foreground transition-colors mt-3 flex items-center gap-1 group">
+          {link.label} <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+        </Link>
+      )}
     </div>
   );
 }
