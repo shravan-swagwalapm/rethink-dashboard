@@ -35,12 +35,15 @@ export default function CaseStudiesPage() {
   const [leaderboardOpen, setLeaderboardOpen] = useState(false);
   const [leaderboardCs, setLeaderboardCs] = useState<CaseStudyWithSubmission | null>(null);
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (signal?: AbortSignal) => {
     if (!activeCohortId) return;
     setLoading(true);
+    setNoSubgroup(false);
     try {
-      const res = await fetch(`/api/case-studies/my-submissions?cohort_id=${activeCohortId}`);
+      const res = await fetch(`/api/case-studies/my-submissions?cohort_id=${activeCohortId}`, { signal });
+      if (signal?.aborted) return;
       const data = await res.json();
+      if (signal?.aborted) return;
 
       if (!data.subgroup) {
         setNoSubgroup(true);
@@ -50,15 +53,18 @@ export default function CaseStudiesPage() {
 
       setSubgroup(data.subgroup);
       setCaseStudies(data.caseStudies || []);
-    } catch {
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'AbortError') return;
       toast.error('Failed to load case studies');
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   }, [activeCohortId]);
 
   useEffect(() => {
-    fetchData();
+    const controller = new AbortController();
+    fetchData(controller.signal);
+    return () => controller.abort();
   }, [fetchData]);
 
   // Open submission panel

@@ -30,7 +30,6 @@ import {
   ExternalLink,
   Plus,
 } from 'lucide-react';
-import { canUpload } from '@/lib/services/case-study-deadline';
 import type { CaseStudy, SubmissionAttachment, SubmissionVisibility, StudentSubmissionStatus } from '@/types';
 
 export interface CaseStudyWithSubmission extends CaseStudy {

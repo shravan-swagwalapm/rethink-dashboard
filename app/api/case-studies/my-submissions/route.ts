@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
     }
 
     // If user has a subgroup, fetch submissions + attachment counts
-    let submissionsByCs: Record<string, Record<string, unknown>> = {};
+    const submissionsByCs: Record<string, Record<string, unknown>> = {};
 
     if (subgroupId) {
       const csIds = caseStudies.map(cs => cs.id);

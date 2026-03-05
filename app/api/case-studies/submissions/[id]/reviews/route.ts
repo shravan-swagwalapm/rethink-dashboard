@@ -83,7 +83,7 @@ export async function GET(
 
     // Fetch rubric scores for visible reviews
     const reviewIds = visibleReviews.map(r => r.id);
-    let rubricScoresByReview: Record<string, Array<Record<string, unknown>>> = {};
+    const rubricScoresByReview: Record<string, Array<Record<string, unknown>>> = {};
 
     if (reviewIds.length) {
       const { data: rubricScores } = await adminClient

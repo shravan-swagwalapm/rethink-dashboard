@@ -115,7 +115,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch mentor's own reviews
     const mentorSubmissionIds = (submissions || []).map(s => s.id);
-    let myReviewMap: Record<string, Record<string, unknown>> = {};
+    const myReviewMap: Record<string, Record<string, unknown>> = {};
 
     if (mentorSubmissionIds.length) {
       const { data: myReviews } = await adminClient

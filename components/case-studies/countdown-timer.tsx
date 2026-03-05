@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { Clock, AlertTriangle } from 'lucide-react';
-import { formatTimeRemaining, getDeadlineUrgency, getEffectiveDeadlineWithGrace } from '@/lib/services/case-study-deadline';
+import { formatTimeRemaining, getDeadlineUrgency } from '@/lib/services/case-study-deadline';
 
 interface CountdownTimerProps {
   deadline: string | null;
