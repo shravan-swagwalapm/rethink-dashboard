@@ -22,6 +22,7 @@ import {
   BookOpen,
   ChevronRight,
   Clock,
+  Heart,
 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { cn } from '@/lib/utils';
@@ -97,6 +98,9 @@ export default function ResourcesPage() {
     fileName: string;
     fileType: string;
   }>({ isOpen: false, fileUrl: '', fileName: '', fileType: '' });
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
+  const [favoritesLoaded, setFavoritesLoaded] = useState(false);
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   // Debounce search input (300ms)
@@ -104,6 +108,68 @@ export default function ResourcesPage() {
     const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
+
+  // Fetch favorites once when user is loaded
+  useEffect(() => {
+    if (userLoading) return;
+    const fetchFavorites = async () => {
+      try {
+        const res = await fetch('/api/learnings/favorites');
+        if (!res.ok) return;
+        const data = await res.json();
+        const ids = new Set<string>((data.favorites || []).map((f: { resource_id: string }) => f.resource_id));
+        setFavoriteIds(ids);
+      } catch {
+        // Non-blocking: hearts just stay unfilled
+      } finally {
+        setFavoritesLoaded(true);
+      }
+    };
+    fetchFavorites();
+  }, [userLoading]);
+
+  // Optimistic toggle handler
+  const handleToggleFavorite = async (e: React.MouseEvent, resourceId: string) => {
+    e.stopPropagation();
+    const wasFavorited = favoriteIds.has(resourceId);
+
+    // Optimistic update
+    setFavoriteIds(prev => {
+      const next = new Set(prev);
+      if (wasFavorited) {
+        next.delete(resourceId);
+      } else {
+        next.add(resourceId);
+      }
+      return next;
+    });
+
+    try {
+      if (wasFavorited) {
+        const res = await fetch(`/api/learnings/favorites?resource_id=${resourceId}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('Failed to remove favorite');
+      } else {
+        const res = await fetch('/api/learnings/favorites', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ resource_id: resourceId }),
+        });
+        if (!res.ok) throw new Error('Failed to add favorite');
+      }
+    } catch {
+      // Revert on error
+      setFavoriteIds(prev => {
+        const next = new Set(prev);
+        if (wasFavorited) {
+          next.add(resourceId);
+        } else {
+          next.delete(resourceId);
+        }
+        return next;
+      });
+      toast.error(wasFavorited ? 'Failed to remove favorite' : 'Failed to add favorite');
+    }
+  };
 
   // Clear search when switching tabs
   const handleTabChange = (tab: Tab) => {
@@ -283,39 +349,66 @@ export default function ResourcesPage() {
         })}
       </div>
 
-      {/* Search */}
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input
-          placeholder={`Search ${activeTab}s...`}
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10"
-        />
+      {/* Search + Favorites Filter */}
+      <div className="flex items-center gap-3">
+        <div className="relative max-w-md flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder={`Search ${activeTab}s...`}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <button
+          onClick={() => setShowFavoritesOnly(prev => !prev)}
+          className={cn(
+            "flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all border whitespace-nowrap",
+            showFavoritesOnly
+              ? "bg-rose-500 text-white border-rose-500/50 shadow-lg shadow-rose-500/25"
+              : "bg-gray-950 text-gray-300 border-gray-800 hover:bg-gray-900 hover:text-white hover:border-gray-700"
+          )}
+        >
+          <Heart className={cn("w-4 h-4", showFavoritesOnly && "fill-current")} />
+          <span className="hidden sm:inline">Favorites</span>
+        </button>
       </div>
 
       {/* Content Area - Unified List View */}
-      {loading ? (
+      {(() => {
+        const displayedResources = showFavoritesOnly
+          ? resources.filter(r => favoriteIds.has(r.id))
+          : resources;
+
+        return loading ? (
         <div className="flex items-center justify-center py-16">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
         </div>
-      ) : resources.length === 0 ? (
+      ) : displayedResources.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16">
             <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
-              <FileText className="w-8 h-8 text-muted-foreground" />
+              {showFavoritesOnly ? (
+                <Heart className="w-8 h-8 text-muted-foreground" />
+              ) : (
+                <FileText className="w-8 h-8 text-muted-foreground" />
+              )}
             </div>
-            <h3 className="text-lg font-medium mb-2">No {activeTab}s yet</h3>
+            <h3 className="text-lg font-medium mb-2">
+              {showFavoritesOnly ? 'No favorites yet' : `No ${activeTab}s yet`}
+            </h3>
             <p className="text-muted-foreground text-center max-w-sm">
-              {searchQuery
-                ? `No results found for "${searchQuery}"`
-                : `${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}s will appear here once uploaded.`}
+              {showFavoritesOnly
+                ? 'Tap the heart icon on any resource to save it here.'
+                : searchQuery
+                  ? `No results found for "${searchQuery}"`
+                  : `${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}s will appear here once uploaded.`}
             </p>
           </CardContent>
         </Card>
       ) : (
         <MotionContainer className="space-y-3">
-          {resources.map((resource) => {
+          {displayedResources.map((resource) => {
             const styles = getResourceStyles(activeTab);
             const Icon = TABS.find(t => t.value === activeTab)?.icon || FileText;
 
@@ -384,8 +477,25 @@ export default function ResourcesPage() {
                   </div>
                 </div>
 
-                {/* Action buttons - file-type specific (always visible) */}
+                {/* Action buttons - favorite + file-type specific (always visible) */}
                 <div className="flex items-center gap-2">
+                  {/* Favorite heart toggle */}
+                  <button
+                    onClick={(e) => handleToggleFavorite(e, resource.id)}
+                    className={cn(
+                      "w-8 h-8 md:w-9 md:h-9 rounded-lg flex items-center justify-center transition-all border",
+                      favoriteIds.has(resource.id)
+                        ? "bg-rose-500/15 border-rose-500/30 text-rose-500"
+                        : "bg-gray-500/10 border-gray-500/20 text-gray-400 hover:bg-rose-500/10 hover:border-rose-500/20 hover:text-rose-400"
+                    )}
+                    title={favoriteIds.has(resource.id) ? "Remove from favorites" : "Add to favorites"}
+                  >
+                    <Heart className={cn(
+                      "w-3.5 h-3.5 md:w-4 md:h-4 transition-transform",
+                      favoriteIds.has(resource.id) && "fill-current scale-110"
+                    )} />
+                  </button>
+
                   {/* PPTX: Only Download button */}
                   {activeTab === 'presentation' && (
                     <button
@@ -466,7 +576,8 @@ export default function ResourcesPage() {
             );
           })}
         </MotionContainer>
-      )}
+      );
+      })()}
 
       {/* Universal Document Viewer */}
       <UniversalViewer
