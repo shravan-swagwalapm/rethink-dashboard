@@ -46,6 +46,7 @@ interface SubgroupSubmission {
     is_late: boolean;
     submitted_by_name: string | null;
     attachment_count: number;
+    link_count: number;
     reviews: Array<{
       id: string;
       reviewer_role: string;
@@ -351,6 +352,9 @@ export function SubmissionDashboard({ caseStudy, open, onClose, onRefresh }: Sub
                             )}
                             {sg.submission?.attachment_count !== undefined && sg.submission.attachment_count > 0 && (
                               <span>{sg.submission.attachment_count} file{sg.submission.attachment_count !== 1 ? 's' : ''}</span>
+                            )}
+                            {sg.submission?.link_count !== undefined && sg.submission.link_count > 0 && (
+                              <span>{sg.submission.link_count} link{sg.submission.link_count !== 1 ? 's' : ''}</span>
                             )}
                           </div>
 

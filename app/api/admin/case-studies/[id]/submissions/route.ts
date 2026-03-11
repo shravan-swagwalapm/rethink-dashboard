@@ -80,16 +80,22 @@ export async function GET(
       }
     }
 
-    // Fetch attachment counts
-    let attachmentCountMap: Record<string, number> = {};
+    // Fetch attachment counts (separate file and link counts)
+    let fileCountMap: Record<string, number> = {};
+    let linkCountMap: Record<string, number> = {};
     if (subIds.length) {
       const { data: attCounts } = await adminClient
         .from('case_study_submission_attachments')
-        .select('submission_id')
+        .select('submission_id, type')
         .in('submission_id', subIds);
 
       for (const a of attCounts || []) {
-        attachmentCountMap[a.submission_id] = (attachmentCountMap[a.submission_id] || 0) + 1;
+        const sid = a.submission_id;
+        if (a.type === 'link') {
+          linkCountMap[sid] = (linkCountMap[sid] || 0) + 1;
+        } else {
+          fileCountMap[sid] = (fileCountMap[sid] || 0) + 1;
+        }
       }
     }
 
@@ -121,7 +127,8 @@ export async function GET(
         submission: submission ? {
           ...submission,
           reviews: submissionId ? (reviewMap[submissionId] ?? []) : [],
-          attachment_count: submissionId ? (attachmentCountMap[submissionId] ?? 0) : 0,
+          attachment_count: submissionId ? (fileCountMap[submissionId] ?? 0) : 0,
+          link_count: submissionId ? (linkCountMap[submissionId] ?? 0) : 0,
         } : null,
       };
     });
