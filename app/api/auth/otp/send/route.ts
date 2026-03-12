@@ -33,7 +33,6 @@ const OTP_EXPIRY_SECONDS = 300; // 5 minutes
  * }
  */
 export async function POST(request: NextRequest) {
-  const startTime = Date.now();
   let identifier: string | undefined;
 
   try {
@@ -114,7 +113,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!isProperlyRegistered) {
-      console.log(`[OTP Send] Phone ${identifier} exists but not properly registered (no cohort/assignments)`);
+      logMetric({ metric: 'otp_failed', value: 1, tags: { reason: 'not_registered' } });
       return NextResponse.json(
         {
           error: 'Unregistered mobile number. Please contact admin for access.',
@@ -189,9 +188,6 @@ export async function POST(request: NextRequest) {
     });
 
     logMetric({ metric: 'otp_sent', value: 1, tags: { type: 'phone' } });
-
-    const duration = Date.now() - startTime;
-    console.log(`[OTP Send] Success in ${duration}ms`);
 
     return NextResponse.json({
       success: true,

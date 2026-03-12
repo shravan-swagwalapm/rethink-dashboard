@@ -198,7 +198,10 @@ export function VideoPlayer({
         }
 
         progressIntervalRef.current = setInterval(() => {
-          handleProgressSave();
+          // Guard against calling after player disposal
+          if (playerRef.current && !playerRef.current.isDisposed()) {
+            handleProgressSave();
+          }
         }, 5000);
       });
 
@@ -248,20 +251,20 @@ export function VideoPlayer({
         clearTimeout(initTimeout);
       }
 
+      // Clear interval first to prevent callbacks during disposal
       if (progressIntervalRef.current) {
         clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
       }
 
       // Save one last time before cleanup
-      if (playerRef.current) {
+      if (playerRef.current && !playerRef.current.isDisposed()) {
         handleProgressSave();
-      }
 
-      if (playerRef.current) {
         try {
           playerRef.current.dispose();
-        } catch (error) {
-          console.error('Error disposing player:', error);
+        } catch {
+          // Player may already be disposed if DOM was removed
         }
         playerRef.current = null;
       }

@@ -34,7 +34,6 @@ const MAX_VERIFY_ATTEMPTS = 5;
  * }
  */
 export async function POST(request: NextRequest) {
-  const startTime = Date.now();
   let identifier: string | undefined;
   let userId: string | undefined;
 
@@ -318,9 +317,6 @@ export async function POST(request: NextRequest) {
     });
 
     logMetric({ metric: 'otp_verified', value: 1, tags: { loginMode } });
-
-    const duration = Date.now() - startTime;
-    console.log(`[OTP Verify] Success in ${duration}ms`);
 
     // Construct callback URL
     const authUrl = `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback?token_hash=${hashedToken}&type=magiclink`;
