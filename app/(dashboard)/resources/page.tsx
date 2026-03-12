@@ -23,6 +23,8 @@ import {
   ChevronRight,
   Clock,
   Heart,
+  AlertTriangle,
+  RefreshCw,
 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { cn } from '@/lib/utils';
@@ -98,6 +100,8 @@ export default function ResourcesPage() {
     fileName: string;
     fileType: string;
   }>({ isOpen: false, fileUrl: '', fileName: '', fileType: '' });
+  const [fetchError, setFetchError] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const [favoritesLoaded, setFavoritesLoaded] = useState(false);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
@@ -187,6 +191,7 @@ export default function ResourcesPage() {
 
     const fetchResources = async () => {
       setLoading(true);
+      setFetchError(false);
       try {
         const params = new URLSearchParams({
           category: activeTab,
@@ -212,7 +217,7 @@ export default function ResourcesPage() {
         }
       } catch (error) {
         if (error instanceof DOMException && error.name === 'AbortError') return;
-        console.error('Error fetching resources:', error);
+        setFetchError(true);
         toast.error('Failed to load resources');
       } finally {
         if (!controller.signal.aborted) {
@@ -226,7 +231,7 @@ export default function ResourcesPage() {
     }
 
     return () => controller.abort();
-  }, [activeTab, debouncedSearch, userLoading, activeCohortId]);
+  }, [activeTab, debouncedSearch, userLoading, activeCohortId, retryKey]);
 
   const formatFileSize = (bytes: number | null) => {
     if (!bytes) return '--';
@@ -384,6 +389,18 @@ export default function ResourcesPage() {
         <div className="flex items-center justify-center py-16">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
         </div>
+      ) : fetchError && resources.length === 0 ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-16">
+            <AlertTriangle className="w-16 h-16 text-destructive opacity-50 mb-4" />
+            <h3 className="text-lg font-medium mb-2">Failed to load resources</h3>
+            <p className="text-muted-foreground text-center max-w-sm mb-4">Check your connection and try again</p>
+            <Button variant="outline" onClick={() => setRetryKey(k => k + 1)}>
+              <RefreshCw className="w-4 h-4 mr-1.5" />
+              Try again
+            </Button>
+          </CardContent>
+        </Card>
       ) : displayedResources.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16">

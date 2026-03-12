@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useUserContext } from '@/contexts/user-context';
 import { getClient } from '@/lib/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
@@ -29,6 +29,8 @@ import {
   X,
   ExternalLink,
   Globe,
+  AlertTriangle,
+  RefreshCw,
 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import {
@@ -62,72 +64,76 @@ export default function CalendarPage() {
   const [sessions, setSessions] = useState<SessionWithRsvp[]>([]);
   const [selectedSession, setSelectedSession] = useState<SessionWithRsvp | null>(null);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
   const [timezoneMode, setTimezoneMode] = useState<TimezoneMode>('ist');
   const [rsvpLoading, setRsvpLoading] = useState(false);
 
   // Get browser's local timezone
   const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-  useEffect(() => {
-    const fetchSessions = async () => {
-      const supabase = getClient();
-      const start = startOfMonth(currentMonth);
-      const end = endOfMonth(currentMonth);
+  const fetchSessions = useCallback(async () => {
+    const supabase = getClient();
+    const start = startOfMonth(currentMonth);
+    const end = endOfMonth(currentMonth);
 
-      try {
-        // FILTERING LOGIC:
-        // - Admin role: Show ALL sessions from all cohorts
-        // - Student/Mentor role: Show ONLY sessions for active cohort
-        //   Uses session_cohorts junction table for proper multi-cohort support
-        if (!isAdmin && !activeCohortId) {
-          setLoading(false);
-          return;
-        }
+    setLoading(true);
+    setFetchError(false);
 
-        const selectClause = (!isAdmin && activeCohortId)
-          ? '*, session_cohorts!inner(cohort_id)'
-          : '*';
-
-        let query = supabase
-          .from('sessions')
-          .select(selectClause)
-          .gte('scheduled_at', start.toISOString())
-          .lte('scheduled_at', end.toISOString())
-          .order('scheduled_at', { ascending: true });
-
-        if (!isAdmin) {
-          query = query.eq('session_cohorts.cohort_id', activeCohortId);
-        }
-
-        const { data: sessionsData, error: sessionsError } = await query;
-
-        if (sessionsError) throw sessionsError;
-
-        // Fetch RSVPs only if user is logged in
-        const { data: rsvpsData } = profile ? await supabase
-          .from('rsvps')
-          .select('*')
-          .eq('user_id', profile.id)
-          .in('session_id', sessionsData?.map((s: Session) => s.id) || []) : { data: null };
-
-        const sessionsWithRsvp = sessionsData?.map((session: Session) => ({
-          ...session,
-          user_rsvp: rsvpsData?.find((r: Rsvp) => r.session_id === session.id),
-        })) || [];
-
-        setSessions(sessionsWithRsvp);
-      } catch (error) {
-        console.error('Error fetching sessions:', error);
-        toast.error('Failed to load calendar');
-      } finally {
+    try {
+      // FILTERING LOGIC:
+      // - Admin role: Show ALL sessions from all cohorts
+      // - Student/Mentor role: Show ONLY sessions for active cohort
+      //   Uses session_cohorts junction table for proper multi-cohort support
+      if (!isAdmin && !activeCohortId) {
         setLoading(false);
+        return;
       }
-    };
 
+      const selectClause = (!isAdmin && activeCohortId)
+        ? '*, session_cohorts!inner(cohort_id)'
+        : '*';
+
+      let query = supabase
+        .from('sessions')
+        .select(selectClause)
+        .gte('scheduled_at', start.toISOString())
+        .lte('scheduled_at', end.toISOString())
+        .order('scheduled_at', { ascending: true });
+
+      if (!isAdmin) {
+        query = query.eq('session_cohorts.cohort_id', activeCohortId);
+      }
+
+      const { data: sessionsData, error: sessionsError } = await query;
+
+      if (sessionsError) throw sessionsError;
+
+      // Fetch RSVPs only if user is logged in
+      const { data: rsvpsData } = profile ? await supabase
+        .from('rsvps')
+        .select('*')
+        .eq('user_id', profile.id)
+        .in('session_id', sessionsData?.map((s: Session) => s.id) || []) : { data: null };
+
+      const sessionsWithRsvp = sessionsData?.map((session: Session) => ({
+        ...session,
+        user_rsvp: rsvpsData?.find((r: Rsvp) => r.session_id === session.id),
+      })) || [];
+
+      setSessions(sessionsWithRsvp);
+    } catch {
+      setFetchError(true);
+      toast.error('Failed to load calendar');
+    } finally {
+      setLoading(false);
+    }
+  }, [profile, currentMonth, activeCohortId, isAdmin]);
+
+  useEffect(() => {
     if (!userLoading) {
       fetchSessions();
     }
-  }, [profile, currentMonth, userLoading, activeCohortId, isAdmin]);
+  }, [userLoading, fetchSessions]);
 
   const handleRsvp = async (response: 'yes' | 'no') => {
     if (!selectedSession || !profile) return;
@@ -254,6 +260,23 @@ export default function CalendarPage() {
   // This prevents flash of empty content
   if (userLoading || loading) {
     return <StudentPageLoader message="Loading your schedule..." />;
+  }
+
+  if (fetchError && sessions.length === 0) {
+    return (
+      <div className="space-y-6">
+        <PageHeader icon={CalendarIcon} title="Calendar" description="View upcoming sessions and events" />
+        <div className="text-center py-16 text-muted-foreground">
+          <AlertTriangle className="w-16 h-16 mx-auto mb-4 opacity-50 text-destructive" />
+          <p className="text-xl font-medium text-foreground">Failed to load calendar</p>
+          <p className="text-sm mt-1">Check your connection and try again</p>
+          <Button variant="outline" className="mt-4" onClick={fetchSessions}>
+            <RefreshCw className="w-4 h-4 mr-1.5" />
+            Try again
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   return (
