@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUserContext } from '@/contexts/user-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,6 +18,8 @@ import {
   FileText,
   Calendar,
   Eye,
+  AlertTriangle,
+  RefreshCw,
 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { format } from 'date-fns';
@@ -45,8 +47,30 @@ export default function StudentInvoicesPage() {
   const [invoices, setInvoices] = useState<InvoiceWithCohort[]>([]);
   const [stats, setStats] = useState<InvoiceStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const hasFetchedRef = useRef(false);
+
+  const fetchInvoices = useCallback(async () => {
+    if (!profile) return;
+
+    setFetchError(false);
+    setLoading(true);
+
+    try {
+      const response = await fetch('/api/invoices');
+      if (!response.ok) throw new Error('Failed to fetch invoices');
+
+      const data = await response.json();
+      setInvoices(data.invoices || []);
+      setStats(data.stats || null);
+    } catch {
+      setFetchError(true);
+      toast.error('Failed to load invoices');
+    } finally {
+      setLoading(false);
+    }
+  }, [profile]);
 
   useEffect(() => {
     // Redirect admin to admin page
@@ -55,31 +79,18 @@ export default function StudentInvoicesPage() {
       return;
     }
 
-    const fetchInvoices = async () => {
-      if (!profile || hasFetchedRef.current) return;
+    if (profile && !hasFetchedRef.current) {
       hasFetchedRef.current = true;
-
-      try {
-        const response = await fetch('/api/invoices');
-        if (!response.ok) throw new Error('Failed to fetch invoices');
-
-        const data = await response.json();
-        setInvoices(data.invoices || []);
-        setStats(data.stats || null);
-      } catch (error) {
-        console.error('Error fetching invoices:', error);
-        toast.error('Failed to load invoices');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (profile) {
       fetchInvoices();
     } else if (!userLoading) {
       setLoading(false);
     }
-  }, [profile, userLoading, isAdmin, router]);
+  }, [profile, userLoading, isAdmin, router, fetchInvoices]);
+
+  const handleRetry = useCallback(() => {
+    hasFetchedRef.current = false;
+    fetchInvoices();
+  }, [fetchInvoices]);
 
   const handleDownload = async (invoice: InvoiceWithCohort) => {
     if (!invoice.pdf_path) {
@@ -136,6 +147,20 @@ export default function StudentInvoicesPage() {
   // This prevents flash of empty content
   if (userLoading || loading) {
     return <StudentPageLoader message="Loading your invoices..." />;
+  }
+
+  if (fetchError && invoices.length === 0) {
+    return (
+      <div className="text-center py-16 text-muted-foreground">
+        <AlertTriangle className="w-16 h-16 mx-auto mb-4 opacity-50 text-destructive" />
+        <p className="text-xl font-medium text-foreground">Failed to load invoices</p>
+        <p className="text-sm mt-1">Check your connection and try again</p>
+        <Button variant="outline" className="mt-4" onClick={handleRetry}>
+          <RefreshCw className="w-4 h-4 mr-1.5" />
+          Try again
+        </Button>
+      </div>
+    );
   }
 
   if (!profile) {

@@ -12,7 +12,7 @@ import { RatingStars } from '@/components/ui/rating-stars';
 import { PageLoader } from '@/components/ui/page-loader';
 import { useUserContext } from '@/contexts/user-context';
 import { toast } from 'sonner';
-import { Loader2, MessageSquare, Star } from 'lucide-react';
+import { Loader2, MessageSquare, Star, AlertTriangle, RefreshCw } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { format } from 'date-fns';
 import { MotionFadeIn } from '@/components/ui/motion';
@@ -46,9 +46,12 @@ export default function MentorFeedbackPage() {
   const [recentFeedback, setRecentFeedback] = useState<FeedbackEntry[]>([]);
   const [myRatings, setMyRatings] = useState<FeedbackAggregate | null>(null);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const fetchData = useCallback(async () => {
+    setLoading(true);
+    setFetchError(false);
     try {
       const [sgRes, fbRes, ratingsRes] = await Promise.all([
         fetch('/api/subgroups/mentor-subgroups'),
@@ -72,6 +75,7 @@ export default function MentorFeedbackPage() {
         setMyRatings(ratingsData.data || null);
       }
     } catch {
+      setFetchError(true);
       toast.error('Failed to load data');
     } finally {
       setLoading(false);
@@ -120,6 +124,20 @@ export default function MentorFeedbackPage() {
   };
 
   if (loading) return <PageLoader message="Loading feedback..." />;
+
+  if (fetchError && subgroups.length === 0) {
+    return (
+      <div className="text-center py-16 text-muted-foreground">
+        <AlertTriangle className="w-16 h-16 mx-auto mb-4 opacity-50 text-destructive" />
+        <p className="text-xl font-medium text-foreground">Failed to load feedback</p>
+        <p className="text-sm mt-1">Check your connection and try again</p>
+        <Button variant="outline" className="mt-4" onClick={fetchData}>
+          <RefreshCw className="w-4 h-4 mr-1.5" />
+          Try again
+        </Button>
+      </div>
+    );
+  }
 
   if (activeRole !== 'mentor') {
     return (

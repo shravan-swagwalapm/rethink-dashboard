@@ -8,7 +8,8 @@ import { PageLoader } from '@/components/ui/page-loader';
 import { ProfileDetailSheet } from '@/components/ui/profile-detail-sheet';
 import { useUserContext } from '@/contexts/user-context';
 import { toast } from 'sonner';
-import { Users } from 'lucide-react';
+import { Users, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/ui/page-header';
 import { MotionFadeIn, MotionContainer, MotionItem } from '@/components/ui/motion';
 import type { Profile } from '@/types';
@@ -25,15 +26,19 @@ export default function MentorSubgroupsPage() {
   const { activeRole } = useUserContext();
   const [subgroups, setSubgroups] = useState<MentorSubgroup[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
   const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
 
   const fetchSubgroups = useCallback(async () => {
+    setLoading(true);
+    setFetchError(false);
     try {
       const res = await fetch('/api/subgroups/mentor-subgroups');
       if (!res.ok) throw new Error('Failed to fetch');
       const result = await res.json();
       setSubgroups(result.data || []);
     } catch {
+      setFetchError(true);
       toast.error('Failed to load subgroups');
     } finally {
       setLoading(false);
@@ -43,6 +48,20 @@ export default function MentorSubgroupsPage() {
   useEffect(() => { fetchSubgroups(); }, [fetchSubgroups]);
 
   if (loading) return <PageLoader message="Loading your subgroups..." />;
+
+  if (fetchError && subgroups.length === 0) {
+    return (
+      <div className="text-center py-16 text-muted-foreground">
+        <AlertTriangle className="w-16 h-16 mx-auto mb-4 opacity-50 text-destructive" />
+        <p className="text-xl font-medium text-foreground">Failed to load subgroups</p>
+        <p className="text-sm mt-1">Check your connection and try again</p>
+        <Button variant="outline" className="mt-4" onClick={fetchSubgroups}>
+          <RefreshCw className="w-4 h-4 mr-1.5" />
+          Try again
+        </Button>
+      </div>
+    );
+  }
 
   if (activeRole !== 'mentor') {
     return (

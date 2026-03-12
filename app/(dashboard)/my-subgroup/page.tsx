@@ -9,7 +9,8 @@ import { PageLoader } from '@/components/ui/page-loader';
 import { ProfileDetailSheet } from '@/components/ui/profile-detail-sheet';
 import { toast } from 'sonner';
 import { MotionContainer, MotionItem, MotionFadeIn } from '@/components/ui/motion';
-import { Users, UserCheck } from 'lucide-react';
+import { Users, UserCheck, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/ui/page-header';
 import type { Profile } from '@/types';
 
@@ -26,8 +27,10 @@ export default function MySubgroupPage() {
   const [loading, setLoading] = useState(true);
   const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
   const [selectedRole, setSelectedRole] = useState<string>('');
+  const [fetchError, setFetchError] = useState(false);
 
   const fetchData = useCallback(async () => {
+    setFetchError(false);
     try {
       const params = new URLSearchParams();
       if (activeCohortId) params.set('cohort_id', activeCohortId);
@@ -37,6 +40,7 @@ export default function MySubgroupPage() {
       setData(result.data);
     } catch {
       toast.error('Failed to load subgroup data');
+      setFetchError(true);
     } finally {
       setLoading(false);
     }
@@ -45,6 +49,20 @@ export default function MySubgroupPage() {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   if (loading) return <PageLoader message="Loading your subgroup..." />;
+
+  if (fetchError) {
+    return (
+      <div className="text-center py-16 text-muted-foreground">
+        <AlertTriangle className="w-16 h-16 mx-auto mb-4 opacity-50 text-destructive" />
+        <p className="text-xl font-medium text-foreground">Failed to load subgroup</p>
+        <p className="text-sm mt-1">Check your connection and try again</p>
+        <Button variant="outline" className="mt-4" onClick={() => { setLoading(true); fetchData(); }}>
+          <RefreshCw className="w-4 h-4 mr-1.5" />
+          Try again
+        </Button>
+      </div>
+    );
+  }
 
   if (!data) {
     return (

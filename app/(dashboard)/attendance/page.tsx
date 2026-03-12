@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useUserContext } from '@/contexts/user-context';
 import { useSearchParams } from 'next/navigation';
 import { getClient } from '@/lib/supabase/client';
@@ -37,6 +37,7 @@ import {
   Users,
   TrendingUp,
   AlertTriangle,
+  RefreshCw,
 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { format, parseISO, differenceInMinutes } from 'date-fns';
@@ -60,87 +61,90 @@ function AttendanceContent() {
   const [sessions, setSessions] = useState<SessionWithAttendance[]>([]);
   const [selectedSession, setSelectedSession] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
   const [exporting, setExporting] = useState(false);
 
+  const fetchAttendanceData = useCallback(async () => {
+    const cohortId = activeCohortId || profile?.cohort_id;
+    if (!cohortId) {
+      setLoading(false);
+      return;
+    }
+
+    setFetchError(false);
+    setLoading(true);
+    const supabase = getClient();
+
+    try {
+      // Fetch all sessions
+      const { data: sessionsData, error: sessionsError } = await supabase
+        .from('sessions')
+        .select('*')
+        .eq('cohort_id', cohortId)
+        .eq('counts_for_students', true)
+        .lte('scheduled_at', new Date().toISOString())
+        .order('scheduled_at', { ascending: false });
+
+      if (sessionsError) throw sessionsError;
+
+      // Fetch attendance data
+      const sessionIds = sessionsData?.map((s: Session) => s.id) || [];
+      const { data: attendanceData } = await supabase
+        .from('attendance')
+        .select(`
+          *,
+          user:profiles(*)
+        `)
+        .in('session_id', sessionIds);
+
+      // Get team members count (using user_role_assignments)
+      let studentsQuery = supabase
+        .from('user_role_assignments')
+        .select('user_id')
+        .eq('role', 'student')
+        .eq('cohort_id', cohortId);
+
+      const { data: studentsData } = await studentsQuery;
+      const totalStudents = studentsData?.length || 0;
+
+      // Merge attendance with sessions
+      const sessionsWithAttendance = sessionsData?.map((session: Session) => {
+        const sessionAttendance = attendanceData?.filter((a: AttendanceWithUser) => a.session_id === session.id) || [];
+
+        // If filtering by student
+        const filteredAttendance = studentIdFilter
+          ? sessionAttendance.filter((a: AttendanceWithUser) => a.user_id === studentIdFilter)
+          : sessionAttendance;
+
+        return {
+          ...session,
+          attendance: filteredAttendance as AttendanceWithUser[],
+          total_students: studentIdFilter ? 1 : totalStudents,
+          attended_count: filteredAttendance.length,
+        };
+      }) || [];
+
+      setSessions(sessionsWithAttendance);
+
+      // Select the most recent session by default
+      if (sessionsWithAttendance.length > 0 && !selectedSession) {
+        setSelectedSession(sessionsWithAttendance[0].id);
+      }
+    } catch (error) {
+      setFetchError(true);
+      toast.error('Failed to load attendance data');
+    } finally {
+      setLoading(false);
+    }
+  }, [profile, activeCohortId, studentIdFilter]);
+
   useEffect(() => {
-    const fetchAttendanceData = async () => {
-      const cohortId = activeCohortId || profile?.cohort_id;
-      if (!cohortId) {
-        setLoading(false);
-        return;
-      }
-
-      const supabase = getClient();
-
-      try {
-        // Fetch all sessions
-        const { data: sessionsData, error: sessionsError } = await supabase
-          .from('sessions')
-          .select('*')
-          .eq('cohort_id', cohortId)
-          .eq('counts_for_students', true)
-          .lte('scheduled_at', new Date().toISOString())
-          .order('scheduled_at', { ascending: false });
-
-        if (sessionsError) throw sessionsError;
-
-        // Fetch attendance data
-        const sessionIds = sessionsData?.map((s: Session) => s.id) || [];
-        const { data: attendanceData } = await supabase
-          .from('attendance')
-          .select(`
-            *,
-            user:profiles(*)
-          `)
-          .in('session_id', sessionIds);
-
-        // Get team members count (using user_role_assignments)
-        let studentsQuery = supabase
-          .from('user_role_assignments')
-          .select('user_id')
-          .eq('role', 'student')
-          .eq('cohort_id', cohortId);
-
-        const { data: studentsData } = await studentsQuery;
-        const totalStudents = studentsData?.length || 0;
-
-        // Merge attendance with sessions
-        const sessionsWithAttendance = sessionsData?.map((session: Session) => {
-          const sessionAttendance = attendanceData?.filter((a: AttendanceWithUser) => a.session_id === session.id) || [];
-
-          // If filtering by student
-          const filteredAttendance = studentIdFilter
-            ? sessionAttendance.filter((a: AttendanceWithUser) => a.user_id === studentIdFilter)
-            : sessionAttendance;
-
-          return {
-            ...session,
-            attendance: filteredAttendance as AttendanceWithUser[],
-            total_students: studentIdFilter ? 1 : totalStudents,
-            attended_count: filteredAttendance.length,
-          };
-        }) || [];
-
-        setSessions(sessionsWithAttendance);
-
-        // Select the most recent session by default
-        if (sessionsWithAttendance.length > 0 && !selectedSession) {
-          setSelectedSession(sessionsWithAttendance[0].id);
-        }
-      } catch (error) {
-        console.error('Error fetching attendance:', error);
-        toast.error('Failed to load attendance data');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     if (!userLoading && (isMentor || isAdmin)) {
       fetchAttendanceData();
     } else if (!userLoading) {
       setLoading(false);
     }
-  }, [profile, isMentor, isAdmin, userLoading, studentIdFilter, activeCohortId]);
+  }, [userLoading, isMentor, isAdmin, fetchAttendanceData]);
 
   const selectedSessionData = sessions.find(s => s.id === selectedSession);
 
@@ -225,6 +229,20 @@ function AttendanceContent() {
   // This prevents flash of empty content
   if (userLoading || loading) {
     return <StudentPageLoader message="Loading attendance records..." />;
+  }
+
+  if (fetchError && sessions.length === 0) {
+    return (
+      <div className="text-center py-16 text-muted-foreground">
+        <AlertTriangle className="w-16 h-16 mx-auto mb-4 opacity-50 text-destructive" />
+        <p className="text-xl font-medium text-foreground">Failed to load attendance</p>
+        <p className="text-sm mt-1">Check your connection and try again</p>
+        <Button variant="outline" className="mt-4" onClick={fetchAttendanceData}>
+          <RefreshCw className="w-4 h-4 mr-1.5" />
+          Try again
+        </Button>
+      </div>
+    );
   }
 
   if (!isMentor && !isAdmin) {

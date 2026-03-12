@@ -25,6 +25,7 @@ import {
   Eye,
   Loader2,
   AlertTriangle,
+  RefreshCw,
   Users,
   ExternalLink,
   Send,
@@ -57,6 +58,7 @@ export default function MentorCaseStudiesPage() {
   const { activeCohortId } = useUserContext();
   const [caseStudies, setCaseStudies] = useState<MentorCaseStudy[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
 
   // Review sheet
   const [reviewOpen, setReviewOpen] = useState(false);
@@ -75,12 +77,14 @@ export default function MentorCaseStudiesPage() {
   const fetchData = useCallback(async () => {
     if (!activeCohortId) return;
     setLoading(true);
+    setFetchError(false);
     try {
       const res = await fetch(`/api/mentor/case-studies?cohort_id=${activeCohortId}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setCaseStudies(data.caseStudies || []);
     } catch {
+      setFetchError(true);
       toast.error('Failed to load case studies');
     } finally {
       setLoading(false);
@@ -181,6 +185,16 @@ export default function MentorCaseStudiesPage() {
       {loading ? (
         <div className="flex items-center justify-center py-20">
           <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+        </div>
+      ) : fetchError && caseStudies.length === 0 ? (
+        <div className="text-center py-16 text-muted-foreground">
+          <AlertTriangle className="w-16 h-16 mx-auto mb-4 opacity-50 text-destructive" />
+          <p className="text-xl font-medium text-foreground">Failed to load case studies</p>
+          <p className="text-sm mt-1">Check your connection and try again</p>
+          <Button variant="outline" className="mt-4" onClick={fetchData}>
+            <RefreshCw className="w-4 h-4 mr-1.5" />
+            Try again
+          </Button>
         </div>
       ) : caseStudies.length === 0 ? (
         <EmptyState

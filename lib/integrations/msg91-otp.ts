@@ -5,6 +5,10 @@
  * @see https://docs.msg91.com/p/tf9GTextN/e/Yv-55gDq3/MSG91
  */
 
+import { fetchWithTimeout } from '@/lib/fetch-with-timeout';
+
+const MSG91_TIMEOUT_MS = 15_000; // 15s — OTP APIs should respond within this
+
 interface MSG91Config {
   authKey: string;
   templateId: string;
@@ -91,7 +95,7 @@ export async function sendOTP(phone: string): Promise<SendOTPResponse> {
   const formattedPhone = formatPhoneForMSG91(phone);
 
   try {
-    const response = await fetch('https://control.msg91.com/api/v5/otp', {
+    const response = await fetchWithTimeout('https://control.msg91.com/api/v5/otp', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -103,7 +107,14 @@ export async function sendOTP(phone: string): Promise<SendOTPResponse> {
         otp_length: config.otpLength,
         otp_expiry: Math.floor(config.expirySeconds / 60), // MSG91 expects minutes
       }),
-    });
+    }, MSG91_TIMEOUT_MS);
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: `MSG91 returned ${response.status}`,
+      };
+    }
 
     const result = await response.json();
 
@@ -122,10 +133,10 @@ export async function sendOTP(phone: string): Promise<SendOTPResponse> {
       error: result.message || 'Failed to send OTP',
     };
   } catch (error: any) {
-    console.error('[MSG91] Send OTP error:', error);
+    const isTimeout = error.name === 'AbortError';
     return {
       success: false,
-      error: error.message || 'Network error sending OTP',
+      error: isTimeout ? 'OTP service timed out. Please try again.' : (error.message || 'Network error sending OTP'),
     };
   }
 }
@@ -150,12 +161,12 @@ export async function verifyOTP(phone: string, otp: string): Promise<VerifyOTPRe
   try {
     const url = `https://control.msg91.com/api/v5/otp/verify?mobile=${formattedPhone}&otp=${otp}`;
 
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
       method: 'GET',
       headers: {
         'authkey': config.authKey,
       },
-    });
+    }, MSG91_TIMEOUT_MS);
 
     const result = await response.json();
 
@@ -174,10 +185,10 @@ export async function verifyOTP(phone: string, otp: string): Promise<VerifyOTPRe
       error: result.message || 'Invalid OTP',
     };
   } catch (error: any) {
-    console.error('[MSG91] Verify OTP error:', error);
+    const isTimeout = error.name === 'AbortError';
     return {
       success: false,
-      error: error.message || 'Network error verifying OTP',
+      error: isTimeout ? 'OTP service timed out. Please try again.' : (error.message || 'Network error verifying OTP'),
     };
   }
 }
@@ -207,12 +218,12 @@ export async function resendOTP(
   try {
     const url = `https://control.msg91.com/api/v5/otp/retry?mobile=${formattedPhone}&retrytype=${retryType}`;
 
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
       method: 'GET',
       headers: {
         'authkey': config.authKey,
       },
-    });
+    }, MSG91_TIMEOUT_MS);
 
     const result = await response.json();
 
@@ -231,10 +242,10 @@ export async function resendOTP(
       error: result.message || 'Failed to resend OTP',
     };
   } catch (error: any) {
-    console.error('[MSG91] Resend OTP error:', error);
+    const isTimeout = error.name === 'AbortError';
     return {
       success: false,
-      error: error.message || 'Network error resending OTP',
+      error: isTimeout ? 'OTP service timed out. Please try again.' : (error.message || 'Network error resending OTP'),
     };
   }
 }
@@ -250,7 +261,7 @@ export async function testMSG91Connection(): Promise<{ success: boolean; error?:
     const config = getMSG91Config();
 
     // Test with a dummy request to check if credentials are valid
-    const response = await fetch('https://control.msg91.com/api/v5/otp', {
+    const response = await fetchWithTimeout('https://control.msg91.com/api/v5/otp', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -262,19 +273,19 @@ export async function testMSG91Connection(): Promise<{ success: boolean; error?:
         otp_length: 6,
         otp_expiry: 5,
       }),
-    });
+    }, MSG91_TIMEOUT_MS);
 
-    const result = await response.json();
-
-    // Even if sending to test number fails, we know credentials are valid if we get a proper response
+    // Any response (even error) means MSG91 is reachable and credentials are accepted
+    // A 401/403 would indicate bad credentials
     return {
-      success: response.ok || result.type === 'error',
-      error: response.ok ? undefined : 'MSG91 credentials may be invalid',
+      success: response.ok,
+      error: response.ok ? undefined : `MSG91 returned ${response.status} — check credentials`,
     };
   } catch (error: any) {
+    const isTimeout = error.name === 'AbortError';
     return {
       success: false,
-      error: error.message || 'Could not connect to MSG91',
+      error: isTimeout ? 'MSG91 connection timed out' : (error.message || 'Could not connect to MSG91'),
     };
   }
 }

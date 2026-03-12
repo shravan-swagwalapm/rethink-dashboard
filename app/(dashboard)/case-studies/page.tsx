@@ -7,7 +7,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { CaseStudyViewerModal } from '@/components/case-studies/case-study-viewer-modal';
 import { Leaderboard } from '@/components/case-studies/leaderboard';
 import { toast } from 'sonner';
-import { FileText, Loader2, Mail } from 'lucide-react';
+import { AlertTriangle, FileText, Loader2, Mail, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { CaseStudyReview } from '@/types';
 import { SubmissionPanel } from './components/submission-panel';
@@ -19,6 +19,7 @@ export default function CaseStudiesPage() {
   const [caseStudies, setCaseStudies] = useState<CaseStudyWithSubmission[]>([]);
   const [subgroup, setSubgroup] = useState<{ id: string; name: string } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
   const [noSubgroup, setNoSubgroup] = useState(false);
 
   // Submission panel
@@ -38,6 +39,7 @@ export default function CaseStudiesPage() {
   const fetchData = useCallback(async (signal?: AbortSignal) => {
     if (!activeCohortId) return;
     setLoading(true);
+    setFetchError(false);
     setNoSubgroup(false);
     try {
       const res = await fetch(`/api/case-studies/my-submissions?cohort_id=${activeCohortId}`, { signal });
@@ -55,6 +57,7 @@ export default function CaseStudiesPage() {
       setCaseStudies(data.caseStudies || []);
     } catch (e) {
       if (e instanceof DOMException && e.name === 'AbortError') return;
+      setFetchError(true);
       toast.error('Failed to load case studies');
     } finally {
       if (!signal?.aborted) setLoading(false);
@@ -118,6 +121,24 @@ export default function CaseStudiesPage() {
   }, {});
 
   const weekNumbers = Object.keys(grouped).map(Number).sort((a, b) => a - b);
+
+  // Fetch error gate
+  if (fetchError && caseStudies.length === 0) {
+    return (
+      <div className="p-6">
+        <PageHeader title="Case Studies" />
+        <div className="text-center py-16 text-muted-foreground">
+          <AlertTriangle className="w-16 h-16 mx-auto mb-4 opacity-50 text-destructive" />
+          <p className="text-xl font-medium text-foreground">Failed to load case studies</p>
+          <p className="text-sm mt-1">Check your connection and try again</p>
+          <Button variant="outline" className="mt-4" onClick={() => fetchData()}>
+            <RefreshCw className="w-4 h-4 mr-1.5" />
+            Try again
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   // Subgroup gate
   if (!loading && noSubgroup) {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useUserContext } from '@/contexts/user-context';
 import { getClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -36,6 +36,8 @@ import {
   Calendar,
   TrendingUp,
   Trophy,
+  AlertTriangle,
+  RefreshCw,
 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import Link from 'next/link';
@@ -51,75 +53,78 @@ export default function TeamPage() {
   const { profile, isMentor, isAdmin, activeCohortId, loading: userLoading } = useUserContext();
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
+  const fetchTeamMembers = useCallback(async () => {
+    if (!profile) {
+      setLoading(false);
+      return;
+    }
+
+    setFetchError(false);
+    setLoading(true);
+    const supabase = getClient();
+
+    try {
+      // Fetch team members via server-side API (uses adminClient, bypasses RLS)
+      const view = (isMentor && !isAdmin) ? 'mentor' : 'admin';
+      const params = new URLSearchParams({ view });
+      if (activeCohortId) params.set('cohort_id', activeCohortId);
+
+      const res = await fetch(`/api/team/members?${params}`);
+      if (!res.ok) throw new Error('Failed to fetch team members');
+      const { members: fetchedMembers } = await res.json();
+      const members: Profile[] = fetchedMembers || [];
+
+      // Fetch rankings for all members
+      const memberIds = members?.map((m: Profile) => m.id) || [];
+      const { data: rankings } = await supabase
+        .from('rankings')
+        .select('*')
+        .in('user_id', memberIds);
+
+      // Fetch attendance data
+      const { data: attendanceData } = await supabase
+        .from('attendance')
+        .select('user_id, attendance_percentage')
+        .in('user_id', memberIds);
+
+      // Calculate average attendance per user
+      const attendanceByUser = attendanceData?.reduce((acc: Record<string, { total: number; count: number }>, a: { user_id: string; attendance_percentage: number | null }) => {
+        if (!acc[a.user_id]) {
+          acc[a.user_id] = { total: 0, count: 0 };
+        }
+        acc[a.user_id].total += a.attendance_percentage || 0;
+        acc[a.user_id].count += 1;
+        return acc;
+      }, {} as Record<string, { total: number; count: number }>);
+
+      // Merge all data
+      const enrichedMembers = members?.map((member: Profile) => ({
+        ...member,
+        ranking: rankings?.find((r: Ranking) => r.user_id === member.id),
+        attendance_percentage: attendanceByUser?.[member.id]
+          ? Math.round(attendanceByUser[member.id].total / attendanceByUser[member.id].count)
+          : 0,
+      })) || [];
+
+      setTeamMembers(enrichedMembers);
+    } catch {
+      setFetchError(true);
+      toast.error('Failed to load team members');
+    } finally {
+      setLoading(false);
+    }
+  }, [profile, isMentor, isAdmin, activeCohortId]);
+
   useEffect(() => {
-    const fetchTeamMembers = async () => {
-      if (!profile) {
-        setLoading(false);
-        return;
-      }
-
-      const supabase = getClient();
-
-      try {
-        // Fetch team members via server-side API (uses adminClient, bypasses RLS)
-        const view = (isMentor && !isAdmin) ? 'mentor' : 'admin';
-        const params = new URLSearchParams({ view });
-        if (activeCohortId) params.set('cohort_id', activeCohortId);
-
-        const res = await fetch(`/api/team/members?${params}`);
-        if (!res.ok) throw new Error('Failed to fetch team members');
-        const { members: fetchedMembers } = await res.json();
-        const members: Profile[] = fetchedMembers || [];
-
-        // Fetch rankings for all members
-        const memberIds = members?.map((m: Profile) => m.id) || [];
-        const { data: rankings } = await supabase
-          .from('rankings')
-          .select('*')
-          .in('user_id', memberIds);
-
-        // Fetch attendance data
-        const { data: attendanceData } = await supabase
-          .from('attendance')
-          .select('user_id, attendance_percentage')
-          .in('user_id', memberIds);
-
-        // Calculate average attendance per user
-        const attendanceByUser = attendanceData?.reduce((acc: Record<string, { total: number; count: number }>, a: { user_id: string; attendance_percentage: number | null }) => {
-          if (!acc[a.user_id]) {
-            acc[a.user_id] = { total: 0, count: 0 };
-          }
-          acc[a.user_id].total += a.attendance_percentage || 0;
-          acc[a.user_id].count += 1;
-          return acc;
-        }, {} as Record<string, { total: number; count: number }>);
-
-        // Merge all data
-        const enrichedMembers = members?.map((member: Profile) => ({
-          ...member,
-          ranking: rankings?.find((r: Ranking) => r.user_id === member.id),
-          attendance_percentage: attendanceByUser?.[member.id]
-            ? Math.round(attendanceByUser[member.id].total / attendanceByUser[member.id].count)
-            : 0,
-        })) || [];
-
-        setTeamMembers(enrichedMembers);
-      } catch (error) {
-        console.error('Error fetching team members:', error);
-        toast.error('Failed to load team members');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     if (!userLoading && (isMentor || isAdmin)) {
       fetchTeamMembers();
     } else if (!userLoading) {
       setLoading(false);
     }
-  }, [profile, isMentor, isAdmin, userLoading, activeCohortId]);
+  }, [userLoading, isMentor, isAdmin, fetchTeamMembers]);
 
   // Filter team members based on search
   const filteredMembers = searchQuery
@@ -140,6 +145,20 @@ export default function TeamPage() {
   // This prevents flash of empty content
   if (userLoading || loading) {
     return <StudentPageLoader message="Loading your team..." />;
+  }
+
+  if (fetchError && teamMembers.length === 0) {
+    return (
+      <div className="text-center py-16 text-muted-foreground">
+        <AlertTriangle className="w-16 h-16 mx-auto mb-4 opacity-50 text-destructive" />
+        <p className="text-xl font-medium text-foreground">Failed to load team</p>
+        <p className="text-sm mt-1">Check your connection and try again</p>
+        <Button variant="outline" className="mt-4" onClick={fetchTeamMembers}>
+          <RefreshCw className="w-4 h-4 mr-1.5" />
+          Try again
+        </Button>
+      </div>
+    );
   }
 
   if (!isMentor && !isAdmin) {
