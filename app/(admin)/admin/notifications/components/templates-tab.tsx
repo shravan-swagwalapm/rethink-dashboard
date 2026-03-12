@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import DOMPurify from 'isomorphic-dompurify';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -716,7 +717,7 @@ export function TemplatesTab() {
                 <Label className="text-xs text-muted-foreground dark:text-gray-500">Body</Label>
                 <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-950 border dark:border-gray-800 mt-1 max-h-[400px] overflow-y-auto">
                   {previewTemplate.channel === 'email' ? (
-                    <div dangerouslySetInnerHTML={{ __html: previewTemplate.body }} className="prose dark:prose-invert max-w-none" />
+                    <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(previewTemplate.body) }} className="prose dark:prose-invert max-w-none" />
                   ) : (
                     <pre className="whitespace-pre-wrap dark:text-white font-sans">{previewTemplate.body}</pre>
                   )}

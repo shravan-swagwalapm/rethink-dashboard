@@ -113,13 +113,15 @@ export function CaseStudyCard({
             )}
           </div>
 
-          {/* Deadline info */}
+          {/* Deadline info — hide active countdown once submitted */}
           <div className="flex items-center gap-3 text-sm text-muted-foreground">
-            <CountdownTimer
-              deadline={cs.due_date}
-              graceMinutes={cs.grace_period_minutes}
-              deadlineOverride={cs.submission?.deadline_override}
-            />
+            {status === 'not_submitted' && (
+              <CountdownTimer
+                deadline={cs.due_date}
+                graceMinutes={cs.grace_period_minutes}
+                deadlineOverride={cs.submission?.deadline_override}
+              />
+            )}
             {deadline && (
               <span className="text-xs">
                 Due: {deadline.toLocaleDateString('en-IN', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}

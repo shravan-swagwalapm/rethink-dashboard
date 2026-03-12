@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import DOMPurify from 'isomorphic-dompurify';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -373,7 +374,7 @@ export function ComposeTab({ onNavigateToTemplates }: ComposeTabProps) {
                         <p className="text-xs text-muted-foreground mb-1">Body:</p>
                         {selectedTemplate.channel === 'email' ? (
                           <div
-                            dangerouslySetInnerHTML={{ __html: previewContent.body }}
+                            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(previewContent.body) }}
                             className="prose dark:prose-invert max-w-none"
                           />
                         ) : (

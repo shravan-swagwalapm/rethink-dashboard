@@ -59,6 +59,7 @@ import {
   RefreshCw,
   Settings,
   GraduationCap,
+  AlertTriangle,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
@@ -75,6 +76,7 @@ export default function CohortsPage() {
   const router = useRouter();
   const [cohorts, setCohorts] = useState<CohortWithStats[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const [showForm, setShowForm] = useState(false);
@@ -99,6 +101,8 @@ export default function CohortsPage() {
     if (hasFetchedRef.current && !force) return;
     hasFetchedRef.current = true;
 
+    setFetchError(false);
+    setLoading(true);
     try {
       const response = await fetch('/api/admin/cohorts');
       if (!response.ok) {
@@ -108,6 +112,7 @@ export default function CohortsPage() {
       const data = await response.json();
       setCohorts(data);
     } catch (error) {
+      setFetchError(true);
       toast.error(error instanceof Error ? error.message : 'Failed to load cohorts');
     } finally {
       setLoading(false);
@@ -283,6 +288,23 @@ export default function CohortsPage() {
 
   if (loading) {
     return <PageLoader message="Loading cohorts..." />;
+  }
+
+  if (fetchError && cohorts.length === 0) {
+    return (
+      <div className="space-y-6">
+        <PageHeader icon={GraduationCap} title="Cohorts" description="Manage learning cohorts and their configurations" />
+        <div className="text-center py-16 text-muted-foreground">
+          <AlertTriangle className="w-16 h-16 mx-auto mb-4 opacity-50 text-destructive" />
+          <p className="text-xl font-medium text-foreground">Failed to load cohorts</p>
+          <p className="text-sm mt-1">Check your connection and try again</p>
+          <Button variant="outline" className="mt-4" onClick={() => fetchCohorts(true)}>
+            <RefreshCw className="w-4 h-4 mr-1.5" />
+            Try again
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   return (

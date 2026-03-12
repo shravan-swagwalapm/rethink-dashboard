@@ -39,6 +39,7 @@ import {
   AlertTriangle,
   BarChart3,
   Trophy,
+  RefreshCw,
 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -227,6 +228,7 @@ function StudentView() {
   const [attendance, setAttendance] = useState<AttendanceSession[]>([]);
   const [stats, setStats] = useState<AttendanceStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
 
   // Leaderboard state
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
@@ -235,24 +237,29 @@ function StudentView() {
   const [cohortAvg, setCohortAvg] = useState<number>(0);
   const [leaderboardLoading, setLeaderboardLoading] = useState(true);
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const cohortParam = activeCohortId ? `?cohort_id=${activeCohortId}` : '';
-        const res = await fetch(`/api/analytics${cohortParam}`);
-        if (res.ok) {
-          const data = await res.json();
-          setAttendance(data.attendance || []);
-          setStats(data.stats);
-        }
-      } catch (error) {
-        console.error('Failed to fetch attendance:', error);
-      } finally {
-        setLoading(false);
+  const fetchAttendance = useCallback(async () => {
+    setLoading(true);
+    setFetchError(false);
+    try {
+      const cohortParam = activeCohortId ? `?cohort_id=${activeCohortId}` : '';
+      const res = await fetch(`/api/analytics${cohortParam}`);
+      if (res.ok) {
+        const data = await res.json();
+        setAttendance(data.attendance || []);
+        setStats(data.stats);
+      } else {
+        setFetchError(true);
       }
+    } catch {
+      setFetchError(true);
+    } finally {
+      setLoading(false);
     }
-    fetchData();
   }, [activeCohortId]);
+
+  useEffect(() => {
+    fetchAttendance();
+  }, [fetchAttendance]);
 
   // Fetch leaderboard data separately
   useEffect(() => {
@@ -266,8 +273,8 @@ function StudentView() {
           setLeaderboardSessions(data.sessions || []);
           setCohortAvg(data.cohortAvg || 0);
         }
-      } catch (error) {
-        console.error('Failed to fetch leaderboard:', error);
+      } catch {
+        // Leaderboard is non-critical — silently degrade
       } finally {
         setLeaderboardLoading(false);
       }
@@ -321,6 +328,20 @@ function StudentView() {
             <Skeleton key={i} className="h-16 w-full rounded-lg" />
           ))}
         </div>
+      </div>
+    );
+  }
+
+  if (fetchError) {
+    return (
+      <div className="text-center py-16 text-muted-foreground">
+        <AlertTriangle className="w-16 h-16 mx-auto mb-4 opacity-50 text-destructive" />
+        <p className="text-xl font-medium text-foreground">Failed to load analytics</p>
+        <p className="text-sm mt-1">Check your connection and try again</p>
+        <Button variant="outline" className="mt-4" onClick={fetchAttendance}>
+          <RefreshCw className="w-4 h-4 mr-1.5" />
+          Try again
+        </Button>
       </div>
     );
   }
