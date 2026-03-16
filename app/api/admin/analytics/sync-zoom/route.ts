@@ -47,7 +47,7 @@ export async function GET() {
     // Get all sessions with zoom_meeting_id to find linked ones
     const { data: linkedSessions } = await supabase
       .from('sessions')
-      .select('id, zoom_meeting_id, title, cohort_id, counts_for_students, actual_duration_minutes, duration_minutes, cliff_detection, formal_end_minutes')
+      .select('id, zoom_meeting_id, title, cohort_id, counts_for_students, actual_duration_minutes, duration_minutes, cliff_detection, formal_end_minutes, scheduled_at')
       .not('zoom_meeting_id', 'is', null);
 
     const sessionByMeetingId = new Map(
@@ -168,7 +168,55 @@ export async function GET() {
       };
     });
 
-    return NextResponse.json({ meetings: enrichedMeetings });
+    // Append DB-only sessions (older than 30 days, not in Zoom response)
+    const zoomMeetingIds = new Set(meetings.map((m) => String(m.id)));
+    const dbOnlySessions = (linkedSessions || []).filter(
+      (s) => s.zoom_meeting_id && !zoomMeetingIds.has(s.zoom_meeting_id)
+    );
+
+    // Get UUIDs from import logs for DB-only sessions (needed for recalculation)
+    const dbOnlySessionIds = dbOnlySessions.map((s) => s.id);
+    const { data: importLogs } = dbOnlySessionIds.length > 0
+      ? await supabase
+          .from('zoom_import_logs')
+          .select('session_id, zoom_meeting_uuid')
+          .in('session_id', dbOnlySessionIds)
+          .order('created_at', { ascending: false })
+      : { data: [] };
+
+    const uuidBySessionId = new Map<string, string>();
+    for (const log of importLogs || []) {
+      if (!uuidBySessionId.has(log.session_id)) {
+        uuidBySessionId.set(log.session_id, log.zoom_meeting_uuid);
+      }
+    }
+
+    const historicalMeetings = dbOnlySessions.map((s) => ({
+      zoomId: s.zoom_meeting_id!,
+      uuid: uuidBySessionId.get(s.id) || s.zoom_meeting_id!,
+      topic: s.title,
+      date: s.scheduled_at || '',
+      duration: s.actual_duration_minutes || s.duration_minutes || 0,
+      scheduledDuration: s.duration_minutes || 0,
+      participantCount: attendanceCountBySession.get(s.id) || 0,
+      linkedSessionId: s.id,
+      linkedSessionTitle: s.title,
+      cohortId: s.cohort_id || null,
+      countsForStudents: s.counts_for_students || false,
+      actualDurationMinutes: s.actual_duration_minutes || s.duration_minutes || 0,
+      hasAttendance: attendanceCountBySession.has(s.id),
+      uniqueParticipantCount: attendanceCountBySession.get(s.id) || null,
+      isProperSession: !!s.cohort_id,
+      cliffDetection: s.cliff_detection || null,
+      formalEndMinutes: s.formal_end_minutes || null,
+    }));
+
+    // Sort all meetings by date descending (newest first)
+    const allMeetings = [...enrichedMeetings, ...historicalMeetings].sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
+
+    return NextResponse.json({ meetings: allMeetings });
   } catch (error) {
     console.error('Error syncing Zoom meetings:', error);
     const message = error instanceof Error ? error.message : 'Failed to sync Zoom meetings';
