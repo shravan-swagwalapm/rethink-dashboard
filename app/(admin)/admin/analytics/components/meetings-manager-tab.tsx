@@ -107,6 +107,7 @@ export function MeetingsManagerTab({ cohorts }: MeetingsManagerTabProps) {
   const [editDurationValue, setEditDurationValue] = useState('');
   const [selectedCliffMeeting, setSelectedCliffMeeting] = useState<ZoomMeeting | null>(null);
   const [cliffDetailOpen, setCliffDetailOpen] = useState(false);
+  const [recalculatingAll, setRecalculatingAll] = useState(false);
   const [bulkDetecting, setBulkDetecting] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [bulkResults, setBulkResults] = useState<any>(null);
@@ -243,6 +244,13 @@ export function MeetingsManagerTab({ cohorts }: MeetingsManagerTabProps) {
         toast.success(
           `Attendance calculated for ${result.imported + result.unmatched} participants (${result.unmatched} unmatched)`
         );
+      }
+
+      // Surface any sanity-check warnings from the calculator
+      if (result.warnings?.length > 0) {
+        for (const w of result.warnings) {
+          toast.warning(w, { duration: 8000 });
+        }
       }
 
       // Update meeting status + unique count
@@ -383,6 +391,37 @@ export function MeetingsManagerTab({ cohorts }: MeetingsManagerTabProps) {
       toast.error('Failed to detect formal ends');
     } finally {
       setBulkDetecting(false);
+    }
+  }, [syncFromZoom]);
+
+  const handleDetectAndRecalculate = useCallback(async () => {
+    setRecalculatingAll(true);
+    try {
+      // Step 1: Detect formal ends for all sessions
+      toast.info('Detecting formal ends...');
+      const detectRes = await fetch('/api/admin/analytics/detect-cliffs-bulk', { method: 'POST' });
+      if (!detectRes.ok) throw new Error('Formal end detection failed');
+      const detectData = await detectRes.json();
+      const detected = (detectData.results || []).filter(
+        (r: { status: string }) => r.status === 'detected'
+      ).length;
+      toast.success(`Detected ${detected} formal ends. Recalculating...`);
+
+      // Step 2: Recalculate all attendance (uses detected cliffs automatically)
+      const res = await fetch('/api/admin/analytics/recalculate-all', { method: 'POST' });
+      if (!res.ok) throw new Error('Bulk recalculation failed');
+      const data = await res.json();
+      const { summary } = data;
+      if (summary.errors > 0) {
+        toast.error(`Recalculated ${summary.success}/${summary.total} sessions (${summary.errors} failed)`);
+      } else {
+        toast.success(`Recalculated all ${summary.success} sessions with formal ends applied`);
+      }
+      syncFromZoom();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to detect & recalculate');
+    } finally {
+      setRecalculatingAll(false);
     }
   }, [syncFromZoom]);
 
@@ -578,6 +617,15 @@ export function MeetingsManagerTab({ cohorts }: MeetingsManagerTabProps) {
           {bulkDetecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
           Detect Formal Ends
         </Button>
+        <Button
+          variant="outline"
+          onClick={handleDetectAndRecalculate}
+          disabled={recalculatingAll}
+          className="gap-2"
+        >
+          {recalculatingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Calculator className="w-4 h-4" />}
+          Detect & Recalculate All
+        </Button>
       </div>
 
       {/* Meetings table */}
@@ -664,7 +712,7 @@ export function MeetingsManagerTab({ cohorts }: MeetingsManagerTabProps) {
                       const isCalculating = calculatingIds.has(meeting.zoomId);
                       return (
                         <TableRow
-                          key={meeting.zoomId}
+                          key={meeting.uuid}
                           className="transition-colors hover:bg-muted/50"
                         >
                           <TableCell className="sticky left-0 bg-background z-10 font-medium">

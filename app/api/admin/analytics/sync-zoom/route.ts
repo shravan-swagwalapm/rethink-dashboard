@@ -1,8 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdmin } from '@/lib/api/verify-admin';
 import { createAdminClient } from '@/lib/supabase/server';
-import { zoomService } from '@/lib/integrations/zoom';
+import { zoomService, ZoomMeetingListItem } from '@/lib/integrations/zoom';
 import { format, subDays } from 'date-fns';
+
+/** Collapse multiple Zoom instances (same meeting ID) into one row.
+ *  Keeps the instance with the highest participants_count (the "real" session). */
+function deduplicateZoomMeetings(meetings: ZoomMeetingListItem[]): ZoomMeetingListItem[] {
+  const bestByMeetingId = new Map<number, ZoomMeetingListItem>();
+  for (const m of meetings) {
+    const existing = bestByMeetingId.get(m.id);
+    const count = m.participants_count ?? 0;
+    const existingCount = existing?.participants_count ?? 0;
+    if (!existing || count > existingCount) {
+      bestByMeetingId.set(m.id, m);
+    }
+  }
+  return Array.from(bestByMeetingId.values());
+}
 
 /**
  * GET: List past Zoom meetings (last 30 days) with session linking info
@@ -23,10 +38,11 @@ export async function GET() {
     const thirtyDaysAgo = subDays(today, 30);
 
     // Fetch ALL past meetings from Zoom (auto-paginates)
-    const meetings = await zoomService.listAllPastMeetings({
+    const rawMeetings = await zoomService.listAllPastMeetings({
       from: format(thirtyDaysAgo, 'yyyy-MM-dd'),
       to: format(today, 'yyyy-MM-dd'),
     });
+    const meetings = deduplicateZoomMeetings(rawMeetings);
 
     // Get all sessions with zoom_meeting_id to find linked ones
     const { data: linkedSessions } = await supabase
@@ -95,13 +111,16 @@ export async function GET() {
     // The Reports API duration field is the actual runtime for past meetings.
     // This ensures the attendance calculator has correct duration even when
     // getPastMeetingDetails() fails (e.g., missing meeting:read:past_meeting:admin scope).
+    const MINIMUM_AUTO_SAVE_DURATION = 10; // minutes — reject implausibly short Zoom durations
     const sessionsToUpdateDuration: { id: string; duration: number }[] = [];
     for (const m of meetings) {
       const linkedSession = sessionByMeetingId.get(String(m.id));
       if (linkedSession && !linkedSession.actual_duration_minutes && m.duration > 0) {
         // Use getPastMeetingDetails if available, otherwise fall back to Reports API duration
+        // Guard: only use m.duration if >= 10 min (Zoom defaults to 1 for some meeting types)
         const zoomActualDuration = pastDetailsMap.get(String(m.id));
-        const resolvedDuration = zoomActualDuration || m.duration;
+        const resolvedDuration = zoomActualDuration || (m.duration >= MINIMUM_AUTO_SAVE_DURATION ? m.duration : null);
+        if (!resolvedDuration || resolvedDuration < MINIMUM_AUTO_SAVE_DURATION) continue; // skip, don't save bad data
         sessionsToUpdateDuration.push({ id: linkedSession.id, duration: resolvedDuration });
       }
     }
@@ -203,11 +222,30 @@ export async function POST(request: NextRequest) {
         .eq('id', sessionId);
 
       if (error) {
+        const isUniqueViolation = error.code === '23505';
+        if (isUniqueViolation) {
+          return NextResponse.json(
+            { error: 'This Zoom meeting is already linked to another session' },
+            { status: 409 }
+          );
+        }
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
     } else {
+      // Guard: prevent duplicate sessions for the same Zoom meeting
+      const { data: existingSession } = await supabase
+        .from('sessions')
+        .select('id')
+        .eq('zoom_meeting_id', zoomMeetingId)
+        .limit(1)
+        .maybeSingle();
+
+      if (existingSession) {
+        return NextResponse.json({ success: true, sessionId: existingSession.id });
+      }
+
       // Create a minimal session record
-      const { error } = await supabase.from('sessions').insert({
+      const { data: newSession, error } = await supabase.from('sessions').insert({
         title: topic || 'Zoom Meeting',
         zoom_meeting_id: zoomMeetingId,
         cohort_id: cohortId || null,
@@ -216,11 +254,13 @@ export async function POST(request: NextRequest) {
         actual_duration_minutes: actualDurationMinutes || null,
         counts_for_students: countsForStudents ?? true,
         created_by: auth.userId,
-      });
+      }).select('id').single();
 
       if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
+
+      return NextResponse.json({ success: true, sessionId: newSession.id });
     }
 
     return NextResponse.json({ success: true });
