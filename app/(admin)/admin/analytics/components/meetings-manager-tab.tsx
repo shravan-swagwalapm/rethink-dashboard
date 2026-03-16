@@ -639,7 +639,7 @@ export function MeetingsManagerTab({ cohorts }: MeetingsManagerTabProps) {
             <CardTitle>Zoom Meetings</CardTitle>
             <CardDescription>
               {synced
-                ? `${meetings.length} meetings from the last 30 days`
+                ? `${meetings.length} meetings`
                 : 'Click "Sync from Zoom" to import your past meetings'}
             </CardDescription>
           </CardHeader>

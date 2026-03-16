@@ -211,9 +211,9 @@ export async function GET() {
       formalEndMinutes: s.formal_end_minutes || null,
     }));
 
-    // Sort all meetings by date descending (newest first)
+    // Sort all meetings by date ascending (oldest first, newest at bottom)
     const allMeetings = [...enrichedMeetings, ...historicalMeetings].sort(
-      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
     );
 
     return NextResponse.json({ meetings: allMeetings });
