@@ -1,5 +1,5 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server';
-import { isAdminRole, ADMIN_ROLES } from '@/lib/utils/auth';
+import { canAdmin, type PolicyContext } from '@/lib/auth/policy';
 
 /**
  * Result of admin verification.
@@ -12,9 +12,22 @@ export type VerifyAdminResult =
 /**
  * Shared admin verification for all /api/admin/* routes.
  *
- * 1. Authenticates the user via Supabase session cookie
- * 2. Checks admin role using adminClient (bypasses RLS)
- * 3. Uses isAdminRole() which accepts: admin, super_admin, company_user
+ * Stage 1 of ADR-0003: this is now a thin wrapper over `canAdmin` from
+ * `lib/auth/policy.ts`. Source-of-truth for admin authority lives in
+ * `user_role_assignments` only — the legacy `profiles.role` column is no
+ * longer consulted here. See:
+ *   - docs/adr/0003-cohort-scoped-policy-module.md §"Migration path" (Stage 1)
+ *   - docs/adr/0003-cohort-scoped-policy-module.md §"Source of truth"
+ *
+ * 1. Authenticates the user via Supabase session cookie.
+ * 2. Builds a PolicyContext from the auth user (UI `role` is unused for
+ *    authorization — passed as `null` per ADR-0003 §"Trust boundary").
+ * 3. Delegates the role decision to `canAdmin(ctx, adminClient)`.
+ * 4. Maps the PolicyResult back to the existing VerifyAdminResult shape so
+ *    the ~26 call sites compile and behave unchanged.
+ *
+ * Errors from `canAdmin` (e.g. Supabase outage) propagate; the route handler's
+ * outer try/catch surfaces a 5xx rather than a misleading 403.
  *
  * Usage:
  *   const auth = await verifyAdmin();
@@ -31,31 +44,24 @@ export async function verifyAdmin(): Promise<VerifyAdminResult> {
     return { authorized: false, error: 'Unauthorized', status: 401 };
   }
 
-  // Use adminClient to bypass RLS for the role check
   const adminClient = await createAdminClient();
+  const ctx: PolicyContext = {
+    profile: { id: user.id, email: user.email ?? null },
+    role: null,
+  };
 
-  // Check profiles.role first (legacy single-role field)
-  const { data: profile } = await adminClient
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single();
+  const result = await canAdmin(ctx, adminClient);
 
-  if (profile?.role && isAdminRole(profile.role)) {
-    return { authorized: true, userId: user.id, userEmail: user.email || '' };
+  if (result.allowed) {
+    return { authorized: true, userId: user.id, userEmail: user.email ?? '' };
   }
 
-  // Fallback: check user_role_assignments for any admin-level role
-  const { data: roleAssignment } = await adminClient
-    .from('user_role_assignments')
-    .select('role')
-    .eq('user_id', user.id)
-    .in('role', [...ADMIN_ROLES])
-    .limit(1)
-    .maybeSingle();
-
-  if (roleAssignment) {
-    return { authorized: true, userId: user.id, userEmail: user.email || '' };
+  // `profile_not_found` means the auth user we just resolved doesn't match a
+  // known profile — treat as 401 (not authenticated as anyone we recognise).
+  // Any other reason (`no_role`, etc.) means the user is authenticated but
+  // lacks admin authority — 403.
+  if (result.reason === 'profile_not_found') {
+    return { authorized: false, error: 'Unauthorized', status: 401 };
   }
 
   return { authorized: false, error: 'Forbidden', status: 403 };

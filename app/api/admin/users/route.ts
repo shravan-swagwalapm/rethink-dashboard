@@ -167,6 +167,41 @@ export async function PUT(request: NextRequest) {
       }
     }
 
+    // Gate legacy profiles.role-only updates: a caller attempting to change role or cohort
+    // must use the multi-role schema (role_assignments). See ADR-0003 — user_role_assignments
+    // is the canonical source of truth for admin authority; direct profiles.role writes are
+    // no longer supported because verifyAdmin no longer reads profiles.role.
+    if (role_assignments === undefined && (role !== undefined || cohort_id !== undefined)) {
+      return NextResponse.json(
+        {
+          error: 'role_assignments is required',
+          detail: 'Direct updates to profiles.role are no longer supported. Send role_assignments per the multi-role schema (see ADR-0003).',
+        },
+        { status: 400 }
+      );
+    }
+
+    // If no role-related fields are being modified, return the user as-is (profile-only
+    // updates already returned early above; reaching here with all role fields undefined
+    // means a no-op request).
+    if (role_assignments === undefined) {
+      const { data: updatedUser } = await adminClient
+        .from('profiles')
+        .select('*, cohort:cohorts!fk_profile_cohort(*)')
+        .eq('id', id)
+        .single();
+
+      const { data: updatedAssignments } = await adminClient
+        .from('user_role_assignments')
+        .select('*, cohort:cohorts(*)')
+        .eq('user_id', id);
+
+      return NextResponse.json({
+        ...updatedUser,
+        role_assignments: updatedAssignments || [],
+      });
+    }
+
     // Get current user data and role assignments BEFORE update
     const { data: currentUser } = await adminClient
       .from('profiles')
@@ -179,11 +214,10 @@ export async function PUT(request: NextRequest) {
       .select('*')
       .eq('user_id', id);
 
-    const oldCohortId = currentUser?.cohort_id;
     const oldCohortIds = new Set((currentAssignments || []).map(a => a.cohort_id).filter(Boolean));
 
     // Handle role_assignments update (new multi-role mode)
-    if (role_assignments !== undefined && Array.isArray(role_assignments)) {
+    if (Array.isArray(role_assignments)) {
       // Validate: no user can be both mentor AND student for the same cohort
       const cohortRoles = new Map<string, Set<string>>();
       for (const ra of role_assignments as RoleAssignment[]) {
@@ -259,55 +293,6 @@ export async function PUT(request: NextRequest) {
               console.error('Failed to send calendar invites:', e);
             }
           }
-        }
-      }
-    } else {
-      // Legacy mode: update role and/or cohort_id directly
-      const updateData: { role?: string; cohort_id?: string | null } = {};
-      if (role !== undefined) updateData.role = role;
-      if (cohort_id !== undefined) updateData.cohort_id = cohort_id || null;
-
-      if (Object.keys(updateData).length > 0) {
-        const { error } = await adminClient
-          .from('profiles')
-          .update(updateData)
-          .eq('id', id);
-
-        if (error) throw error;
-      }
-
-      // Handle cohort change - remove from old, add to new
-      if (cohort_id !== undefined && currentUser?.email) {
-        const newCohortId = cohort_id || null;
-
-        if (oldCohortId && oldCohortId !== newCohortId) {
-          try {
-            await removeCalendarInvitesFromOldCohort(currentUser.email, oldCohortId, auth.userId!);
-          } catch (calendarError) {
-            console.error('Failed to remove old calendar invites:', calendarError);
-          }
-        }
-
-        if (newCohortId && newCohortId !== oldCohortId) {
-          try {
-            await sendCalendarInvitesToNewMember(currentUser.email, newCohortId, auth.userId!);
-          } catch (calendarError) {
-            console.error('Failed to send new calendar invites:', calendarError);
-          }
-        }
-
-        // Also update the role assignment table
-        if (newCohortId !== oldCohortId) {
-          // Update or insert role assignment
-          await adminClient
-            .from('user_role_assignments')
-            .upsert({
-              user_id: id,
-              role: role || 'student',
-              cohort_id: newCohortId,
-            }, {
-              onConflict: 'user_id,role,cohort_id',
-            });
         }
       }
     }
