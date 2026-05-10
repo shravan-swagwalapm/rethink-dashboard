@@ -109,7 +109,18 @@ function makeMockAdminClient(
 
   const fromSpy = vi.fn((table: string) => buildBuilder(table));
 
-  const client = { from: fromSpy } as unknown as SupabaseClient;
+  // Diagnostic guard: `canAdmin` must read directly from
+  // `user_role_assignments` per ADR-0003 §"Source of truth". If a future
+  // implementation reaches for a Postgres function via `.rpc(...)`, fail loudly
+  // with a message that points at the violated invariant — much clearer than
+  // the default `client.rpc is not a function` TypeError.
+  const rpcSpy = vi.fn(() => {
+    throw new Error(
+      'Mock guard: rpc unexpectedly called — canAdmin must read directly from user_role_assignments per ADR-0003 §"Source of truth"',
+    );
+  });
+
+  const client = { from: fromSpy, rpc: rpcSpy } as unknown as SupabaseClient;
 
   return {
     client,
@@ -220,6 +231,19 @@ describe('canAdmin (red phase — T4)', () => {
     // `user_role_assignments`.
     expect(mock.tablesQueried()).not.toContain('profiles');
     expect(mock.tablesQueried()).toContain('user_role_assignments');
+
+    // Defense against the embedded-select leak: PostgREST allows joining
+    // through a foreign table inside the select string itself, e.g.
+    // `.select('role, profiles!inner(role)')`. That call would never hit
+    // `.from('profiles')`, so the check above wouldn't catch it — but it
+    // would still violate ADR-0003's source-of-truth invariant. Inspect every
+    // captured `.select(...)` argument and forbid any reference to `profiles`.
+    const selectArgStrings = mock.chainCalls
+      .filter((call) => call.method === 'select')
+      .flatMap((call) => call.args.filter((a): a is string => typeof a === 'string'));
+    for (const arg of selectArgStrings) {
+      expect(arg).not.toContain('profiles');
+    }
   });
 
   it('Test 6 — activeRole tampering regression: ctx.role is never read', async () => {
