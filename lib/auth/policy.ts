@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { ADMIN_ROLES } from '@/lib/utils/auth';
 
 /**
  * Cohort-scoped policy module — Stage 1 surface.
@@ -59,22 +60,49 @@ export type PolicyContext = {
 /**
  * Predicate: does this user have admin authority?
  *
- * STUB — implementation lands in T5. The real predicate must:
- * - Read ONLY from `user_role_assignments` (NEVER from `profiles.role`).
- * - Treat any matching admin row as global authority (system-wide or
- *   cohort-scoped). The `cohort_id` on an admin row records provenance, not
- *   restriction.
- * - Ignore `ctx.role` entirely.
- *
- * @throws Error always — this stub exists only so the T4 tests can fail
- *   loudly until T5 lands the implementation.
+ * Source-of-truth invariant: admin authority is sourced exclusively from
+ * `user_role_assignments`; the legacy `profiles.role` column and the
+ * UI-supplied `ctx.role` are never consulted. Any matching admin row grants
+ * system-wide authority — `cohort_id` on an admin row records provenance,
+ * not restriction. See `docs/adr/0003-cohort-scoped-policy-module.md`
+ * §"Source of truth", §"Granularity (resolved Q6)", §"Trust boundary
+ * (resolved Q7)".
  */
 export async function canAdmin(
-  // The arguments are intentionally unused in the stub. Underscore-prefixed
-  // names keep TS strict + noUnusedParameters quiet without changing the
-  // public signature that T5 will fill in.
-  _ctx: PolicyContext,
-  _adminClient: SupabaseClient,
+  ctx: PolicyContext,
+  adminClient: SupabaseClient,
 ): Promise<PolicyResult> {
-  throw new Error('canAdmin not yet implemented (T5)');
+  // Guard: invalid context must short-circuit before any DB call. The
+  // verifyAdmin wrapper (T6) translates this to a 401-shaped response.
+  if (!ctx.profile?.id) {
+    return { allowed: false, reason: 'profile_not_found' };
+  }
+
+  const { data, error } = await adminClient
+    .from('user_role_assignments')
+    .select('role')
+    .eq('user_id', ctx.profile.id)
+    .in('role', [...ADMIN_ROLES]);
+
+  if (error) {
+    // Re-throw so the verifyAdmin wrapper (T6) can surface a 5xx with the
+    // underlying Supabase error visible in logs. Swallowing here would mask
+    // an outage as a 403 and produce confusing user-facing behavior.
+    throw error;
+  }
+
+  // Defense-in-depth: trust but verify the PostgREST `.in(...)` filter. If
+  // any returned row has an unexpected role (driver bug, test mock without
+  // real filtering, or RLS policy drift), refuse to grant admin authority.
+  const adminRoles: readonly string[] = ADMIN_ROLES;
+  const hasAdminRow = (data ?? []).some(
+    (row: { role?: unknown }) =>
+      typeof row?.role === 'string' && adminRoles.includes(row.role),
+  );
+
+  if (hasAdminRow) {
+    return { allowed: true };
+  }
+
+  return { allowed: false, reason: 'no_role' };
 }
