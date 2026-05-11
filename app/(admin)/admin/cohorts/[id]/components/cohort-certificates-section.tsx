@@ -211,10 +211,16 @@ export function CohortCertificatesSection({ cohortId, cohortName }: CohortCertif
       if (!response.ok) {
         // Surface the discriminated `reason` from the service's validate stage
         // for actionable copy, falling back to the generic error message.
+        // Route-layer reasons (`invalid_uuid`, `not_member`) join the service's
+        // own validate reasons (`too_large`, `invalid_type`).
         if (body?.reason === 'too_large') {
           toast.error('File too large — maximum 10 MB');
         } else if (body?.reason === 'invalid_type') {
           toast.error('Invalid file type — only PNG, JPG, or PDF allowed');
+        } else if (body?.reason === 'not_member') {
+          toast.error('Recipient is not a cohort member');
+        } else if (body?.reason === 'invalid_uuid') {
+          toast.error('Invalid recipient or cohort identifier');
         } else {
           toast.error(body.error || `Upload failed (HTTP ${response.status})`);
         }
@@ -312,76 +318,78 @@ export function CohortCertificatesSection({ cohortId, cohortName }: CohortCertif
             </p>
           </div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Member</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Issued</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {members.map((m) => (
-                <TableRow key={m.user_id}>
-                  <TableCell>
-                    <div>
-                      <p className="font-medium">{m.full_name || 'Unnamed'}</p>
-                      <p className="text-sm text-muted-foreground">{m.email}</p>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={m.role === 'mentor' ? 'default' : 'outline'} className="capitalize">
-                      {m.role}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {m.certificate ? (
-                      <div className="flex items-center gap-2">
-                        <Badge className="bg-green-500/10 text-green-700 hover:bg-green-500/10">
-                          Issued
-                        </Badge>
-                        <FileTypeBadge mime={m.certificate.file_type} />
-                      </div>
-                    ) : (
-                      <Badge variant="outline" className="text-muted-foreground">
-                        Not issued
-                      </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {m.certificate
-                      ? format(new Date(m.certificate.uploaded_at), 'MMM d, yyyy')
-                      : '-'}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => openUpload(m)}
-                      >
-                        <Upload className="w-3.5 h-3.5 mr-1.5" />
-                        {m.certificate ? 'Replace' : 'Upload'}
-                      </Button>
-                      {m.certificate && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openDelete(m)}
-                          aria-label={`Delete certificate for ${m.full_name || m.email}`}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-500/10"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
-                      )}
-                    </div>
-                  </TableCell>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Member</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Issued</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {members.map((m) => (
+                  <TableRow key={m.user_id}>
+                    <TableCell>
+                      <div>
+                        <p className="font-medium">{m.full_name || 'Unnamed'}</p>
+                        <p className="text-sm text-muted-foreground">{m.email}</p>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={m.role === 'mentor' ? 'default' : 'outline'} className="capitalize">
+                        {m.role}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {m.certificate ? (
+                        <div className="flex items-center gap-2">
+                          <Badge className="bg-green-500/10 text-green-700 hover:bg-green-500/10">
+                            Issued
+                          </Badge>
+                          <FileTypeBadge mime={m.certificate.file_type} />
+                        </div>
+                      ) : (
+                        <Badge variant="outline" className="text-muted-foreground">
+                          Not issued
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {m.certificate
+                        ? format(new Date(m.certificate.uploaded_at), 'MMM d, yyyy')
+                        : '-'}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openUpload(m)}
+                        >
+                          <Upload className="w-3.5 h-3.5 mr-1.5" />
+                          {m.certificate ? 'Replace' : 'Upload'}
+                        </Button>
+                        {m.certificate && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openDelete(m)}
+                            aria-label={`Delete certificate for ${m.full_name || m.email}`}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-500/10"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         )}
       </CardContent>
 

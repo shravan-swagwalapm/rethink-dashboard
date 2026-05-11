@@ -1,7 +1,10 @@
 import { createAdminClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { verifyAdmin } from '@/lib/api/verify-admin';
 import { replaceCertificate } from '@/lib/services/certificates';
+
+const uuidSchema = z.string().uuid();
 
 /**
  * POST /api/admin/cohort-certificates
@@ -49,7 +52,48 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // UUID shape check — fail fast before we touch storage or the DB. Postgres
+    // would otherwise return "invalid input syntax for type uuid" as an opaque 500.
+    if (!uuidSchema.safeParse(userId).success || !uuidSchema.safeParse(cohortId).success) {
+      return NextResponse.json(
+        {
+          error: 'Invalid user_id or cohort_id',
+          stage: 'validate',
+          reason: 'invalid_uuid',
+        },
+        { status: 400 }
+      );
+    }
+
     const adminClient = await createAdminClient();
+
+    // Membership check — the service trusts its inputs, so request validation
+    // (is this user even in this cohort?) belongs here. Prevents "ghost certs"
+    // for users not in user_role_assignments, which RLS would then surface to them.
+    const { data: membership, error: membershipError } = await adminClient
+      .from('user_role_assignments')
+      .select('user_id')
+      .eq('user_id', userId)
+      .eq('cohort_id', cohortId)
+      .in('role', ['student', 'mentor'])
+      .maybeSingle();
+
+    if (membershipError) {
+      return NextResponse.json(
+        { error: membershipError.message, stage: 'validate' },
+        { status: 500 }
+      );
+    }
+    if (!membership) {
+      return NextResponse.json(
+        {
+          error: 'Recipient is not a member of this cohort',
+          stage: 'validate',
+          reason: 'not_member',
+        },
+        { status: 400 }
+      );
+    }
 
     const result = await replaceCertificate(adminClient, {
       userId,
