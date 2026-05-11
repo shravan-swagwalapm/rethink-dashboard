@@ -49,6 +49,7 @@ import {
 } from 'lucide-react';
 import type { Cohort, CohortResourceSharingInfo, LearningModuleWithSharing } from '@/types';
 import { PageHeader } from '@/components/ui/page-header';
+import { CohortCertificatesSection } from './components/cohort-certificates-section';
 
 interface CohortStats {
   total_modules: number;
@@ -502,6 +503,11 @@ export default function CohortSettingsPage() {
               </CardContent>
             </Card>
           </div>
+        )}
+
+        {/* Certificates Section — completed cohorts only */}
+        {cohort.status === 'completed' && (
+          <CohortCertificatesSection cohortId={cohortId} cohortName={cohort.name} />
         )}
 
         {/* Link Resources Section */}
