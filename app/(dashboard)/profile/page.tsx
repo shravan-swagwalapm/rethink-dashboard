@@ -49,6 +49,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import type { Invoice } from '@/types';
 import { generateQRCode, downloadQRCode } from '@/lib/qr-code';
 import { ProfileCardPreviewModal } from '@/components/ProfileCardPreviewModal';
+import { CertificatesCard } from './components/certificates-card';
 
 const TIMEZONES = [
   'Asia/Kolkata',
@@ -777,6 +778,11 @@ export default function ProfilePage() {
           )}
         </CardContent>
       </Card>
+      </MotionFadeIn>
+
+      {/* Certificates Section */}
+      <MotionFadeIn delay={0.25}>
+        <CertificatesCard />
       </MotionFadeIn>
 
       {/* Invoices Section */}
