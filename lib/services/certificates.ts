@@ -19,9 +19,12 @@
  * Rollback semantics (replaceCertificate):
  *   1. validate → fail returns `validate` (no storage call).
  *   2. storage.upload (upsert:true) → fail returns `storage_upload` (no DB write).
- *   3. DB upsert → fail attempts storage.remove cleanup:
+ *   3. DB upsert (chained with .select().single()) → fail attempts storage.remove cleanup:
  *        - cleanup succeeds → `db_upsert`.
  *        - cleanup fails → `rollback` with `originalError` set to the DB error.
+ *   4. On success, if a prior row pointed at a different storage path
+ *      (MIME-switch, e.g. .pdf → .png), the old object is removed
+ *      best-effort. Failure does not affect the success result.
  *
  * RLS: this service expects the caller to pass the *service-role* client.
  * v1 ownership for signed URLs is enforced in app code (this module), not at
@@ -41,7 +44,7 @@ export const ALLOWED_CERTIFICATE_MIME_TYPES = [
   'image/jpeg',
   'application/pdf',
 ] as const;
-export const SIGNED_URL_TTL_SECONDS = 300; // 5 minutes
+export const SIGNED_URL_TTL_SECONDS = 60; // 1 minute (per plan acceptance criterion)
 
 type AllowedMime = (typeof ALLOWED_CERTIFICATE_MIME_TYPES)[number];
 
@@ -171,7 +174,24 @@ export async function replaceCertificate(
 
   const path = certificatePathFor(cohortId, userId, file.type);
 
-  // 2. Storage upload (upsert:true → idempotent for same path)
+  // 2. Look up any existing row so we can detect a MIME-switch orphan after
+  // the upsert succeeds. The old object only needs removal when the extension
+  // (and therefore the storage path) changes — same-path uploads overwrite
+  // via storage upsert. Lookup failure is non-fatal: we proceed as if no
+  // prior row existed; worst case we leave a stale file (no user-visible
+  // breakage), which is preferable to blocking the replacement.
+  const { data: existingRow } = await adminClient
+    .from('cohort_certificates')
+    .select('file_path')
+    .eq('user_id', userId)
+    .eq('cohort_id', cohortId)
+    .maybeSingle();
+  const previousPath =
+    existingRow && typeof (existingRow as { file_path?: unknown }).file_path === 'string'
+      ? ((existingRow as { file_path: string }).file_path)
+      : null;
+
+  // 3. Storage upload (upsert:true → idempotent for same path)
   const buffer = await file.arrayBuffer();
   const { error: uploadError } = await adminClient.storage
     .from(CERTIFICATES_BUCKET)
@@ -191,8 +211,11 @@ export async function replaceCertificate(
     };
   }
 
-  // 3. DB upsert (UNIQUE(user_id, cohort_id) routes between INSERT/UPDATE)
-  const row = {
+  // 4. DB upsert (UNIQUE(user_id, cohort_id) routes between INSERT/UPDATE).
+  // Collapsed into a single chain with .select().single() — the canonical row
+  // returns in one round-trip and the read-back-after-write failure mode is
+  // gone: Supabase returns the row iff the write succeeded.
+  const rowToInsert = {
     user_id: userId,
     cohort_id: cohortId,
     file_path: path,
@@ -201,11 +224,13 @@ export async function replaceCertificate(
     uploaded_by: uploadedBy,
   };
 
-  const { error: upsertError } = await adminClient
+  const { data: row, error: upsertError } = await adminClient
     .from('cohort_certificates')
-    .upsert(row, { onConflict: 'user_id,cohort_id' });
+    .upsert(rowToInsert, { onConflict: 'user_id,cohort_id' })
+    .select('id, file_path')
+    .single();
 
-  if (upsertError) {
+  if (upsertError || !row) {
     // Attempt to clean up the orphan storage object before surfacing.
     const { error: cleanupError } = await adminClient.storage
       .from(CERTIFICATES_BUCKET)
@@ -227,39 +252,24 @@ export async function replaceCertificate(
       ok: false,
       error: {
         stage: 'db_upsert',
-        message: errMessage(upsertError),
+        message: upsertError ? errMessage(upsertError) : 'Upsert returned no row',
         cause: upsertError,
       },
     };
   }
 
-  // Read back the canonical row so callers get the actual UUID.
-  const { data: readBack, error: readError } = await adminClient
-    .from('cohort_certificates')
-    .select('id, file_path')
-    .eq('user_id', userId)
-    .eq('cohort_id', cohortId)
-    .single();
-
-  if (readError || !readBack) {
-    // The write succeeded but readback failed — surface as db_upsert with the
-    // readback error. Best-effort cleanup would leave the user without the
-    // record they thought succeeded, which is worse than a stale row.
-    return {
-      ok: false,
-      error: {
-        stage: 'db_upsert',
-        message: readError ? errMessage(readError) : 'Row not found after upsert',
-        cause: readError,
-      },
-    };
+  // 5. MIME-switch cleanup: if the prior cert lived at a different path
+  // (e.g. admin replaced .pdf with .png), remove the orphaned object. Failure
+  // here is non-fatal — the replacement succeeded from the user's POV.
+  if (previousPath && previousPath !== path) {
+    await adminClient.storage.from(CERTIFICATES_BUCKET).remove([previousPath]);
   }
 
   return {
     ok: true,
     row: {
-      id: (readBack as { id: string }).id,
-      file_path: (readBack as { file_path: string }).file_path,
+      id: (row as { id: string }).id,
+      file_path: (row as { file_path: string }).file_path,
     },
   };
 }
@@ -292,23 +302,10 @@ export async function deleteCertificate(
 
   const filePath = (cert as { file_path: string }).file_path;
 
-  // 2. Remove the storage object.
-  const { error: storageError } = await adminClient.storage
-    .from(CERTIFICATES_BUCKET)
-    .remove([filePath]);
-
-  if (storageError) {
-    return {
-      ok: false,
-      error: {
-        stage: 'storage_delete',
-        message: errMessage(storageError),
-        cause: storageError,
-      },
-    };
-  }
-
-  // 3. Delete the DB row.
+  // 2. Delete the DB row FIRST, then remove storage. Order matters:
+  // DB-first prefers orphaned storage (cheap, repairable by a janitor) over
+  // orphaned DB rows pointing at non-existent objects (user-visible 500s on
+  // later signed-URL requests).
   const { error: deleteError } = await adminClient
     .from('cohort_certificates')
     .delete()
@@ -324,6 +321,12 @@ export async function deleteCertificate(
       },
     };
   }
+
+  // 3. Best-effort storage cleanup. DB row is gone — the user's intent
+  // ("remove this cert from my view") is fulfilled. A residual storage object
+  // is recoverable by a janitor job and surfaces no user-facing breakage, so
+  // we swallow the error rather than misreport the operation as failed.
+  await adminClient.storage.from(CERTIFICATES_BUCKET).remove([filePath]);
 
   return { ok: true };
 }

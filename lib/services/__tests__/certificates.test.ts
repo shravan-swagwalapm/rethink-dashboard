@@ -16,6 +16,7 @@
  *   6. replaceCertificate DB upsert fails — storage.remove called for cleanup.
  *   7. deleteCertificate happy path — storage.remove + DB delete invoked.
  *   8. issueCertSignedUrl denies when requester is not the cert owner.
+ *   9. replaceCertificate MIME switch (PDF → PNG) removes the old PDF object.
  *
  * Globals (`describe`, `it`, `expect`, `vi`) provided by vitest.config.ts.
  */
@@ -337,7 +338,12 @@ describe('replaceCertificate', () => {
     const mock = makeMockAdminClient({
       tables: {
         cohort_certificates: {
-          upsert: { error: { message: 'unique violation on (user_id, cohort_id)' } },
+          // The upsert is chained with .select().single() — the terminal call
+          // resolves through `select_single`. Return an error there so the
+          // upsert failure surfaces correctly.
+          select_single: {
+            error: { message: 'unique violation on (user_id, cohort_id)' },
+          },
         },
       },
       storage: {
@@ -368,6 +374,66 @@ describe('replaceCertificate', () => {
     // The remove call should target the path that was just uploaded.
     const paths = removes[0].args[0] as string[];
     expect(paths).toEqual([`${cohortId}/${userId}.pdf`]);
+  });
+
+  it('Test 9 — MIME switch (PDF → PNG): old PDF object removed after successful PNG upload', async () => {
+    const oldPath = `${cohortId}/${userId}.pdf`;
+    const newPath = `${cohortId}/${userId}.png`;
+
+    // The mock's select_single slot is shared between the pre-upload lookup
+    // (returns the prior row's file_path) and the upsert read-back (returns
+    // the new canonical row). The spy invokes the function source twice per
+    // logical lookup — once eagerly when the chain is built, once when the
+    // terminal .maybeSingle()/.single() resolves. We only care about the
+    // terminal-resolution values, which are calls #2 and #3 in this flow:
+    //   1. eager from .select('file_path') (discarded)
+    //   2. .maybeSingle() → fills existingRow with the prior path
+    //   3. .single() on the .upsert().select() chain → canonical new row
+    let selectCallCount = 0;
+    const mock = makeMockAdminClient({
+      tables: {
+        cohort_certificates: {
+          select_single: () => {
+            selectCallCount += 1;
+            if (selectCallCount === 2) {
+              return { data: { file_path: oldPath }, error: null };
+            }
+            if (selectCallCount === 3) {
+              return {
+                data: { id: 'cert-replaced-1', file_path: newPath },
+                error: null,
+              };
+            }
+            return { data: null, error: null };
+          },
+        },
+      },
+      storage: {
+        certificates: {
+          upload: { error: null, data: { path: newPath } },
+          remove: { error: null },
+        },
+      },
+    });
+
+    const result = await replaceCertificate(mock.client, {
+      userId,
+      cohortId,
+      file: makeFile({ type: 'image/png', size: 2048 }),
+      uploadedBy,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      row: { id: 'cert-replaced-1', file_path: newPath },
+    });
+
+    const removes = mock.calls.filter(
+      (c): c is StorageCallRecord =>
+        c.kind === 'storage' && c.op === 'remove' && c.bucket === 'certificates',
+    );
+    expect(removes).toHaveLength(1);
+    expect(removes[0].args[0]).toEqual([oldPath]);
   });
 });
 
