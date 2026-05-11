@@ -19,7 +19,7 @@ import { format, isToday, isTomorrow, parseISO } from 'date-fns';
 import { InvoiceCard } from '@/components/dashboard/invoice-card';
 import { toast } from 'sonner';
 import { MotionFadeIn, MotionContainer, MotionItem } from '@/components/ui/motion';
-import type { Session, DashboardStats, LearningModule, Resource, Invoice, Cohort, ModuleResource, ModuleResourceType, AdminDashboardStats, AdminDashboardSession, AdminDashboardLearning, StudentDashboardResponse } from '@/types';
+import type { Session, DashboardStats, LearningModule, Resource, Invoice, Cohort, CohortStatus, ModuleResource, ModuleResourceType, AdminDashboardStats, AdminDashboardSession, AdminDashboardLearning, StudentDashboardResponse } from '@/types';
 
 interface InvoiceWithCohort extends Invoice { cohort?: Cohort; }
 interface RecentLearningAsset extends ModuleResource {
@@ -34,6 +34,7 @@ interface DashboardCache {
   recentModules: LearningModule[]; recentResources: Resource[];
   recentLearningAssets: RecentLearningAsset[]; invoices: InvoiceWithCohort[];
   pendingInvoiceAmount: number; cohortStartDate: string | null; cohortName: string;
+  cohortEndDate?: string | null; cohortStatus?: CohortStatus;
 }
 function getDashboardCache(cohortId: string): DashboardCache | null {
   try { const raw = localStorage.getItem(`${DASHBOARD_CACHE_KEY}${cohortId}`); return raw ? JSON.parse(raw) : null; } catch { return null; }
@@ -74,7 +75,9 @@ export default function DashboardPage() {
   const [invoices, setInvoices] = useState<InvoiceWithCohort[]>([]);
   const [pendingInvoiceAmount, setPendingInvoiceAmount] = useState(0);
   const [cohortStartDate, setCohortStartDate] = useState<Date | null>(null);
+  const [cohortEndDate, setCohortEndDate] = useState<Date | null>(null);
   const [cohortName, setCohortName] = useState<string>('');
+  const [cohortStatus, setCohortStatus] = useState<CohortStatus | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
@@ -107,7 +110,10 @@ export default function DashboardPage() {
         setRecentResources(cached.recentResources); setRecentLearningAssets(cached.recentLearningAssets);
         setInvoices(cached.invoices); setPendingInvoiceAmount(cached.pendingInvoiceAmount);
         if (cached.cohortStartDate) setCohortStartDate(new Date(cached.cohortStartDate));
-        setCohortName(cached.cohortName); setLoading(false);
+        if (cached.cohortEndDate) setCohortEndDate(new Date(cached.cohortEndDate));
+        setCohortName(cached.cohortName);
+        setCohortStatus(cached.cohortStatus);
+        setLoading(false);
         if (Date.now() - cached.timestamp > CACHE_MAX_AGE) setIsStale(true);
       }
 
@@ -116,11 +122,16 @@ export default function DashboardPage() {
         if (ac.signal.aborted) return;
         if (!res.ok) throw new Error(`BFF returned ${res.status}`);
         const data: StudentDashboardResponse = await res.json();
-        if (data.cohort) { setCohortName(data.cohort.name); if (data.cohort.start_date) setCohortStartDate(new Date(data.cohort.start_date)); }
+        if (data.cohort) {
+          setCohortName(data.cohort.name);
+          setCohortStartDate(data.cohort.start_date ? new Date(data.cohort.start_date) : null);
+          setCohortEndDate(data.cohort.end_date ? new Date(data.cohort.end_date) : null);
+          setCohortStatus(data.cohort.status);
+        }
         setStats(data.stats); setUpcomingSessions(data.upcomingSessions); setRecentModules(data.recentModules);
         setRecentResources(data.recentResources); setRecentLearningAssets(data.recentLearningAssets);
         setInvoices(data.invoices); setPendingInvoiceAmount(data.pendingInvoiceAmount);
-        setDashboardCache(activeCohortId, { stats: data.stats, upcomingSessions: data.upcomingSessions, recentModules: data.recentModules, recentResources: data.recentResources, recentLearningAssets: data.recentLearningAssets, invoices: data.invoices, pendingInvoiceAmount: data.pendingInvoiceAmount, cohortStartDate: data.cohort?.start_date || null, cohortName: data.cohort?.name || '' });
+        setDashboardCache(activeCohortId, { stats: data.stats, upcomingSessions: data.upcomingSessions, recentModules: data.recentModules, recentResources: data.recentResources, recentLearningAssets: data.recentLearningAssets, invoices: data.invoices, pendingInvoiceAmount: data.pendingInvoiceAmount, cohortStartDate: data.cohort?.start_date || null, cohortEndDate: data.cohort?.end_date || null, cohortName: data.cohort?.name || '', cohortStatus: data.cohort?.status });
         if (data._meta.failedQueries === data._meta.totalQueries && !cached) setError('Unable to load dashboard.');
         else if (data._meta.failedQueries > 0) setIsStale(true);
         else { setError(null); setIsStale(false); }
@@ -256,7 +267,9 @@ export default function DashboardPage() {
     <div className="space-y-5">
       <WelcomeBanner
         cohortStartDate={cohortStartDate}
+        cohortEndDate={cohortEndDate}
         cohortName={cohortName}
+        cohortStatus={cohortStatus}
         nextSession={upcomingSessions[0]}
         lastLearning={recentLearningAssets[0]}
       />

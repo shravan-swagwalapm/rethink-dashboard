@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
     // ── Phase A: Fetch cohort metadata (needed for modules query) ──
     const { data: cohort, error: cohortError } = await adminClient
       .from('cohorts')
-      .select('id, name, start_date, active_link_type, linked_cohort_id')
+      .select('id, name, start_date, end_date, status, active_link_type, linked_cohort_id')
       .eq('id', cohortId)
       .single();
 
@@ -191,7 +191,12 @@ export async function GET(request: NextRequest) {
     const completedResources = (completedResult as { count: number | null }).count || 0;
 
     const response: StudentDashboardResponse = {
-      cohort: { name: cohort.name, start_date: cohort.start_date ?? null },
+      cohort: {
+        name: cohort.name,
+        start_date: cohort.start_date ?? null,
+        end_date: cohort.end_date ?? null,
+        status: cohort.status,
+      },
       stats: {
         total_students: totalStudents,
         attendance_percentage: Math.round(avgAttendance),

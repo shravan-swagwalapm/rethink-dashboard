@@ -1,15 +1,17 @@
 'use client';
 
 import { useUserContext } from '@/contexts/user-context';
-import { Zap, TrendingUp, ArrowRight, Play, Calendar } from 'lucide-react';
+import { Zap, TrendingUp, ArrowRight, Play, Calendar, CheckCircle2 } from 'lucide-react';
 import { format, differenceInDays, parseISO } from 'date-fns';
 import Link from 'next/link';
 import { useState, useEffect, useMemo } from 'react';
-import type { Session, ModuleResource } from '@/types';
+import type { Session, ModuleResource, CohortStatus } from '@/types';
 
 interface WelcomeBannerProps {
   cohortStartDate?: Date | null;
+  cohortEndDate?: Date | null;
   cohortName?: string;
+  cohortStatus?: CohortStatus;
   nextSession?: Session | null;
   lastLearning?: (ModuleResource & { progress?: { is_completed: boolean } }) | null;
 }
@@ -123,7 +125,7 @@ const orbits = [
   { rx: 70, ry: 25, cx: '68%', cy: '50%', speed: 12, dotSize: 2, color: 'hsl(172 50% 65%)', tilt: -5 },
 ];
 
-export function WelcomeBanner({ cohortStartDate, cohortName, nextSession, lastLearning }: WelcomeBannerProps) {
+export function WelcomeBanner({ cohortStartDate, cohortEndDate, cohortName, cohortStatus, nextSession, lastLearning }: WelcomeBannerProps) {
   const { profile } = useUserContext();
   const starLayers = useStarField();
 
@@ -136,7 +138,8 @@ export function WelcomeBanner({ cohortStartDate, cohortName, nextSession, lastLe
 
   const firstName = profile?.full_name?.split(' ')[0] || 'there';
   const daysUntilStart = cohortStartDate ? differenceInDays(cohortStartDate, new Date()) : null;
-  const hasStarted = daysUntilStart !== null && daysUntilStart <= 0;
+  const isCompleted = cohortStatus === 'completed';
+  const hasStarted = !isCompleted && daysUntilStart !== null && daysUntilStart <= 0;
 
   const getQuickAction = () => {
     if (nextSession) {
@@ -304,12 +307,17 @@ export function WelcomeBanner({ cohortStartDate, cohortName, nextSession, lastLe
             </h1>
             <div className="flex items-center gap-3 pt-1.5">
               {cohortName && <span className="text-base text-white/60 font-medium">{cohortName}</span>}
-              {cohortStartDate && (
+              {(cohortStartDate || isCompleted) && (
                 <>
                   <span className="w-px h-4 bg-white/20" />
-                  {hasStarted ? (
+                  {isCompleted ? (
+                    <span className="inline-flex items-center gap-1.5 text-base font-medium" style={{ color: 'hsl(210 70% 65%)' }}>
+                      <CheckCircle2 className="w-4 h-4" />
+                      Completed{cohortEndDate ? ` · ${format(cohortEndDate, 'MMM d, yyyy')}` : ''}
+                    </span>
+                  ) : hasStarted ? (
                     <span className="inline-flex items-center gap-1.5 text-base text-amber-400 font-medium">
-                      <Zap className="w-4 h-4" /> In progress since {format(cohortStartDate, 'MMM d')}
+                      <Zap className="w-4 h-4" /> In progress since {format(cohortStartDate!, 'MMM d')}
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-1.5 text-base text-emerald-400 font-medium">

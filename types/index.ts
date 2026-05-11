@@ -659,7 +659,12 @@ export interface AdminDashboardLearning {
 
 // Student BFF Dashboard Response
 export interface StudentDashboardResponse {
-  cohort: { name: string; start_date: string | null } | null;
+  cohort: {
+    name: string;
+    start_date: string | null;
+    end_date: string | null;
+    status: CohortStatus;
+  } | null;
   stats: DashboardStats;
   upcomingSessions: Session[];
   recentModules: LearningModule[];
