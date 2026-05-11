@@ -26,6 +26,7 @@ import {
   replaceCertificate,
   deleteCertificate,
   issueCertSignedUrl,
+  listCertificatesForUser,
   type CertificateFileInput,
 } from '@/lib/services/certificates';
 
@@ -524,5 +525,86 @@ describe('issueCertSignedUrl', () => {
       (c) => c.kind === 'storage' && c.op === 'createSignedUrl',
     );
     expect(signs).toHaveLength(0);
+  });
+});
+
+describe('listCertificatesForUser', () => {
+  it('Test 10 — listCertificatesForUser returns rows sorted DESC by end_date, NULLs last, ties broken by uploaded_at DESC', async () => {
+    // Four input rows that exercise every branch of the sort:
+    //   row1     : end_date 2026-03-01, uploaded 2026-03-02 (earlier upload)
+    //   row1Tie  : end_date 2026-03-01, uploaded 2026-03-05 (later upload — wins tie)
+    //   row2     : end_date 2025-12-15, uploaded 2025-12-20
+    //   rowNull  : end_date null,       uploaded 2026-04-01 (sinks despite recent upload)
+    //
+    // Expected order:
+    //   1. row1Tie (newest tie, latest uploaded_at)
+    //   2. row1    (loses tie)
+    //   3. row2
+    //   4. rowNull (NULLs LAST)
+    const rows = [
+      {
+        id: 'row2',
+        cohort_id: 'cohort-2',
+        file_type: 'application/pdf',
+        file_size: 1000,
+        uploaded_at: '2025-12-20T00:00:00Z',
+        cohorts: { name: 'Cohort 2', end_date: '2025-12-15' },
+      },
+      {
+        id: 'row1',
+        cohort_id: 'cohort-1',
+        file_type: 'application/pdf',
+        file_size: 1000,
+        uploaded_at: '2026-03-02T00:00:00Z',
+        cohorts: { name: 'Cohort 1', end_date: '2026-03-01' },
+      },
+      {
+        id: 'rowNull',
+        cohort_id: 'cohort-null',
+        file_type: 'application/pdf',
+        file_size: 1000,
+        uploaded_at: '2026-04-01T00:00:00Z',
+        cohorts: { name: 'No End Date Cohort', end_date: null },
+      },
+      {
+        id: 'row1Tie',
+        cohort_id: 'cohort-1-tie',
+        file_type: 'application/pdf',
+        file_size: 1000,
+        uploaded_at: '2026-03-05T00:00:00Z',
+        cohorts: { name: 'Cohort 1 Tie', end_date: '2026-03-01' },
+      },
+    ];
+
+    const mock = makeMockAdminClient({
+      tables: {
+        cohort_certificates: {
+          // `listCertificatesForUser` awaits `.select(...)` directly (no
+          // `.single()`), which in the mock resolves through the
+          // `select_single` slot. Returning the array shape here is correct.
+          select_single: { data: rows, error: null },
+        },
+      },
+    });
+
+    const result = await listCertificatesForUser(mock.client);
+
+    expect(result.map((r) => r.id)).toEqual([
+      'row1Tie',
+      'row1',
+      'row2',
+      'rowNull',
+    ]);
+    // Spot-check the joined-shape flattening on a representative row.
+    expect(result[0]).toMatchObject({
+      id: 'row1Tie',
+      cohort_id: 'cohort-1-tie',
+      cohort_name: 'Cohort 1 Tie',
+      cohort_end_date: '2026-03-01',
+      file_type: 'application/pdf',
+      file_size: 1000,
+      uploaded_at: '2026-03-05T00:00:00Z',
+    });
+    expect(result[3].cohort_end_date).toBeNull();
   });
 });

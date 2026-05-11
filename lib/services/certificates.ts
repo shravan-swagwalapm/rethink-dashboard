@@ -91,6 +91,16 @@ export type DeleteCertificateResult =
       };
     };
 
+export type RecipientCertificateRow = {
+  id: string;
+  cohort_id: string;
+  cohort_name: string | null;
+  cohort_end_date: string | null;
+  file_type: string;
+  file_size: number;
+  uploaded_at: string;
+};
+
 export type SignedUrlResult =
   | { ok: true; url: string; expiresIn: number }
   | {
@@ -411,4 +421,90 @@ export async function issueCertSignedUrl(
     url: (signed as { signedUrl: string }).signedUrl,
     expiresIn: SIGNED_URL_TTL_SECONDS,
   };
+}
+
+// ---------------------------------------------------------------------------
+// listCertificatesForUser
+// ---------------------------------------------------------------------------
+
+/**
+ * Recipient-side list of certificates. The caller MUST pass a user-scoped
+ * Supabase client (`createClient()`), not the admin client — RLS does the
+ * filtering, restricting rows to `auth.uid() = user_id` plus the joined
+ * cohort being in the `completed` state. Per the architectural convention,
+ * the route layer never embeds query construction here; that lives in the
+ * service module so it can be unit-tested in isolation.
+ *
+ * Sort contract:
+ *   1. `cohort_end_date DESC` (most recent on top).
+ *   2. NULL end dates sink to the bottom.
+ *   3. Ties on end_date are broken by `uploaded_at DESC` (deterministic ordering
+ *      when an admin issues two certs for cohorts that share an end date — the
+ *      most recently uploaded comes first).
+ *
+ * Throws on Supabase errors — the route catches and returns a 500. Same
+ * pattern as `replaceCertificate`/`deleteCertificate`'s discriminated-union
+ * is intentionally NOT used here: the read path has exactly one failure mode
+ * (DB error) and the route's catch-block surfaces it without branching.
+ */
+export async function listCertificatesForUser(
+  client: SupabaseClient,
+): Promise<RecipientCertificateRow[]> {
+  const { data, error } = await client
+    .from('cohort_certificates')
+    .select(
+      'id, cohort_id, file_type, file_size, uploaded_at, cohorts!inner(name, end_date)',
+    );
+
+  if (error) {
+    throw new Error(errMessage(error));
+  }
+
+  type Row = {
+    id: string;
+    cohort_id: string;
+    file_type: string;
+    file_size: number;
+    uploaded_at: string;
+    cohorts:
+      | { name: string | null; end_date: string | null }
+      | { name: string | null; end_date: string | null }[]
+      | null;
+  };
+
+  const flattened: RecipientCertificateRow[] = (
+    (data as Row[] | null) ?? []
+  ).map((row) => {
+    // PostgREST returns the joined table as either an object (when the FK is
+    // many-to-one and the embed resolves uniquely) or an array (when the
+    // relationship is ambiguous). Handle both shapes defensively.
+    const cohort = Array.isArray(row.cohorts) ? row.cohorts[0] : row.cohorts;
+    return {
+      id: row.id,
+      cohort_id: row.cohort_id,
+      cohort_name: cohort?.name ?? null,
+      cohort_end_date: cohort?.end_date ?? null,
+      file_type: row.file_type,
+      file_size: row.file_size,
+      uploaded_at: row.uploaded_at,
+    };
+  });
+
+  // Sort by end_date DESC NULLS LAST, tie-broken by uploaded_at DESC. Done
+  // here (not in the SELECT) because PostgREST's `nullsfirst/nullslast`
+  // modifier on a joined column is brittle — pushing it server-side would
+  // require a view. The N is small (one user's certs), so a client-side
+  // sort is cheap and the contract is testable.
+  flattened.sort((a, b) => {
+    if (a.cohort_end_date !== b.cohort_end_date) {
+      if (a.cohort_end_date === null) return 1;
+      if (b.cohort_end_date === null) return -1;
+      return a.cohort_end_date < b.cohort_end_date ? 1 : -1;
+    }
+    // Tie-break: same end_date (or both null) → most recently uploaded first.
+    if (a.uploaded_at === b.uploaded_at) return 0;
+    return a.uploaded_at < b.uploaded_at ? 1 : -1;
+  });
+
+  return flattened;
 }

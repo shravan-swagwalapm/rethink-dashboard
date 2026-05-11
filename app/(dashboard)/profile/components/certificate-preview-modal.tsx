@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -23,6 +23,34 @@ interface CertificatePreviewModalProps {
   cert: CertificatePreviewTarget | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+}
+
+/**
+ * Module-level helper for fetching a fresh signed URL for a certificate.
+ *
+ * Used by both the open-effect and the retry-button handler so the two paths
+ * share one error-narrowing contract. The caller owns the AbortController:
+ *
+ *   - open-effect: aborts on unmount / cert change (prevents a late resolution
+ *     from writing into the next cert's state).
+ *   - retry handler: aborts the previous in-flight retry on each click via a
+ *     ref-stored controller, and the open-effect's cleanup aborts retries too.
+ *
+ * Throws on non-ok response or shape mismatch — DOMException(name='AbortError')
+ * is the abort signal, which callers should swallow.
+ */
+async function fetchCertificateSignedUrl(
+  certId: string,
+  signal: AbortSignal,
+): Promise<string> {
+  const res = await fetch(`/api/certificates/${certId}/signed-url`, { signal });
+  const data = await res.json();
+  if (!res.ok || !data?.ok) {
+    throw new Error(
+      typeof data?.error === 'string' ? data.error : 'Failed to load certificate',
+    );
+  }
+  return data.url as string;
 }
 
 /**
@@ -50,6 +78,10 @@ export function CertificatePreviewModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
+  // A separate controller for retry-button fetches. Stored in a ref so a fresh
+  // retry can abort the previous in-flight retry (and the open-effect cleanup
+  // can abort retries when the user closes / switches certs mid-flight).
+  const retryControllerRef = useRef<AbortController | null>(null);
 
   // Fetch signed URL when the modal opens for a given cert. Reset when it
   // closes so the next open always re-fetches (sub-60s window for any
@@ -59,35 +91,40 @@ export function CertificatePreviewModal({
       setSignedUrl(null);
       setError(null);
       setLoading(false);
+      // Belt-and-suspenders: any retry still in flight from a previous open
+      // pass must not be allowed to setSignedUrl on the now-closed modal.
+      retryControllerRef.current?.abort();
+      retryControllerRef.current = null;
       return;
     }
 
-    let cancelled = false;
+    const controller = new AbortController();
     const run = async () => {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch(`/api/certificates/${cert.id}/signed-url`);
-        const data = (await res.json()) as
-          | { ok: true; url: string; expiresIn: number }
-          | { error: string; stage?: string };
-        if (cancelled) return;
-        if (!res.ok || !('ok' in data) || !data.ok) {
-          const message =
-            'error' in data ? data.error : 'Failed to load certificate';
-          setError(message);
-          return;
-        }
-        setSignedUrl(data.url);
-      } catch {
-        if (!cancelled) setError('Network error — please try again');
+        const url = await fetchCertificateSignedUrl(cert.id, controller.signal);
+        if (controller.signal.aborted) return;
+        setSignedUrl(url);
+      } catch (e) {
+        if (controller.signal.aborted) return;
+        const message =
+          e instanceof Error && e.message
+            ? e.message === 'Failed to fetch'
+              ? 'Network error — please try again'
+              : e.message
+            : 'Network error — please try again';
+        setError(message);
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     };
     void run();
     return () => {
-      cancelled = true;
+      controller.abort();
+      // Also kill any retry that was kicked off during this open pass.
+      retryControllerRef.current?.abort();
+      retryControllerRef.current = null;
     };
   }, [open, cert]);
 
@@ -176,29 +213,36 @@ export function CertificatePreviewModal({
               <Button
                 variant="outline"
                 size="sm"
+                disabled={loading}
                 onClick={() => {
-                  // Toggle a re-fetch by nudging the effect's dependency array.
-                  // Simpler: close+reopen. Here we just trigger another fetch by
-                  // resetting state and re-running.
+                  // Each retry gets its own AbortController stored in a ref so
+                  // a follow-up retry (or modal close, see effect cleanup)
+                  // aborts the previous one. Without this, triple-clicking
+                  // Retry would spawn three parallel fetches and the last to
+                  // resolve would win — including against a stale cert.
+                  retryControllerRef.current?.abort();
+                  const controller = new AbortController();
+                  retryControllerRef.current = controller;
                   setError(null);
                   setLoading(true);
-                  fetch(`/api/certificates/${cert.id}/signed-url`)
-                    .then(async (res) => {
-                      const data = (await res.json()) as
-                        | { ok: true; url: string }
-                        | { error: string };
-                      if (!res.ok || !('ok' in data) || !data.ok) {
-                        setError(
-                          'error' in data
-                            ? data.error
-                            : 'Failed to load certificate',
-                        );
-                        return;
-                      }
-                      setSignedUrl(data.url);
+                  fetchCertificateSignedUrl(cert.id, controller.signal)
+                    .then((url) => {
+                      if (controller.signal.aborted) return;
+                      setSignedUrl(url);
                     })
-                    .catch(() => setError('Network error — please try again'))
-                    .finally(() => setLoading(false));
+                    .catch((e: unknown) => {
+                      if (controller.signal.aborted) return;
+                      const message =
+                        e instanceof Error && e.message
+                          ? e.message === 'Failed to fetch'
+                            ? 'Network error — please try again'
+                            : e.message
+                          : 'Network error — please try again';
+                      setError(message);
+                    })
+                    .finally(() => {
+                      if (!controller.signal.aborted) setLoading(false);
+                    });
                 }}
               >
                 Retry
