@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdmin } from '@/lib/api/verify-admin';
 import { sanitizeFilterValue } from '@/lib/api/sanitize';
 import { sendCalendarInvitesToNewMember, removeCalendarInvitesFromOldCohort } from '@/lib/services/calendar-helpers';
+import { replaceUserRoleAssignments } from '@/lib/services/role-assignments';
 
 // GET - Fetch users and cohorts
 // Supports ?search= query param for RecipientSelector component
@@ -236,25 +237,39 @@ export async function PUT(request: NextRequest) {
         }
       }
 
-      // Delete existing assignments
-      await adminClient
-        .from('user_role_assignments')
-        .delete()
-        .eq('user_id', id);
-
-      // Insert new assignments
-      if (role_assignments.length > 0) {
-        const assignmentsToInsert = (role_assignments as RoleAssignment[]).map(ra => ({
-          user_id: id,
+      // Replace role assignments atomically (with app-level rollback on INSERT
+      // failure). Pre-Stage-1 this was an unchecked DELETE-then-INSERT — a
+      // failed INSERT could permanently lock the user out of admin routes
+      // since the profiles.role fallback is now gone (ADR-0003). See
+      // lib/services/role-assignments.ts.
+      const replaceResult = await replaceUserRoleAssignments(
+        adminClient,
+        id,
+        (role_assignments as RoleAssignment[]).map(ra => ({
           role: ra.role,
           cohort_id: ra.cohort_id,
-        }));
+        })),
+        (currentAssignments ?? []).map(ra => ({
+          role: ra.role,
+          cohort_id: ra.cohort_id,
+        })),
+      );
 
-        await adminClient
-          .from('user_role_assignments')
-          .insert(assignmentsToInsert);
+      if (!replaceResult.ok) {
+        return NextResponse.json(
+          {
+            error: 'Failed to update role assignments',
+            stage: replaceResult.error.stage,
+            detail: replaceResult.error.message,
+          },
+          { status: 500 }
+        );
+      }
 
-        // Update legacy profile fields with first assignment
+      // Update legacy profile fields with first assignment (no longer
+      // load-bearing for auth — canAdmin reads user_role_assignments — but
+      // kept until Stage 3 drops profiles.role).
+      if (role_assignments.length > 0) {
         const firstAssignment = role_assignments[0] as RoleAssignment;
         await adminClient
           .from('profiles')
