@@ -80,15 +80,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Return the upserted row joined with the file_type + uploaded_at metadata
-    // so the client can refresh its local view without a separate GET.
-    const { data: row } = await adminClient
-      .from('cohort_certificates')
-      .select('id, user_id, cohort_id, file_path, file_type, file_size, uploaded_by, uploaded_at')
-      .eq('id', result.row.id)
-      .single();
-
-    return NextResponse.json({ ok: true, certificate: row });
+    // Client calls fetchMembers() after a successful upload, so the route stays
+    // thin — no widening select needed here.
+    return NextResponse.json({ ok: true });
   } catch (error) {
     const message =
       error && typeof error === 'object' && 'message' in error

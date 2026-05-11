@@ -58,11 +58,12 @@ export async function GET(
       return NextResponse.json([]);
     }
 
-    // Deduplicate by user_id; mentor outranks student if both exist.
+    // Deduplicate by user_id; higher rank wins. Composes if future roles are added.
+    const ROLE_RANK = { student: 1, mentor: 2 } as const;
     const roleByUser = new Map<string, 'student' | 'mentor'>();
     for (const a of assignments as { user_id: string; role: 'student' | 'mentor' }[]) {
       const existing = roleByUser.get(a.user_id);
-      if (!existing || (existing === 'student' && a.role === 'mentor')) {
+      if (!existing || ROLE_RANK[a.role] > ROLE_RANK[existing]) {
         roleByUser.set(a.user_id, a.role);
       }
     }

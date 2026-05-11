@@ -209,7 +209,16 @@ export function CohortCertificatesSection({ cohortId, cohortName }: CohortCertif
       const body = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        throw new Error(body.error || `Upload failed (HTTP ${response.status})`);
+        // Surface the discriminated `reason` from the service's validate stage
+        // for actionable copy, falling back to the generic error message.
+        if (body?.reason === 'too_large') {
+          toast.error('File too large — maximum 10 MB');
+        } else if (body?.reason === 'invalid_type') {
+          toast.error('Invalid file type — only PNG, JPG, or PDF allowed');
+        } else {
+          toast.error(body.error || `Upload failed (HTTP ${response.status})`);
+        }
+        return;
       }
 
       const action = uploadTarget.certificate ? 'replaced' : 'uploaded';
@@ -361,6 +370,7 @@ export function CohortCertificatesSection({ cohortId, cohortName }: CohortCertif
                           variant="ghost"
                           size="sm"
                           onClick={() => openDelete(m)}
+                          aria-label={`Delete certificate for ${m.full_name || m.email}`}
                           className="text-red-600 hover:text-red-700 hover:bg-red-500/10"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -400,10 +410,11 @@ export function CohortCertificatesSection({ cohortId, cohortName }: CohortCertif
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
-            <Label>Certificate file</Label>
+            <Label htmlFor="cert-file-input">Certificate file</Label>
             <p className="text-xs text-muted-foreground">PNG, JPG, or PDF. Max 10 MB.</p>
             <div className="border-2 border-dashed rounded-lg p-4 text-center">
               <input
+                id="cert-file-input"
                 ref={fileInputRef}
                 type="file"
                 accept={ACCEPT_ATTR}
@@ -421,6 +432,7 @@ export function CohortCertificatesSection({ cohortId, cohortName }: CohortCertif
                   <Button
                     variant="ghost"
                     size="sm"
+                    aria-label="Remove selected file"
                     onClick={() => {
                       setSelectedFile(null);
                       if (fileInputRef.current) fileInputRef.current.value = '';
